@@ -87,6 +87,8 @@ class OpenAIProvider(LLMProvider):
         )
         latency_ms = int((time.monotonic() - start) * 1000)
 
+        if not response.choices:
+            raise ValueError("LLM returned empty response (no choices)")
         choice = response.choices[0]
         usage = response.usage
 
