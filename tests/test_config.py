@@ -65,17 +65,17 @@ class TestConfigInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestConfigBehavioral:
-    """Behavioral tests for config — should fail with NotImplementedError."""
+    """Behavioral tests for config — verify real implementation."""
 
-    def test_get_settings_raises_not_implemented(self):
-        """get_settings() should raise NotImplementedError until implemented."""
-        with pytest.raises(NotImplementedError):
-            get_settings()
+    def test_get_settings_returns_settings(self):
+        """get_settings() should return a Settings instance."""
+        s = get_settings()
+        assert isinstance(s, Settings)
 
     def test_settings_can_be_instantiated(self):
         """Settings() should construct with defaults."""

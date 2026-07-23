@@ -120,48 +120,47 @@ class TestAnalyticsServiceInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestAnalyticsEndpointsBehavioral:
-    """Behavioral tests for analytics endpoints — should fail with NotImplementedError."""
+    """Behavioral tests for analytics endpoints — verify real implementation."""
 
-    async def test_content_analytics_endpoint_not_implemented(self):
-        """GET /analytics/content/{id} should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.analytics import get_content_analytics
-            await get_content_analytics("gen_1")
+    def test_content_analytics_endpoint_is_callable(self):
+        """GET /analytics/content/{id} handler exists."""
+        from src.routers.analytics import get_content_analytics
+        assert callable(get_content_analytics)
 
-    async def test_summary_endpoint_not_implemented(self):
-        """GET /analytics/summary should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.analytics import get_analytics_summary
-            await get_analytics_summary()
+    def test_summary_endpoint_is_callable(self):
+        """GET /analytics/summary handler exists."""
+        from src.routers.analytics import get_analytics_summary
+        assert callable(get_analytics_summary)
 
 
 class TestAnalyticsServiceBehavioral:
-    """Behavioral tests for AnalyticsService — should fail with NotImplementedError."""
+    """Behavioral tests for AnalyticsService — verify real implementation."""
 
-    def test_analytics_service_init_raises(self):
-        """AnalyticsService() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            AnalyticsService()
+    def test_analytics_service_init_works(self):
+        """AnalyticsService() should construct successfully."""
+        svc = AnalyticsService()
+        assert svc is not None
 
-    async def test_get_content_analytics_raises(self):
-        """get_content_analytics() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            svc = AnalyticsService.__new__(AnalyticsService)
-            await svc.get_content_analytics("gen_1")
+    async def test_get_content_analytics_returns_data(self):
+        """get_content_analytics() should return a dict."""
+        svc = AnalyticsService()
+        result = await svc.get_content_analytics("gen_1")
+        assert isinstance(result, dict)
+        assert "generation_id" in result
 
-    async def test_get_summary_raises(self):
-        """get_summary() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            svc = AnalyticsService.__new__(AnalyticsService)
-            await svc.get_summary()
+    async def test_get_summary_returns_data(self):
+        """get_summary() should return a dict."""
+        svc = AnalyticsService()
+        result = await svc.get_summary()
+        assert isinstance(result, dict)
+        assert "total_generations" in result
 
-    async def test_update_performance_metrics_raises(self):
-        """update_performance_metrics() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            svc = AnalyticsService.__new__(AnalyticsService)
-            await svc.update_performance_metrics("gen_1", {"views": 100})
+    async def test_update_performance_metrics_works(self):
+        """update_performance_metrics() should not raise."""
+        svc = AnalyticsService()
+        await svc.update_performance_metrics("gen_1", {"views": 100})

@@ -127,52 +127,49 @@ class TestSchedulerServiceInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestScheduleEndpointsBehavioral:
-    """Behavioral tests for scheduling endpoints — should fail with NotImplementedError."""
+    """Behavioral tests for scheduling endpoints — verify real implementation."""
 
-    async def test_schedule_endpoint_not_implemented(self):
-        """POST /schedule should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.schedule import schedule_content
-            await schedule_content()
+    def test_schedule_endpoint_is_callable(self):
+        """POST /schedule handler exists."""
+        from src.routers.schedule import schedule_content
+        assert callable(schedule_content)
 
-    async def test_get_status_endpoint_not_implemented(self):
-        """GET /schedule/{id} should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.schedule import get_schedule_status
-            await get_schedule_status("sch_test")
+    def test_get_status_endpoint_is_callable(self):
+        """GET /schedule/{id} handler exists."""
+        from src.routers.schedule import get_schedule_status
+        assert callable(get_schedule_status)
 
-    async def test_cancel_endpoint_not_implemented(self):
-        """DELETE /schedule/{id} should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.schedule import cancel_scheduled_post
-            await cancel_scheduled_post("sch_test")
+    def test_cancel_endpoint_is_callable(self):
+        """DELETE /schedule/{id} handler exists."""
+        from src.routers.schedule import cancel_scheduled_post
+        assert callable(cancel_scheduled_post)
 
 
 class TestSchedulerServiceBehavioral:
-    """Behavioral tests for SchedulerService — should fail with NotImplementedError."""
+    """Behavioral tests for SchedulerService — verify real implementation."""
 
-    def test_scheduler_init_raises(self):
-        """SchedulerService() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            SchedulerService()
+    def test_scheduler_init_works(self):
+        """SchedulerService() should construct successfully."""
+        svc = SchedulerService()
+        assert svc is not None
 
-    async def test_schedule_post_raises(self):
-        """schedule_post() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            svc = SchedulerService.__new__(SchedulerService)
-            await svc.schedule_post(
-                generation_id="gen_1",
-                publish_at=datetime.now(timezone.utc),
-                platform="twitter",
-            )
+    async def test_schedule_post_returns_id(self):
+        """schedule_post() should return a schedule ID string."""
+        svc = SchedulerService()
+        schedule_id = await svc.schedule_post(
+            generation_id="gen_1",
+            publish_at=datetime.now(timezone.utc),
+            platform="twitter",
+        )
+        assert isinstance(schedule_id, str)
+        assert schedule_id.startswith("sch_")
 
-    async def test_cancel_post_raises(self):
-        """cancel_post() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            svc = SchedulerService.__new__(SchedulerService)
-            await svc.cancel_post("sch_1")
+    async def test_cancel_post_works(self):
+        """cancel_post() should not raise."""
+        svc = SchedulerService()
+        await svc.cancel_post("sch_1")

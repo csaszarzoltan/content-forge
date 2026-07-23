@@ -24,8 +24,9 @@ class TestDependenciesInterface:
     def test_get_db_importable(self):
         assert get_db is not None
 
-    def test_get_db_is_async_function(self):
-        assert inspect.iscoroutinefunction(get_db)
+    def test_get_db_is_async_generator(self):
+        import inspect
+        assert inspect.isasyncgenfunction(get_db)
 
     def test_get_settings_dep_importable(self):
         assert get_settings_dep is not None
@@ -51,19 +52,18 @@ class TestDependenciesInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestDependenciesBehavioral:
-    """Behavioral tests for dependencies — should fail with NotImplementedError."""
+    """Behavioral tests for dependencies — verify real implementation."""
 
-    def test_get_db_raises_not_implemented(self):
-        """get_db() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            pytest.skip("Async generator — tested in test_database.py")
+    def test_get_db_is_async_generator_real(self):
+        """get_db() should be an async generator for FastAPI DI."""
+        import inspect
+        assert inspect.isasyncgenfunction(get_db)
 
-    def test_get_settings_dep_raises_not_implemented(self):
-        """get_settings_dep() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            pytest.skip("Async — needs event loop")
+    def test_get_settings_dep_is_coroutine(self):
+        """get_settings_dep() should be an async function."""
+        assert inspect.iscoroutinefunction(get_settings_dep)

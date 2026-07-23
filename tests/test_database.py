@@ -55,8 +55,9 @@ class TestDatabaseInterface:
     def test_get_db_importable(self):
         assert get_db is not None
 
-    def test_get_db_is_async_function(self):
-        assert inspect.iscoroutinefunction(get_db)
+    def test_get_db_is_async_generator(self):
+        import inspect
+        assert inspect.isasyncgenfunction(get_db)
 
     def test_get_db_return_annotation(self):
         sig = inspect.signature(get_db)
@@ -65,27 +66,20 @@ class TestDatabaseInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestDatabaseBehavioral:
-    """Behavioral tests for database — should fail with NotImplementedError."""
+    """Behavioral tests for database — verify real implementation."""
 
-    def test_database_manager_init_raises(self):
-        """DatabaseManager() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            DatabaseManager(database_url="sqlite+aiosqlite:///./test.db")
+    def test_database_manager_init_works(self):
+        """DatabaseManager() should construct with a database URL."""
+        mgr = DatabaseManager(database_url="sqlite+aiosqlite:///./test.db")
+        assert mgr is not None
+        assert mgr._database_url == "sqlite+aiosqlite:///./test.db"
 
-    def test_get_db_raises_not_implemented(self):
-        """get_db() should raise NotImplementedError until implemented."""
-        with pytest.raises(NotImplementedError):
-            # Must actually iterate the async generator
-            gen = get_db()
-            import asyncio
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                pass  # not in event loop, can't test easily
-            # Async gen can't be called synchronously — skip runtime test
-            pytest.skip("Async generator requires event loop")
+    def test_get_db_is_async_generator(self):
+        """get_db() should return an async generator."""
+        import inspect
+        assert inspect.isasyncgenfunction(get_db)

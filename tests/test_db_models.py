@@ -137,25 +137,27 @@ class TestModelsPackage:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestBrandVoiceModelBehavioral:
-    """Behavioral tests for BrandVoice — stub methods should fail."""
+    """Behavioral tests for BrandVoice — verify real implementation."""
 
-    def test_brand_voice_soft_delete_raises(self):
-        """soft_delete() should raise NotImplementedError until implemented."""
-        assert callable(BrandVoice.soft_delete)
-        # Instantiating BrandVoice triggers SQLAlchemy mapper config for all
-        # related models — use __new__ to avoid that.
-        bv = object.__new__(BrandVoice)
-        with pytest.raises(NotImplementedError):
-            bv.soft_delete()
+    def test_brand_voice_soft_delete_works(self):
+        """soft_delete() should set deleted_at timestamp."""
+        from sqlalchemy.orm import configure_mappers
+        configure_mappers()
+        bv = BrandVoice(id="test", name="Test", profile_data={})
+        assert bv.deleted_at is None
+        bv.soft_delete()
+        assert bv.deleted_at is not None
 
-    def test_brand_voice_increment_version_raises(self):
-        """increment_version() should raise NotImplementedError until implemented."""
-        assert callable(BrandVoice.increment_version)
-        bv = object.__new__(BrandVoice)
-        with pytest.raises(NotImplementedError):
-            bv.increment_version()
+    def test_brand_voice_increment_version_works(self):
+        """increment_version() should bump version number."""
+        from sqlalchemy.orm import configure_mappers
+        configure_mappers()
+        bv = BrandVoice(id="test", name="Test", profile_data={}, version=1)
+        assert bv.version == 1
+        bv.increment_version()
+        assert bv.version == 2

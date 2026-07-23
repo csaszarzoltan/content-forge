@@ -131,36 +131,34 @@ class TestContentGeneratorInterface:
 
 
 # ============================================================================
-# SECTION 2 — BEHAVIORAL TESTS (should FAIL with NotImplementedError)
+# SECTION 2 — BEHAVIORAL TESTS (verify real implementation)
 # ============================================================================
 
 
 class TestContentEndpointsBehavioral:
-    """Behavioral tests for content generation — should fail with NotImplementedError."""
+    """Behavioral tests for content generation — verify real implementation."""
+    def test_router_registers_generate_content(self):
+        """POST /generate/{content_type} handler is registered."""
+        from src.routers.content import generate_content
+        assert callable(generate_content)
 
-    async def test_generate_endpoint_not_implemented(self):
-        """POST /generate/{content_type} should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.content import generate_content
-            await generate_content("blog")
-
-    async def test_generate_endpoint_validates_content_type(self):
-        """Should raise NotImplementedError for any content type."""
-        with pytest.raises(NotImplementedError):
-            from src.routers.content import generate_content
-            await generate_content("social")
+    def test_generate_content_validates_content_type(self):
+        """Invalid content_type should be rejected at the router level."""
+        from src.routers.content import VALID_CONTENT_TYPES
+        assert "blog" in VALID_CONTENT_TYPES
+        assert "social" in VALID_CONTENT_TYPES
+        assert "email" in VALID_CONTENT_TYPES
+        assert "invalid" not in VALID_CONTENT_TYPES
 
 
 class TestContentGeneratorBehavioral:
-    """Behavioral tests for ContentGenerator — should fail with NotImplementedError."""
+    """Behavioral tests for ContentGenerator — verify real implementation."""
+    def test_generator_init_works(self):
+        """ContentGenerator() should construct successfully."""
+        gen = ContentGenerator()
+        assert gen is not None
 
-    def test_generator_init_raises(self):
-        """ContentGenerator() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            ContentGenerator()
-
-    async def test_generate_method_raises(self):
-        """ContentGenerator.generate() should raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            gen = ContentGenerator.__new__(ContentGenerator)
-            await gen.generate("blog", "AI trends")
+    def test_generator_has_provider(self):
+        """ContentGenerator should have a _provider attribute after init."""
+        gen = ContentGenerator()
+        assert hasattr(gen, "_provider")
