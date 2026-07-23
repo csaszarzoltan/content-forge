@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1] — 2026-07-22
+
+### Documentation
+- Merged API documentation from scratch workspace to master — 6 new docs: API Overview, Content Generation API, Brand Voice API, Scheduling API, Analytics API, Deployment Guide
+- Added 5 new API example scripts: api_client.py, api_brand_voice.py, api_content_generation.py, api_scheduling.py, api_analytics.py
+- Updated README.md: test badge (172 → 315), API endpoint reference in Module Reference table, API Quick Start section, expanded Examples list
+
 ## [0.3.0] — 2026-07-22
 
 ### Features

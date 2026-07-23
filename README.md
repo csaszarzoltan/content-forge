@@ -2,11 +2,11 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-172%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-315%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Parse, manage, and inject brand voice profiles into LLM prompts for consistent, brand-aligned content generation. Ships with 5 built-in voice presets, 5 scenario templates, compliance scoring, and automatic voice extraction from existing content.
+Parse, manage, and inject brand voice profiles into LLM prompts for consistent, brand-aligned content generation. Ships with 5 built-in voice presets, 5 scenario templates, compliance scoring, automatic voice extraction from existing content, and a full REST API.
 
 ---
 
@@ -23,6 +23,11 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P1   | **Voice scoping** | `VoiceScope` with user-level and project-level voice resolution (project overrides user) |
 | P2   | **Compliance scoring** | `ComplianceScorer` with Flesch-Kincaid readability, banned term detection, vocabulary scoring |
 | P2   | **Voice extraction** | `VoiceExtractor` that infers a voice profile from existing text samples via keyword and style analysis |
+| P0   | **REST API** | FastAPI endpoints for brand voice CRUD, content generation, scheduling, and analytics |
+| P1   | **LLM integration** | OpenAI-compatible provider with configurable model, base URL, and content guard |
+| P1   | **Content generation** | Template-driven generation with brand voice injection and validation |
+| P1   | **Scheduling** | In-memory scheduling service with lifecycle management and status tracking |
+| P2   | **Analytics** | Content performance metrics tracking with summary aggregation |
 
 ## Installation
 
@@ -38,7 +43,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 172 tests pass
+pytest          # 315 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -102,6 +107,26 @@ print(f"Inferred formality: {profile.attributes[0].value}")
 print(f"Preferred words: {profile.vocabulary.preferred}")
 ```
 
+### 5. Use the REST API
+
+```python
+import httpx
+
+# List all brand voices
+resp = httpx.get("http://localhost:8000/brand-voices")
+print(resp.json())
+
+# Generate content with a brand voice
+resp = httpx.post("http://localhost:8000/content/generate", json={
+    "prompt": "Write a product announcement",
+    "brand_voice_id": 1,
+    "template": "launch",
+})
+print(resp.json())
+```
+
+See the [API Overview](docs/api-overview.md) for the complete endpoint reference.
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -117,6 +142,12 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Scoping](docs/scoping.md) | `VoiceScope` — user/project voice resolution, persistence |
 | [Compliance Scoring](docs/compliance.md) | `ComplianceScorer` — readability, banned terms, vocabulary scoring |
 | [Voice Extraction](docs/extraction.md) | `VoiceExtractor` — infer profiles from sample text |
+| [API Overview](docs/api-overview.md) | Complete REST endpoint reference (base URL, all endpoints, response schemas) |
+| [Content Generation API](docs/content-generation.md) | `POST /content/generate` — template-driven content generation with voice injection |
+| [Brand Voice API](docs/brand-voice-api.md) | `GET/POST/PUT/DELETE /brand-voices` — brand voice CRUD endpoints |
+| [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
+| [Analytics API](docs/analytics.md) | `GET/POST /analytics` — content performance metrics and summaries |
+| [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
 
 ## Examples
 
@@ -125,6 +156,11 @@ Ready-to-run examples in [examples/](examples/):
 - [basic_usage.py](examples/basic_usage.py) — End-to-end walkthrough
 - [presets.py](examples/presets.py) — Preset management CRUD
 - [compliance.py](examples/compliance.py) — Compliance scoring with different texts
+- [api_client.py](examples/api_client.py) — Full API client with brand voice CRUD, content generation, scheduling
+- [api_brand_voice.py](examples/api_brand_voice.py) — Brand voice API endpoint usage
+- [api_content_generation.py](examples/api_content_generation.py) — Content generation API workflows
+- [api_scheduling.py](examples/api_scheduling.py) — Scheduled post management via API
+- [api_analytics.py](examples/api_analytics.py) — Analytics API metrics and summaries
 
 ## Changelog
 
@@ -133,7 +169,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 172 tests (interface + behavioral)
+pytest              # 315 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```
