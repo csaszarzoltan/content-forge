@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-380%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-760%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -44,7 +44,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 380 tests pass
+pytest          # 760 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -127,6 +127,65 @@ print(resp.json())
 ```
 
 See the [API Overview](docs/api-overview.md) for the complete endpoint reference.
+
+## 🌐 Multi-Language Content Engine
+
+ContentForge supports **full multi-language content generation** — detect input language, select per-language prompt templates, score translation quality, and schedule cross-language publishing.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Language detection** | Auto-detect input language via `fast-langdetect` with confidence scoring, explicit override, and batch detection |
+| P0   | **Per-language prompt templates** | `PromptTemplateRegistry` with language-scoped templates, brand voice localization, and English fallback |
+| P0   | **Translation scoring** | BLEU + chrF scoring via `sacrebleu` for automated translation quality assessment |
+| P1   | **Translation service** | Dual path (LLM generation in target language + NMT-style translation) with quality gate |
+| P1   | **Multilingual scheduling** | Timezone-aware publishing, language-specific calendars, auto-translate on schedule, dependency chains |
+| P0   | **Languages API** | `GET /api/v1/languages` — list supported languages with ETag-based caching |
+| P0   | **Translate API** | `POST /api/v1/content/translate` — translate content between languages with quality scoring |
+
+### Usage
+
+```python
+# Language detection
+from contentforge.multilang import LanguageDetector
+detector = LanguageDetector()
+result = detector.detect("I want a blog post about cloud computing")
+print(result.language)   # "en"
+
+# Per-language template
+from contentforge.multilang import MultiLangTemplateManager
+tm = MultiLangTemplateManager()
+messages = tm.render("blog-post", language="hu", variables={
+    "topic": "Felhőalapú migráció",
+    "audience": "IT-vezetők",
+    "tone": "szakértői",
+    "word_count": 800,
+})
+
+# Translation quality scoring
+from contentforge.multilang.translation import QualityScorer
+scorer = QualityScorer()
+score = scorer.score("en", "hu", "Cloud migration reduces costs.",
+                     "A felhőalapú migráció csökkenti a költségeket.")
+print(f"BLEU: {score.bleu:.3f}, Passed: {score.passed}")
+
+# Multi-language scheduling
+scheduler = MultilingualScheduler()
+await scheduler.schedule_multilang(
+    source_generation_id="gen_abc",
+    source_language="en",
+    target_languages=["de", "hu"],
+    base_publish_at=datetime(2026, 8, 16, 14, 0, tzinfo=timezone.utc),
+    stagger_hours=6,
+)
+```
+
+See the per-feature guides in [docs/](docs/) for details:
+- [Language Detection](docs/language-detection.md)
+- [Prompt Templates](docs/prompt-templates.md)
+- [Translation Pipeline](docs/translation-pipeline.md)
+- [Multilingual Scheduling](docs/multilingual-scheduling.md)
 
 ## Authentication
 
@@ -327,8 +386,12 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Content Generation API](docs/content-generation.md) | `POST /content/generate` — template-driven content generation with voice injection |
 | [Brand Voice API](docs/brand-voice-api.md) | `GET/POST/PUT/DELETE /brand-voices` — brand voice CRUD endpoints |
 | [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
-| [Analytics API](docs/analytics.md) | `GET/POST /analytics` — content performance metrics and summaries |
-| [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
+|| [Analytics API](docs/analytics.md) | `GET/POST /analytics` — content performance metrics and summaries |
+|| [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
+|| [Language Detection](docs/language-detection.md) | Auto-detect input language with fast-langdetect, confidence scoring, batch detection |
+|| [Prompt Templates (per-language)](docs/prompt-templates.md) | Language-adaptive prompt templates, brand voice localization, fallback chain |
+|| [Translation Pipeline](docs/translation-pipeline.md) | BLEU/chrF quality scoring, cross-language consistency, post-processing |
+|| [Multilingual Scheduling](docs/multilingual-scheduling.md) | Timezone-aware publishing, language calendars, auto-translate, dependency chains |
 
 ## Examples
 
@@ -342,6 +405,7 @@ Ready-to-run examples in [examples/](examples/):
 - [api_content_generation.py](examples/api_content_generation.py) — Content generation API workflows
 - [api_scheduling.py](examples/api_scheduling.py) — Scheduled post management via API
 - [api_analytics.py](examples/api_analytics.py) — Analytics API metrics and summaries
+- [multilingual_generation.py](examples/multilingual_generation.py) — End-to-end multi-language pipeline (detection → templates → scoring → scheduling)
 
 ## Changelog
 
@@ -350,7 +414,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 315 tests (interface + behavioral)
+pytest              # 760 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```

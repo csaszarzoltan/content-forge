@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0] — 2026-07-25
+
+### Features
+- **Multi-Language Content Generation Engine** — Full multi-language pipeline with language detection, per-language prompt templates, translation quality scoring, and multilingual scheduling
+- **Language detection** — Auto-detect input language via `fast-langdetect` with confidence scoring, explicit override, and batch detection
+- **Per-language prompt templates** — `PromptTemplateRegistry` with language-scoped templates, brand voice adaptation, and fallback chain (missing language → English + translate wrapper)
+- **Translation quality scoring** — BLEU and chrF scoring via `sacrebleu` for automated quality assessment
+- **Translation service** — Dual path (LLM generation + NMT translation) with scoring pipeline
+- **Multilingual scheduling** — Timezone-aware publishing, language-specific calendars, auto-translate on schedule, cross-language dependency chains
+- **New API endpoints** — `POST /api/v1/content/translate` (translate content), `GET /api/v1/languages` (list supported languages with caching via ETag)
+- **Brand voice templates** — Per-language brand voice templates (de_blog, fr_social, ja_email) with locale-appropriate voice adaptation
+
+### Documentation
+- Added 4 new docs: language-detection.md, prompt-templates.md, translation-pipeline.md, scheduling.md
+- Added multilingual_generation.py example — end-to-end workflow from detection to scheduling
+- Updated README.md with 🌐 Multi-Language Content Engine section
+- Updated docs/api-overview.md and docs/deployment.md for multi-language endpoints and configuration
+
+### Tests
+- 380 new tests across 11 test modules (language detection, models, endpoint, translation, prompt templates, scoring, scheduling, auto-detection)
+- 760 passing, 27 skipped — ruff clean
+
 ## [0.4.0] — 2026-07-23
 
 ### Features
