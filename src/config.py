@@ -2,6 +2,7 @@
 
 Loaded from environment variables and/or .env file.
 """
+
 from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     SECRET_KEY: str = "change-me-in-production"
     HEALTH_CHECK_LLM: bool = False
+
+    # JWT authentication settings
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",

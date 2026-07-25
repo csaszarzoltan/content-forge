@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# runtime DB
+*.db
+contentforge.db

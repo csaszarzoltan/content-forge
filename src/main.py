@@ -7,11 +7,18 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy.ext.asyncio import create_async_engine
+
 from src.config import get_settings
+from src.database import Base
+from src.models import BrandVoice, ContentAnalytics, Generation, ScheduledPost, User  # noqa: F401
 from src.routers.analytics import router as analytics_router
+from src.routers.auth import router as auth_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.content import router as content_router
+from src.routers.languages import router as languages_router
 from src.routers.schedule import router as schedule_router
+from src.routers.translate import router as translate_router
 from src.services.scheduler import SchedulerService
 
 
@@ -21,6 +28,13 @@ async def lifespan(app: FastAPI):
     # Startup
     settings = get_settings()
     app.state.settings = settings
+
+    # Create database tables on startup
+    engine = create_async_engine(settings.DATABASE_URL)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
+
     app.state.scheduler = SchedulerService()
     await app.state.scheduler.start()
     yield
@@ -47,8 +61,11 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth_router)
 app.include_router(brand_voice_router)
 app.include_router(content_router)
+app.include_router(languages_router)
+app.include_router(translate_router)
 app.include_router(schedule_router)
 app.include_router(analytics_router)
 

@@ -20,6 +20,7 @@ class GenerationResult(BaseModel):
     model_used: str
     tokens_used: int
     latency_ms: int
+    language: str = "en"
 
 
 class ContentGenerator:
@@ -54,8 +55,18 @@ class ContentGenerator:
         if content_type not in valid_types:
             raise ValueError(f"Invalid content_type: {content_type}. Must be one of {valid_types}")
 
+        # Auto-detect topic language (AC-T7.1)
+        from src.services.language_detection import detect_language
+
+        lang_result = detect_language(topic)
+        detected_language = lang_result.language_code if lang_result.is_reliable else "en"
+
         # Build system prompt with brand voice context
         system_prompt = self._build_system_prompt(content_type, brand_voice_id)
+
+        # For non-English without brand_voice_id, augment with "Respond in {lang}" (AC-T7.3)
+        if detected_language != "en" and not brand_voice_id:
+            system_prompt += f"\nRespond in {detected_language}."
 
         # Build user prompt
         prompt = self._build_user_prompt(content_type, topic, kwargs)
@@ -85,6 +96,7 @@ class ContentGenerator:
             model_used=response.model_used,
             tokens_used=response.tokens_prompt + response.tokens_completion,
             latency_ms=latency_ms,
+            language=detected_language,
         )
 
     def _build_system_prompt(self, content_type: str, brand_voice_id: str | None) -> str:

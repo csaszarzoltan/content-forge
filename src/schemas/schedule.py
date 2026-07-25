@@ -27,6 +27,9 @@ class ScheduleRequest(BaseModel):
     platform_config: PlatformConfig = Field(default_factory=PlatformConfig)
     retry_on_failure: bool = True
     max_retries: int = 3
+    source_language: str | None = None
+    target_language: str | None = None
+    timezone: str | None = None
 
 
 class ScheduleResponse(BaseModel):
@@ -38,6 +41,9 @@ class ScheduleResponse(BaseModel):
     publish_at: datetime
     platform: str
     created_at: datetime
+    source_language: str | None = None
+    target_language: str | None = None
+    timezone: str | None = None
 
 
 class ScheduleStatusResponse(BaseModel):

@@ -27,6 +27,8 @@ class ScheduledPost(Base):
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     platform: Mapped[str] = mapped_column(String(30), nullable=False)  # twitter, linkedin, email, blog
     platform_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    target_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False
     )  # pending, publishing, published, failed

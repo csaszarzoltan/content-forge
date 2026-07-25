@@ -30,6 +30,7 @@ class Generation(Base):
     generated_text: Mapped[str] = mapped_column(Text, default="")
     compliance_scores: Mapped[dict] = mapped_column(JSON, default=dict)
     model_used: Mapped[str] = mapped_column(String(100), default="gpt-4o")
+    language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

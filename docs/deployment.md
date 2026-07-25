@@ -19,25 +19,57 @@ ContentForge is containerised and ready for deployment on [Railway](https://rail
 | `Dockerfile` | Python 3.11-slim container with uvicorn, health check, layer caching |
 | `railway.json` | Build/deploy config — Nixpacks builder, health check path, restart policy |
 
+### Live URL
+
+**Production:** https://contentforge-production-7e96.up.railway.app
+
 ### Deploy steps
 
-**Option A: Railway CLI**
+**Option A: Railway CLI (if project slot available)**
 
 ```bash
 # 1. Create a Railway project
 railway init --name contentforge
 
 # 2. Set environment variables
-railway vars set DATABASE_URL="postgresql+asyncpg://..."
-railway vars set LLM_API_KEY="sk-..."
-railway vars set SECRET_KEY="random-32-char-string"
-railway vars set ENVIRONMENT="production"
-railway vars set CORS_ORIGINS="https://myapp.com"
+railway variable set DATABASE_URL="postgresql+asyncpg://..."
+railway variable set LLM_API_KEY="sk-..."
+railway variable set SECRET_KEY="random-32-char-string"
+railway variable set ENVIRONMENT="production"
+railway variable set CORS_ORIGINS="https://myapp.com"
 
 # 3. Deploy
 railway up
 
-# 4. Open the deployed URL
+# 4. Generate a public domain
+railway domain
+
+# 5. Open the deployed URL
+railway open
+```
+
+**Option A2: Railway CLI (add as service to existing project)**
+
+```bash
+# 1. Link to an existing project
+railway link --project <existing-project>
+
+# 2. Create a new service
+railway add --service contentforge
+
+# 3. Link to the new service
+railway link --project <existing-project> --service contentforge
+
+# 4. Set environment variables
+railway variable set ENVIRONMENT=production SECRET_KEY="your-secret"
+
+# 5. Deploy
+railway up
+
+# 6. Generate a public domain
+railway domain
+
+# 7. Open the deployed URL
 railway open
 ```
 
@@ -51,13 +83,19 @@ railway open
 ### Verify deployment
 
 ```bash
-curl https://your-project.up.railway.app/health
+curl https://contentforge-production-7e96.up.railway.app/health
 ```
 
 Expected response:
 ```json
 {"status":"healthy","version":"0.3.0","timestamp":"...","checks":{"database":"ok","scheduler":"ok","llm_provider":"ok"}}
 ```
+
+### Notes
+
+- **Database tables** are auto-created on app startup via `Base.metadata.create_all()` in the lifespan handler. No manual migration step needed for SQLite.
+- **`$PORT` variable**: The `startCommand` in `railway.json` wraps `$PORT` with a shell (`sh -c '...'`) to ensure shell variable expansion works correctly.
+- **Service vs Project**: Railway free plan limits you to 2 **projects**, but you can add unlimited **services** per project. ContentForge was deployed as a service within the existing `locust-performance-kit` project.
 
 ---
 
@@ -74,27 +112,40 @@ Expected response:
 | `ENVIRONMENT` | No | `development` | Set to `production` in deployment. Controls debug mode and logging. |
 | `CORS_ORIGINS` | No | `*` | Comma-separated allowed CORS origins. In production, restrict to your frontend domain(s). |
 | `HEALTH_CHECK_LLM` | No | `false` | When `true`, the `/health` endpoint performs a live LLM connectivity check. |
+| `JWT_SECRET` | **Yes** | `change-me-in-production` | Secret key for JWT token signing. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. |
+| `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm (HS256, RS256, etc.). |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `15` | How long access tokens are valid, in minutes. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `30` | How long refresh tokens are valid, in days. |
 
 ---
 
 ## Railway free plan limits
 
-Railway's free tier allows **2 projects per account**. If you already have projects (e.g., `locust-performance-kit`, `receiptslens`), you'll see:
+Railway's free tier allows **2 projects per account** with unlimited services per project. If both project slots are occupied:
 
+**Strategy: Add as a service to an existing project**
+
+Instead of creating a new project (which would hit the 2-project limit), you can add a new service to an existing project:
+
+```bash
+# 1. Link to an existing project
+railway link --project <existing-project>
+
+# 2. Create the new service
+railway add --service contentforge
+
+# 3. Link to the new service
+railway link --project <existing-project> --service contentforge
+
+# 4. Set environment variables
+railway variable set ENVIRONMENT=production SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+
+# 5. Deploy
+railway up
+
+# 6. Generate a public domain
+railway domain
 ```
-Error: Free plan resource limit — 2 existing projects
-```
-
-**Workarounds:**
-
-1. **Upgrade to a paid Railway plan** — removes the project limit
-2. **Delete or archive an existing project**:
-   ```bash
-   railway project delete
-   railway init --name contentforge
-   railway up
-   ```
-3. **Use GitHub auto-deploy** — connect the repo via Railway dashboard (free tier limit still applies)
 
 ---
 

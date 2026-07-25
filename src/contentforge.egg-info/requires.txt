@@ -4,6 +4,8 @@ fastapi>=0.115.0
 uvicorn>=0.30.0
 sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.20.0
+python-jose[cryptography]>=3.5.0
+passlib[bcrypt]>=1.7.4
 
 [dev]
 pytest>=7.0

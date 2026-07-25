@@ -21,6 +21,9 @@ class SchedulerService:
         platform: str,
         platform_config: dict | None = None,
         max_retries: int = 3,
+        source_language: str | None = None,
+        target_language: str | None = None,
+        timezone: str | None = None,
     ) -> str:
         """Schedule a content piece for publishing.
 

@@ -42,6 +42,95 @@ The `llm_provider` check is passive by default — set `HEALTH_CHECK_LLM=true` t
 
 ---
 
+### `POST /auth/register`
+
+Register a new user account.
+
+**Request body:**
+```json
+{
+  "email": "alice@example.com",
+  "password": "secure-password-8chars",
+  "display_name": "Alice"
+}
+```
+
+**Response** (201 Created):
+```json
+{
+  "id": "a1b2c3d4-...",
+  "email": "alice@example.com",
+  "display_name": "Alice",
+  "role": "user",
+  "organization_id": null,
+  "created_at": "2026-07-23T17:39:00+00:00"
+}
+```
+
+**Errors:** `409 Conflict` — email already registered. `422 Unprocessable Entity` — password shorter than 8 characters or invalid email format.
+
+---
+
+### `POST /auth/login`
+
+Authenticate with email + password to receive a JWT token pair.
+
+**Request body:**
+```json
+{
+  "email": "alice@example.com",
+  "password": "secure-password-8chars"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+
+The `access_token` expires in 15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). The `refresh_token` expires in 30 days. Send the access token as `Authorization: Bearer <token>` on subsequent requests.
+
+**Errors:** `401 Unauthorized` — invalid email or password.
+
+---
+
+### `POST /auth/refresh`
+
+Exchange a valid refresh token for a new token pair. Issues a new token pair and updates the stored hash, but the previous refresh token remains valid until its JWT expiry (default 30 days).
+
+**Request body:**
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+**Response** (200 OK) — same shape as login response.
+
+**Errors:** `401 Unauthorized` — invalid, expired, or already-used refresh token.
+
+---
+
+### `GET /auth/me`
+
+Return the authenticated user's profile. Requires a valid Bearer access token.
+
+**Request headers:**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
+
+**Response** (200 OK) — same UserResponse shape as register.
+
+**Errors:** `401 Unauthorized` — missing, invalid, or expired token.
+
+---
+
 ### `POST /brand-voice`
 
 Create a brand voice profile.
@@ -332,7 +421,9 @@ All endpoints return standard HTTP status codes:
 | `200` | Success |
 | `201` | Created |
 | `204` | No Content (delete operations) |
+| `401` | Unauthorized (missing/invalid credentials) |
 | `404` | Resource not found |
+| `409` | Conflict (duplicate resource, e.g. email already registered) |
 | `422` | Validation error (invalid input) |
 | `500` | Internal server error |
 

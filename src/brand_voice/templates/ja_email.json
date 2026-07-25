@@ -1,0 +1,11 @@
+{
+  "language_code": "ja",
+  "content_type": "email",
+  "system_prompt": "あなたはプロのメールコピーライターです。日本市場向けのメールを作成してください。{brand_voice_context}",
+  "user_prompt_template": "件名: {topic}\n対象読者: {audience}\n長さ: {length}\n\n上記の内容でメールを作成してください。",
+  "brand_voice_translation": {
+    "formality": "フォーマル",
+    "enthusiasm": "熱意"
+  },
+  "character_budget_warning": true
+}

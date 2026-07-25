@@ -45,6 +45,7 @@ class BrandVoiceResponse(BaseModel):
     formatting: dict
     metadata: dict
     version: int
+    languages: list[str] = ["en"]
     created_at: datetime
     updated_at: datetime
 

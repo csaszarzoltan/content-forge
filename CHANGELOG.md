@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0] — 2026-07-23
+
+### Features
+- **JWT authentication** — Full auth system with register, login, token refresh, and current-user retrieval
+- **User accounts** — User model with email, password (bcrypt-hashed), display name, role, and organization_id
+- **Multi-tenant scoping** — `scope_query_by_user` dependency injects `current_user.id` into session for automatic query filtering
+- **Token refresh** — Refresh endpoints issue new token pairs and update stored hashes. Previous refresh tokens remain valid until JWT expiry (30 days); add a blacklist for full rotation in production.
+- **Optional auth** — `get_optional_current_user` dependency returns `None` for unauthenticated requests, ready for mixed public/protected endpoints
+
+### Documentation
+- Added Authentication section to README.md — registration, login, API usage, token refresh, multi-tenant scoping with runnable Python examples
+- Added JWT config to .env.example — JWT_SECRET, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+- Added auth endpoints to docs/api-overview.md — POST /auth/register, POST /auth/login, POST /auth/refresh, GET /auth/me
+- Added JWT environment variables to docs/deployment.md
+
+### Tests
+- 26 new auth integration tests (service layer + HTTP endpoints) — 380 total, zero failures
+- Test badge updated to 380 passing
+
 ## [0.3.1] — 2026-07-22
 
 ### Documentation

@@ -1,0 +1,11 @@
+{
+  "language_code": "fr",
+  "content_type": "social",
+  "system_prompt": "Vous êtes un rédacteur de contenu professionnel pour les réseaux sociaux en français. {brand_voice_context}",
+  "user_prompt_template": "Rédigez un post pour les réseaux sociaux sur : {topic}. Public cible : {audience}. Longueur : {length}.",
+  "brand_voice_translation": {
+    "formality": "formel",
+    "enthusiasm": "enthousiasme"
+  },
+  "character_budget_warning": false
+}

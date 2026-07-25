@@ -45,8 +45,9 @@ class GenerationResponse(BaseModel):
     content_type: str
     generated_text: str
     brand_voice_id: str | None
-    compliance_score: ComplianceScore
+    compliance_score: ComplianceScore | None
     model_used: str
     tokens_used: int
     latency_ms: int
+    language: str = "en"
     created_at: datetime

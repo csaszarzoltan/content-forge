@@ -2,7 +2,8 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-315%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-380%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -43,7 +44,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 315 tests pass
+pytest          # 380 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -126,6 +127,186 @@ print(resp.json())
 ```
 
 See the [API Overview](docs/api-overview.md) for the complete endpoint reference.
+
+## Authentication
+
+ContentForge uses **JWT-based authentication** with access and refresh tokens. All API endpoints require a valid Bearer token (except register and login).
+
+### Setup
+
+Set these environment variables (or add to `.env`):
+
+```bash
+JWT_SECRET=your-256-bit-secret             # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+JWT_ALGORITHM=HS256                         # Signing algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES=15              # Short-lived access tokens
+REFRESH_TOKEN_EXPIRE_DAYS=30                # Long-lived refresh tokens
+```
+
+### 1. Register a user
+
+```python
+import httpx
+
+base_url = "http://localhost:8000"
+
+# Register a new account
+resp = httpx.post(f"{base_url}/auth/register", json={
+    "email": "alice@example.com",
+    "password": "secure-password-8chars",
+    "display_name": "Alice",
+})
+print(resp.status_code)   # 201
+print(resp.json())
+# {
+#   "id": "a1b2c3d4-...",
+#   "email": "alice@example.com",
+#   "display_name": "Alice",
+#   "role": "user",
+#   "organization_id": None,
+#   "created_at": "2026-07-23T17:39:00+00:00"
+# }
+```
+
+The password is hashed with **bcrypt** before storage and is never returned in responses. Duplicate emails return `409 Conflict`.
+
+### 2. Login to obtain a JWT token pair
+
+```python
+# Login with email + password
+resp = httpx.post(f"{base_url}/auth/login", json={
+    "email": "alice@example.com",
+    "password": "secure-password-8chars",
+})
+print(resp.status_code)   # 200
+data = resp.json()
+print(data)
+# {
+#   "access_token": "eyJhbGciOiJIUzI1NiIs...",
+#   "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+#   "token_type": "bearer",
+#   "expires_in": 900      # seconds (15 min)
+# }
+
+access_token = data["access_token"]
+refresh_token = data["refresh_token"]
+```
+
+- **Access token** — short-lived (default 15 min). Sent with every authenticated request.
+- **Refresh token** — long-lived (default 30 days). Used to get new token pairs without re-logging in.
+
+### 3. Use the token in API requests
+
+Pass the access token via the `Authorization` header:
+
+```python
+headers = {"Authorization": f"Bearer {access_token}"}
+
+# Get the authenticated user's profile
+resp = httpx.get(f"{base_url}/auth/me", headers=headers)
+print(resp.status_code)   # 200
+print(resp.json())
+# {
+#   "id": "a1b2c3d4-...",
+#   "email": "alice@example.com",
+#   "display_name": "Alice",
+#   "role": "user",
+#   "organization_id": None,
+#   "created_at": "2026-07-23T17:39:00+00:00"
+# }
+
+# Protected API endpoints also use the same header:
+resp = httpx.get(f"{base_url}/brand-voices", headers=headers)
+print(resp.json())
+
+# Without a token, protected endpoints return 401:
+resp = httpx.get(f"{base_url}/auth/me")
+print(resp.status_code)   # 401
+print(resp.json())
+# {"detail": "Not authenticated"}
+```
+
+Invalid or expired tokens return `401 Unauthorized` with a `WWW-Authenticate: Bearer` header.
+
+### 4. Refresh tokens
+
+When the access token expires, use the refresh token to get a fresh pair:
+
+```python
+resp = httpx.post(f"{base_url}/auth/refresh", json={
+    "refresh_token": refresh_token,
+})
+print(resp.status_code)   # 200
+data = resp.json()
+
+new_access_token = data["access_token"]
+new_refresh_token = data["refresh_token"]   # new token issued; old one still valid until JWT expiry
+```
+
+**Token rotation** — each refresh call issues a new refresh token and updates the stored hash, but the previous refresh token remains valid until its JWT expiry (default 30 days). For production deployments, add a token blacklist or check the stored hash on refresh to fully invalidate compromised tokens.
+
+### 5. Full end-to-end workflow
+
+```python
+import httpx
+
+base_url = "http://localhost:8000"
+
+# Step 1: Register
+httpx.post(f"{base_url}/auth/register", json={
+    "email": "bot@example.com", "password": "pass-1234-5678",
+})
+
+# Step 2: Login
+login = httpx.post(f"{base_url}/auth/login", json={
+    "email": "bot@example.com", "password": "pass-1234-5678",
+}).json()
+token = login["access_token"]
+
+# Step 3: Use token for protected endpoints
+headers = {"Authorization": f"Bearer {token}"}
+me = httpx.get(f"{base_url}/auth/me", headers=headers).json()
+print(f"Logged in as {me['display_name']} ({me['role']})")
+
+# Step 4: Refresh when token expires
+new_tokens = httpx.post(f"{base_url}/auth/refresh", json={
+    "refresh_token": login["refresh_token"],
+}).json()
+print(f"New access token: {new_tokens['access_token'][:20]}...")
+```
+
+### Multi-tenant scoping
+
+ContentForge supports **multi-tenant isolation** through the `organization_id` field on each user:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `organization_id` | `str \| None` | Groups users into tenants. Set during registration or by an admin. |
+| `role` | `str` | Access level — `"user"` (default) or `"admin"`. |
+
+**How scoping works:**
+
+1. When a user authenticates, the `get_current_user` dependency extracts their identity from the JWT.
+2. The `scope_query_by_user` dependency injects `current_user.id` into the database session's `info` dict (`db.info["current_user_id"]`).
+3. Downstream CRUD endpoints that consume this dependency automatically filter queries by user ID or organization ID, ensuring users only see their own data.
+
+```python
+# Protected route using user-scoped session:
+@router.get("/brand-voices")
+async def list_brand_voices(
+    db: AsyncSession = Depends(scope_query_by_user),
+    current_user: User = Depends(get_current_user),
+):
+    # db.info["current_user_id"] is set → queries auto-scope by user
+    ...
+```
+
+**Best practices for multi-tenant apps:**
+
+- Set `organization_id` at registration time (or via an admin endpoint)
+- Use `scope_query_by_user` for all user-owned resources (brand voices, content, schedules, analytics)
+- For admin-only operations, check `current_user.role == "admin"`
+- Tokens don't encode tenant info — always look up the user's `organization_id` from the database
 
 ## Module Reference
 

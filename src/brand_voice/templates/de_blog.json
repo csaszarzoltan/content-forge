@@ -1,0 +1,11 @@
+{
+  "language_code": "de",
+  "content_type": "blog",
+  "system_prompt": "Du bist ein professioneller Content-Autor, der Blogbeiträge auf Deutsch verfasst. {brand_voice_context}",
+  "user_prompt_template": "Schreibe einen Blogbeitrag über: {topic}. Zielgruppe: {audience}. Länge: {length}.",
+  "brand_voice_translation": {
+    "formality": "formell",
+    "enthusiasm": "Begeisterung"
+  },
+  "character_budget_warning": false
+}
