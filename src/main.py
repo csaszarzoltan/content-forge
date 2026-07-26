@@ -18,6 +18,7 @@ from src.routers.brand_voice import router as brand_voice_router
 from src.routers.content import router as content_router
 from src.routers.languages import router as languages_router
 from src.routers.schedule import router as schedule_router
+from src.routers.seo import router as seo_router
 from src.routers.translate import router as translate_router
 from src.services.scheduler import SchedulerService
 
@@ -68,6 +69,7 @@ app.include_router(languages_router)
 app.include_router(translate_router)
 app.include_router(schedule_router)
 app.include_router(analytics_router)
+app.include_router(seo_router)
 
 
 @app.get("/")
