@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ContentForge",
-    version="0.6.0",
+    version="0.7.0",
     description="AI-powered content generation platform with brand voice customization",
     lifespan=lifespan,
 )

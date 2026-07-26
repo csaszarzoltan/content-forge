@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.0] — 2026-07-26
+
+### Features
+- **Social Media Auto-Publishing** — Full create→optimize→publish workflow with platform connectors
+- **SocialMediaConnector ABC** — Abstract base for platform adapters (publish, preview, validate_credentials)
+- **Twitter/X Publisher** — OAuth 1.0a signed API v2 posting with 280-char truncation and rate limiting
+- **LinkedIn Publisher** — OAuth 2.0 UGC post creation with text/link share support
+- **Rate Limiting** — Token bucket algorithm per platform (Twitter: 300/15min, LinkedIn: 750/day)
+- **PlatformToken Model** — Encrypted OAuth token storage per user per platform via Fernet
+- **PublishService** — Orchestrator: resolve connector → rate limit → publish → status update → retry
+- **New API endpoint** — `POST /api/v1/publish` — publish content to social platforms
+- **Publishing Status Tracking** — scheduled → publishing → published | failed lifecycle
+
+### Dependencies
+- Promoted `httpx` from dev to core dependency (required for async HTTP calls to platform APIs)
+- Added `cryptography` (required for Fernet token encryption)
+
+### Tests
+- 128 new tests across connectors, rate limiter, publish endpoint, publish service, integration
+- Total: 1209 passing, 27 skipped — ruff clean
+
 ## [0.6.0] — 2026-07-26
 
 ### Features
