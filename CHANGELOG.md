@@ -1,6 +1,23 @@
 # Changelog
 
-## [0.5.0] — 2026-07-25
+## [0.6.0] — 2026-07-26
+
+### Features
+- **SEO Content Optimization Engine** — Full SEO analysis pipeline with 6 specialized services
+- **SEO Analyzer** — Keyword density, word/sentence/paragraph counting, content quality scoring (thin/adequate/comprehensive)
+- **Readability Scorer** — Flesch-Kincaid Grade Level, Coleman-Liau Index, Flesch Reading Ease with reading level classification
+- **Meta Tag Generator** — Title tag and meta description truncation with "..." suffix, Open Graph tags (og:title, og:description, og:url, og:type), canonical URL normalization
+- **SERP Preview Generator** — Google-style search result HTML snippets with HTML escaping, breadcrumb navigation from URL paths
+- **JSON-LD Generator** — Schema.org Article, BlogPosting, and WebPage structured data markup
+- **Internal Linker** — TF-IDF scoring for term relevance, content-based link suggestions with relevance ranking (max 10 suggestions)
+- **New API endpoint** — `POST /api/v1/seo/analyze` — full SEO analysis: content score, readability, meta tags, SERP preview, JSON-LD, internal link suggestions
+
+### Dependencies
+- Added `textstat` (>=0.7) — readability scoring formulas
+
+### Tests
+- 229 new SEO tests (interface contracts + behavioral verification across all 6 services and API endpoint)
+- 1209 total tests — 229 SEO + 980 non-auth regression passing, 27 skipped, ruff clean
 
 ### Features
 - **Multi-Language Content Generation Engine** — Full multi-language pipeline with language detection, per-language prompt templates, translation quality scoring, and multilingual scheduling
