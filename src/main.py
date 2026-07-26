@@ -17,9 +17,11 @@ from src.routers.auth import router as auth_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.content import router as content_router
 from src.routers.languages import router as languages_router
+from src.routers.publish import router as publish_router
 from src.routers.schedule import router as schedule_router
 from src.routers.seo import router as seo_router
 from src.routers.translate import router as translate_router
+from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 
 
@@ -35,6 +37,27 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
+
+    # Initialize social media connectors
+    from src.connectors.linkedin import LinkedInConnector
+    from src.connectors.twitter import TwitterConnector
+
+    connectors: dict = {}
+    if settings.TWITTER_API_KEY:
+        connectors["twitter"] = TwitterConnector(
+            api_key=settings.TWITTER_API_KEY,
+            api_secret=settings.TWITTER_API_SECRET,
+            access_token=settings.TWITTER_ACCESS_TOKEN,
+            access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
+        )
+    if settings.LINKEDIN_CLIENT_ID:
+        connectors["linkedin"] = LinkedInConnector(
+            client_id=settings.LINKEDIN_CLIENT_ID,
+            client_secret=settings.LINKEDIN_CLIENT_SECRET,
+            access_token="",
+        )
+
+    app.state.publish_service = PublishService(connectors=connectors)
 
     app.state.scheduler = SchedulerService()
     await app.state.scheduler.start()
@@ -67,6 +90,7 @@ app.include_router(brand_voice_router)
 app.include_router(content_router)
 app.include_router(languages_router)
 app.include_router(translate_router)
+app.include_router(publish_router)
 app.include_router(schedule_router)
 app.include_router(analytics_router)
 app.include_router(seo_router)
