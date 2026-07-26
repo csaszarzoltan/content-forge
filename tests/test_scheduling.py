@@ -173,3 +173,77 @@ class TestSchedulerServiceBehavioral:
         """cancel_post() should not raise."""
         svc = SchedulerService()
         await svc.cancel_post("sch_1")
+
+    async def test_schedule_post_generates_unique_ids(self):
+        """Each schedule_post() call should generate a unique ID."""
+        svc = SchedulerService()
+        id1 = await svc.schedule_post(
+            generation_id="gen_u1", publish_at=datetime.now(timezone.utc), platform="twitter",
+        )
+        id2 = await svc.schedule_post(
+            generation_id="gen_u2", publish_at=datetime.now(timezone.utc), platform="linkedin",
+        )
+        assert id1 != id2
+        assert id1.startswith("sch_")
+        assert id2.startswith("sch_")
+
+    async def test_schedule_post_different_platforms(self):
+        """schedule_post() should accept both 'twitter' and 'linkedin' platforms."""
+        svc = SchedulerService()
+        now = datetime.now(timezone.utc)
+        tid = await svc.schedule_post(generation_id="g1", publish_at=now, platform="twitter")
+        lid = await svc.schedule_post(generation_id="g2", publish_at=now, platform="linkedin")
+        assert isinstance(tid, str)
+        assert isinstance(lid, str)
+        assert tid.startswith("sch_")
+        assert lid.startswith("sch_")
+
+    async def test_schedule_post_with_config(self):
+        """schedule_post() should accept platform_config."""
+        svc = SchedulerService()
+        sid = await svc.schedule_post(
+            generation_id="g3",
+            publish_at=datetime.now(timezone.utc),
+            platform="twitter",
+            platform_config={"max_retries": 5},
+        )
+        assert isinstance(sid, str)
+
+    async def test_schedule_post_with_languages(self):
+        """schedule_post() should accept source and target language."""
+        svc = SchedulerService()
+        sid = await svc.schedule_post(
+            generation_id="g4",
+            publish_at=datetime.now(timezone.utc),
+            platform="twitter",
+            source_language="en",
+            target_language="de",
+        )
+        assert isinstance(sid, str)
+
+    async def test_get_post_status_returns_dict(self):
+        """get_post_status() should return a dict with schedule status."""
+        svc = SchedulerService()
+        status = await svc.get_post_status("sch_test123")
+        assert isinstance(status, dict)
+        assert status["schedule_id"] == "sch_test123"
+        assert "status" in status
+
+    async def test_get_post_status_after_schedule(self):
+        """get_post_status() should work for scheduled IDs."""
+        svc = SchedulerService()
+        sid = await svc.schedule_post(
+            generation_id="g5", publish_at=datetime.now(timezone.utc), platform="twitter",
+        )
+        status = await svc.get_post_status(sid)
+        assert status["schedule_id"] == sid
+
+    async def test_start_and_shutdown(self):
+        """start() and shutdown() should toggle running state."""
+        svc = SchedulerService()
+        # Not running initially
+        assert not svc._running
+        await svc.start()
+        assert svc._running
+        await svc.shutdown()
+        assert not svc._running

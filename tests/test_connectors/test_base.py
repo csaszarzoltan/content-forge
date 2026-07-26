@@ -100,3 +100,45 @@ class TestConnectorsPackage:
         from src import connectors
 
         assert connectors is not None
+
+    def test_connectors_init_exports(self):
+        """Connectors __init__ should export SocialMediaConnector."""
+        from src.connectors import SocialMediaConnector
+
+        assert SocialMediaConnector is not None
+
+
+class TestSocialMediaConnectorErrorHierarchy:
+    """Verify the connector error hierarchy."""
+
+    def test_connector_error_importable(self):
+        from src.connectors.errors import ConnectorError
+        assert ConnectorError is not None
+        assert issubclass(ConnectorError, Exception)
+
+    def test_publish_error_is_connector_error(self):
+        from src.connectors.errors import ConnectorError, PublishError
+        assert issubclass(PublishError, ConnectorError)
+
+    def test_auth_error_is_publish_error(self):
+        from src.connectors.errors import AuthError, PublishError
+        assert issubclass(AuthError, PublishError)
+
+    def test_rate_limit_error_is_publish_error(self):
+        from src.connectors.errors import PublishError, RateLimitError
+        assert issubclass(RateLimitError, PublishError)
+
+    def test_auth_error_string_representation(self):
+        from src.connectors.errors import AuthError
+        err = AuthError("Invalid token")
+        assert "Invalid token" in str(err)
+
+    def test_rate_limit_error_string_representation(self):
+        from src.connectors.errors import RateLimitError
+        err = RateLimitError("Too many requests")
+        assert "Too many requests" in str(err)
+
+    def test_publish_error_string_representation(self):
+        from src.connectors.errors import PublishError
+        err = PublishError("Publication failed")
+        assert "Publication failed" in str(err)

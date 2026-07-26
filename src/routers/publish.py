@@ -87,6 +87,19 @@ async def publish_content(
     )
 
 
+@router.get("/status")
+async def list_publish_status(
+    request: Request,
+    status_filter: str | None = None,
+    current_user=Depends(get_optional_current_user),  # noqa: B008
+):
+    """List publish operations, optionally filtered by status."""
+    _get_publish_service(request)  # ensures service exists (logs if not)
+
+    # Basic listing — all statuses for now
+    return {"statuses": [], "filter": status_filter}
+
+
 @router.get("/{publish_id}")
 async def get_publish_status(
     publish_id: str,
@@ -103,16 +116,3 @@ async def get_publish_status(
         retry_count=status_data.get("retry_count", 0),
         error_message=status_data.get("error"),
     )
-
-
-@router.get("/status")
-async def list_publish_status(
-    request: Request,
-    status_filter: str | None = None,
-    current_user=Depends(get_optional_current_user),  # noqa: B008
-):
-    """List publish operations, optionally filtered by status."""
-    _get_publish_service(request)  # ensures service exists (logs if not)
-
-    # Basic listing — all statuses for now
-    return {"statuses": [], "filter": status_filter}
