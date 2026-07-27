@@ -19,6 +19,7 @@ dependencies = [
     "fast-langdetect>=1.0",
     "sacrebleu>=1.0",
     "textstat>=0.7",
+    "scipy>=1.14.0",
 ]
 
 [project.optional-dependencies]
