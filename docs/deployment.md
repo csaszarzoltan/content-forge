@@ -116,6 +116,13 @@ Expected response:
 | `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm (HS256, RS256, etc.). |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `15` | How long access tokens are valid, in minutes. |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | No | `30` | How long refresh tokens are valid, in days. |
+| `ENCRYPTION_KEY` | Yes (prod) | `""` | Fernet key for token encryption (32 url-safe base64 bytes). Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `TWITTER_API_KEY` | No | `""` | Twitter/X API v2 key. |
+| `TWITTER_API_SECRET` | No | `""` | Twitter/X API v2 secret. |
+| `TWITTER_ACCESS_TOKEN` | No | `""` | OAuth 1.0a user access token for Twitter/X. |
+| `TWITTER_ACCESS_TOKEN_SECRET` | No | `""` | OAuth 1.0a user access token secret for Twitter/X. |
+| `LINKEDIN_CLIENT_ID` | No | `""` | LinkedIn OAuth 2.0 client ID. |
+| `LINKEDIN_CLIENT_SECRET` | No | `""` | LinkedIn OAuth 2.0 client secret. |
 
 ---
 

@@ -75,4 +75,5 @@ print(engine.render("launch", profile))
 
 - [README.md](../README.md) — Project overview and quick start
 - [CHANGELOG.md](../CHANGELOG.md) — Version history
+- [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples

@@ -86,14 +86,14 @@ Authenticate with email + password to receive a JWT token pair.
 **Response** (200 OK):
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "access_token": "eyJhbG...NiIs...",
+  "refresh_token": "eyJhbG...NiIs...",
   "token_type": "bearer",
   "expires_in": 900
 }
 ```
 
-The `access_token` expires in 15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). The `refresh_token` expires in 30 days. Send the access token as `Authorization: Bearer <token>` on subsequent requests.
+The `access_token` expires in 15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`). The `refresh_token` expires in 30 days. Send the access token as `Authorization: Bearer *** on subsequent requests.
 
 **Errors:** `401 Unauthorized` — invalid email or password.
 
@@ -106,7 +106,7 @@ Exchange a valid refresh token for a new token pair. Issues a new token pair and
 **Request body:**
 ```json
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+  "refresh_token": "eyJhbG...NiIs..."
 }
 ```
 
@@ -122,7 +122,7 @@ Return the authenticated user's profile. Requires a valid Bearer access token.
 
 **Request headers:**
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Authorization: Bearer eyJhbG...s...
 ```
 
 **Response** (200 OK) — same UserResponse shape as register.
@@ -409,6 +409,100 @@ Get aggregate analytics across all content.
   "avg_engagement_rate": 0.0
 }
 ```
+
+---
+
+### `POST /api/v1/publish`
+
+Publish generated content to a social media platform.
+
+**Request body:**
+
+```json
+{
+  "generation_id": "gen_a1b2c3d4e5f6",
+  "platform": "twitter",
+  "text": "Check out our latest blog post on microservices vs monoliths!",
+  "platform_config": {}
+}
+```
+
+**Request fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `generation_id` | Yes | string | ID of the generated content to publish |
+| `platform` | Yes | string | Target platform — `"twitter"` or `"linkedin"` |
+| `text` | No | string | Content text to publish (default: `""`) |
+| `platform_config` | No | object | Platform-specific config (`article_url`, `article_title`) |
+
+**Platform-specific `platform_config`:** for `linkedin`, pass `article_url` (string) and `article_title` (string) to create a link share post.
+
+**Response** (201 Created):
+
+```json
+{
+  "publish_id": "pub_a1b2c3d4e5f6",
+  "generation_id": "gen_a1b2c3d4e5f6",
+  "platform": "twitter",
+  "status": "published",
+  "platform_url": "https://twitter.com/user/status/1234567890",
+  "created_at": "2026-07-26T12:00:00+00:00"
+}
+```
+
+**Errors:** `422` — invalid platform. `500` — auth failure or rate limit exhausted.
+
+---
+
+### `GET /api/v1/publish/{publish_id}`
+
+Get the status of a publish operation.
+
+```bash
+curl http://localhost:8000/api/v1/publish/pub_a1b2c3d4e5f6
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "publish_id": "pub_a1b2c3d4e5f6",
+  "status": "published",
+  "retry_count": 0,
+  "error_message": null
+}
+```
+
+Status values: `published`, `failed`, `not_found`.
+
+---
+
+### `GET /api/v1/publish/status`
+
+List publish operations, optionally filtered by status.
+
+```bash
+curl http://localhost:8000/api/v1/publish/status
+curl "http://localhost:8000/api/v1/publish/status?status_filter=published"
+```
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `status_filter` | string | `null` | Filter by status value |
+
+**Response** (200 OK):
+
+```json
+{
+  "statuses": [],
+  "filter": null
+}
+```
+
+> **Note:** The listing endpoint is an in-memory stub — it always returns an empty `statuses` array. Persistent tracking is planned.
 
 ---
 

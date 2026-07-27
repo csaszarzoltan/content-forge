@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-760%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-1209%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -29,6 +29,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P1   | **Content generation** | Template-driven generation with brand voice injection and validation |
 | P1   | **Scheduling** | In-memory scheduling service with lifecycle management and status tracking |
 | P2   | **Analytics** | Content performance metrics tracking with summary aggregation |
+| P1   | **Social Media Publishing** | Pluggable platform connectors (Twitter/X, LinkedIn) with rate limiting, retry, and status tracking |
 
 ## Installation
 
@@ -367,6 +368,41 @@ async def list_brand_voices(
 - For admin-only operations, check `current_user.role == "admin"`
 - Tokens don't encode tenant info — always look up the user's `organization_id` from the database
 
+## 📱 Social Media Publishing
+
+ContentForge can publish generated content directly to Twitter/X and LinkedIn through a pluggable connector architecture. Each platform has a dedicated connector implementing the `SocialMediaConnector` abstract base class with per-platform rate limiting, automatic retry on transient errors, and Fernet-encrypted credential storage.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Platform connectors** | Twitter/X (OAuth 1.0a) and LinkedIn (OAuth 2.0) with character limit handling |
+| P0   | **Rate limiting** | Token bucket algorithm per platform with configurable burst capacity and refill rate |
+| P0   | **Publish API** | `POST /api/v1/publish` — publish content, `GET /api/v1/publish/{id}` — check status |
+| P1   | **Token encryption** | Fernet symmetric encryption for platform OAuth tokens at rest |
+| P1   | **Status tracking** | In-memory publish status with retry count and error messages |
+
+### Usage
+
+```python
+import httpx
+
+# Publish to Twitter
+resp = httpx.post("http://localhost:8000/api/v1/publish", json={
+    "generation_id": "gen_a1b2c3d4e5f6",
+    "platform": "twitter",
+    "text": "Check out our latest blog post!",
+})
+print(resp.json())
+# {"publish_id": "pub_...", "status": "published", ...}
+
+# Check status
+status = httpx.get(f"http://localhost:8000/api/v1/publish/{resp.json()['publish_id']}")
+print(status.json())
+```
+
+See the [Social Media Publishing Guide](docs/social-publishing.md) for full connector API, configuration, rate limit details, and production readiness considerations.
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -388,6 +424,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
 || [Analytics API](docs/analytics.md) | `GET/POST /analytics` — content performance metrics and summaries |
 || [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
+|| [Social Media Publishing](docs/social-publishing.md) | Platform connectors, rate limiting, publish API, production readiness |
 || [Language Detection](docs/language-detection.md) | Auto-detect input language with fast-langdetect, confidence scoring, batch detection |
 || [Prompt Templates (per-language)](docs/prompt-templates.md) | Language-adaptive prompt templates, brand voice localization, fallback chain |
 || [Translation Pipeline](docs/translation-pipeline.md) | BLEU/chrF quality scoring, cross-language consistency, post-processing |
@@ -414,7 +451,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 760 tests (interface + behavioral)
+pytest              # 1209 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```
