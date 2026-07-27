@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import get_settings
 from src.database import Base
-from src.models import BrandVoice, ContentAnalytics, Generation, ScheduledPost, User  # noqa: F401
+from src.models import ABEvent, ABTest, ABVariant, BrandVoice, ContentAnalytics, Generation, ScheduledPost, User  # noqa: F401
+from src.routers.ab_test import router as ab_router
 from src.routers.analytics import router as analytics_router
 from src.routers.auth import router as auth_router
 from src.routers.brand_voice import router as brand_voice_router
@@ -92,6 +93,7 @@ app.include_router(languages_router)
 app.include_router(translate_router)
 app.include_router(publish_router)
 app.include_router(schedule_router)
+app.include_router(ab_router)
 app.include_router(analytics_router)
 app.include_router(seo_router)
 
