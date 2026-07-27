@@ -2,6 +2,7 @@
 
 All models inherit from :class:`src.database.Base`.
 """
+from src.models.ab_test import ABEvent, ABTest, ABVariant
 from src.models.analytics import ContentAnalytics
 from src.models.brand_voice import BrandVoice
 from src.models.ab_test import ABEvent, ABTest, ABVariant
