@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.0] — 2026-07-27
+
+### Features
+- **A/B Testing Framework** — Full statistical A/B test lifecycle with chi-squared significance calculator
+- **ABTestService** — Service layer covering create, track track events, conclude with winner, and result retrieval
+- **AbStatsService** — Chi-squared significance calculator using scipy for statistical validity
+- **6 REST API endpoints** — `POST /api/v1/ab/experiments`, `POST /api/v1/ab/experiments/{id}/track`, `GET /api/v1/ab/experiments/{id}/results`, `POST /api/v1/ab/experiments/{id}/conclude`, `GET /api/v1/ab/experiments`, `GET /api/v1/ab/dashboard`
+- **Dashboard aggregation** — Summary endpoint for experiment overview with status breakdown
+
+### Tests
+- 109 new A/B testing tests covering all service layers, statistical calculations, and API endpoints
+- Total: 1318 passing, 27 skipped
+
+### Docs
+- Added social media publishing documentation (api-overview, dedicated guide)
+- Updated README with social publishing feature row and corrected test count badge
+
+### Fixes
+- Replaced truncated JWT token examples with `***` placeholders in API docs
+
 ## [0.7.0] — 2026-07-26
 
 ### Features
