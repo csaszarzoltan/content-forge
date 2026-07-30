@@ -1,11 +1,14 @@
 """ContentForge - AI-powered content generation platform."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import get_settings
@@ -30,6 +33,7 @@ from src.routers.publish import router as publish_router
 from src.routers.schedule import router as schedule_router
 from src.routers.seo import router as seo_router
 from src.routers.translate import router as translate_router
+from src.routers.workspaces import router as workspaces_router
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 
@@ -77,7 +81,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ContentForge",
-    version="0.7.0",
+    version="0.9.0",
     description="AI-powered content generation platform with brand voice customization",
     lifespan=lifespan,
 )
@@ -104,12 +108,16 @@ app.include_router(schedule_router)
 app.include_router(ab_router)
 app.include_router(analytics_router)
 app.include_router(seo_router)
+app.include_router(workspaces_router)
+app.mount(
+    "/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static"
+)
 
 
 @app.get("/")
 async def root():
     """Root endpoint — returns API version info."""
-    return {"message": "ContentForge API", "version": "0.3.0"}
+    return {"message": "ContentForge API", "version": "0.9.0"}
 
 
 @app.get("/health")
@@ -117,7 +125,7 @@ async def health():
     """Health check endpoint for Railway deployment."""
     return {
         "status": "healthy",
-        "version": "0.3.0",
+        "version": "0.9.0",
         "timestamp": datetime.now(UTC).isoformat(),
         "checks": {
             "database": "ok",

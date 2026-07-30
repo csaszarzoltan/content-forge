@@ -151,3 +151,20 @@
 
 ### Features
 - Initial ContentForge scaffold with FastAPI
+
+## [0.9.0] - 2026-07-30
+
+### Added
+
+- Six accessible content operations workspaces: campaign creation, governance approvals, explainable brand voice, channel preview and publish recovery, localization QA, and provenance auditing.
+- Versioned `/api/v1` automation contracts for campaign, approval, publish batch, localization, and provenance resources.
+- SQLite-backed workflow state with explicit transitions, partial-success preservation, idempotent channel retry selection, conflict-of-interest approval protection, locale quality gates, and secret-redacted provenance export.
+- Responsive workspace styling with skip navigation, live status messaging, visible focus, mobile reflow, empty states, and recovery guidance.
+- Deterministic product workflow tests and offline fallback behavior for language detection and readability scoring.
+
+### Fixed
+
+- Repaired the malformed `pyproject.toml`, removed duplicate dependencies, and aligned application and package versions at 0.9.0.
+- Constrained `bcrypt` below version 5 for Passlib compatibility.
+- Replaced runtime NLTK corpus dependency in readability scoring with deterministic local formulas.
+- Added a cached offline language detector fallback when the optional model cannot be downloaded.

@@ -77,3 +77,9 @@ print(engine.render("launch", profile))
 - [CHANGELOG.md](../CHANGELOG.md) — Version history
 - [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples
+
+## Product workspaces
+
+- [Content operations workspaces](product-workspaces.md)
+- [Implementation research](research/APPLICATION_RESEARCH_REPORT.md)
+- [Feature requirements index](research/FEATURE_REQUIREMENTS_INDEX.md)

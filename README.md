@@ -455,3 +455,52 @@ pytest              # 1209 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```
+
+## Content operations workspaces
+
+ContentForge 0.9 adds a browser-based delivery layer to the existing APIs. Start the application and open:
+
+- `/workspace/campaigns` for multi-channel campaign generation and partial-result recovery.
+- `/workspace/approvals` for brand, compliance, and publishing-risk decisions.
+- `/workspace/voice` for evidence-backed, versioned brand voice rules.
+- `/workspace/publish` for channel previews and duplicate-safe retry planning.
+- `/workspace/localization` for locale-by-locale semantic and brand QA.
+- `/workspace/provenance` for model, prompt-template, human-edit, approval, and delivery traceability.
+
+The workspaces use a lightweight server-rendered architecture. Domain state is implemented in `src.product_ops`, delivery routes in `src.routers.workspaces`, and the responsive design in `src/static/workspaces.css`. The UI layer does not own generation, translation, or connector logic; it coordinates existing domain services and exposes explicit recovery states.
+
+Runtime workflow data uses `CONTENTFORGE_OPS_DB`, defaulting to `/tmp/contentforge_ops.db`. Production deployments should point this variable at a protected persistent volume and enforce tenant-aware authorization at the gateway or application layer.
+
+### Workspace API examples
+
+Create a campaign:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/campaigns \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Autumn launch","channels":["linkedin","twitter"]}'
+```
+
+Capture provenance:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/provenance \
+  -H 'Content-Type: application/json' \
+  -d '{"asset_id":"asset-1","model":"gpt-4o","prompt_template":"launch-v3","voice_version":"voice-2"}'
+```
+
+### Reproducible development
+
+```bash
+uv sync --extra dev
+env -u ENVIRONMENT uv run pytest -q
+uv run ruff check src/product_ops.py src/routers/workspaces.py \
+  src/services/readability.py src/services/language_detection.py \
+  tests/test_product_workspaces.py src/main.py
+uv run ruff format --check src/product_ops.py src/routers/workspaces.py \
+  src/services/readability.py src/services/language_detection.py \
+  tests/test_product_workspaces.py src/main.py
+uv build
+```
+
+The isolated workflow suite is `tests/test_product_workspaces.py`. The full suite deliberately unsets the host `ENVIRONMENT` variable so configuration-default tests remain deterministic.
