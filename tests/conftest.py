@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+import pytest_asyncio
 
 from brand_voice.models import (
     FormattingPrefs,
@@ -115,3 +116,30 @@ def sample_text_with_banned_terms() -> str:
         "We need to pivot our strategy and disrupt the market. "
         "Let's circle back on the synergy opportunities."
     )
+
+
+@pytest_asyncio.fixture
+async def db_session():
+    """In-memory async SQLite session with all ORM tables created.
+
+    Shared by the analytics pre-dev behavioral tests (RED phase). All models
+    are registered on ``Base.metadata`` via ``src.models`` imports.
+    """
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+
+    import src.models  # noqa: F401  (register all ORM models)
+
+    from src.database import Base
+
+    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    session = factory()
+    yield session
+    await session.close()
+    await engine.dispose()

@@ -17,6 +17,7 @@ from src.models import (  # noqa: F401
     ABEvent,
     ABTest,
     ABVariant,
+    AnalyticsEvent,
     BrandVoice,
     ContentAnalytics,
     Generation,
