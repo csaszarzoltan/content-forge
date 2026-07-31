@@ -14,6 +14,10 @@ import json
 import re
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from pydantic import BaseModel
 
 from tests.analytics_test_utils import (
@@ -24,7 +28,6 @@ from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import ExportResponse
 from src.services.analytics import AnalyticsService
 
-pytestmark = pytest.mark.asyncio
 
 CSV_HEADER = ["date", "generation_id", "content_type", "channel", "event_type", "value"]
 

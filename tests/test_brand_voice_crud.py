@@ -11,7 +11,10 @@ from datetime import datetime
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
+
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
 from src.schemas.brand_voice import (
     BrandVoiceCreate,

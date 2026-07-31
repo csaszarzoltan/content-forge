@@ -11,6 +11,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.database import Base, DatabaseManager, get_db
 
 

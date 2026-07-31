@@ -11,6 +11,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +41,6 @@ from src.schemas.ab_test import (
 from src.services.ab_service import ABTestService
 from src.services.ab_stats import AbStatsService, SignificanceResult
 
-pytestmark = pytest.mark.asyncio
 
 
 # ============================================================================

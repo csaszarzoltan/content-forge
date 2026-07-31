@@ -13,6 +13,10 @@ from typing import Any
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.services.prompt_templates import (
     LanguagePromptTemplate,
     PromptTemplateRegistry,

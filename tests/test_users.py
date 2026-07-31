@@ -10,7 +10,12 @@ import uuid
 
 from src.models.user import User
 
+import pytest
 
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
+# ============================================================================
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
 # ============================================================================
@@ -134,5 +139,6 @@ class TestUserModelBehavioral:
         created = User.__table__.columns["created_at"]
         updated = User.__table__.columns["updated_at"]
         from sqlalchemy import DateTime
+
         assert isinstance(created.type, DateTime)
         assert isinstance(updated.type, DateTime)

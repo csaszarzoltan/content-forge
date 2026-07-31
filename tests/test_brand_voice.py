@@ -12,6 +12,10 @@ from pathlib import Path
 import pytest
 
 # ── P0: Core Models ─────────────────────────────────────────────────────────
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from brand_voice.models import (
     FormattingPrefs,
     ScenarioTone,

@@ -5,10 +5,13 @@ import inspect
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from src.schemas.seo import ReadabilityMetrics
 from src.services.readability import ReadabilityScorer
 
-pytestmark = pytest.mark.asyncio
 
 
 # ── SECTION 1: Interface Tests ──────────────────────────────────────────────

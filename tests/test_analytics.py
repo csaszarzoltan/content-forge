@@ -15,6 +15,10 @@ import inspect
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
@@ -59,7 +63,6 @@ from src.schemas.analytics import (
 )
 from src.services.analytics import AnalyticsService
 
-pytestmark = pytest.mark.asyncio
 
 NEW_SCHEMAS = [
     TrackEventRequest,

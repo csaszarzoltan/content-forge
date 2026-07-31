@@ -20,6 +20,10 @@ from pathlib import Path
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.models.brand_voice import BrandVoice
 from src.models.generation import Generation
 from src.models.scheduled_post import ScheduledPost

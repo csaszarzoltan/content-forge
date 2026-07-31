@@ -10,6 +10,10 @@ import inspect
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.schemas.translation import TranslateRequest
 from src.services.translation import TranslationService
 

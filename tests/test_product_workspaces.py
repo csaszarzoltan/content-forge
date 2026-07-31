@@ -2,6 +2,10 @@ from pathlib import Path
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.product_ops import ContentOpsStore, render_workspace
 
 

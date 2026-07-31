@@ -10,6 +10,11 @@ import inspect
 from src.schemas.seo import LinkSuggestion
 from src.services.internal_linker import InternalLinker
 
+import pytest
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
 # ============================================================================
@@ -54,6 +59,7 @@ class TestInternalLinkerInterface:
 
     def test_link_suggestion_is_pydantic(self):
         from pydantic import BaseModel
+
         assert issubclass(LinkSuggestion, BaseModel)
 
     def test_link_suggestion_fields(self):

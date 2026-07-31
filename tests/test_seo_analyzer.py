@@ -5,10 +5,13 @@ import inspect
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from src.schemas.seo import ContentScore
 from src.services.seo_analyzer import SEOAnalyzer
 
-pytestmark = pytest.mark.asyncio
 
 
 # ============================================================================

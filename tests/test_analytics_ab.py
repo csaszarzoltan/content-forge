@@ -10,6 +10,10 @@ from __future__ import annotations
 import inspect
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +28,6 @@ from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import ABResultsCorrelationResponse, VariantPerformance
 from src.services.analytics import AnalyticsService
 
-pytestmark = pytest.mark.asyncio
 
 
 async def _seed_ab_test(

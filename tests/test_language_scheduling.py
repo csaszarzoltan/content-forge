@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 import pytest
 
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.schemas.schedule import (
     PlatformConfig,
     ScheduleRequest,

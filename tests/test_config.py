@@ -10,6 +10,10 @@ import inspect
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.config import Settings, get_settings
 
 

@@ -10,6 +10,10 @@ import inspect
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.dependencies import get_db, get_settings_dep, get_current_user
 
 

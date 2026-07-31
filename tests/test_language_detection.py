@@ -16,6 +16,10 @@ from typing import get_type_hints
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.services.language_detection import (
     SUPPORTED_LANGUAGES,
     SHORT_TEXT_THRESHOLD,

@@ -9,6 +9,10 @@ from __future__ import annotations
 import inspect
 
 import pytest
+
+# Mark as integration (uses TestClient/AsyncClient)
+pytestmark = pytest.mark.integration
+
 from httpx import AsyncClient, ASGITransport
 
 from src.main import app

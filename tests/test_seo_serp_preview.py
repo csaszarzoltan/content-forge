@@ -9,10 +9,18 @@ import inspect
 
 from src.services.serp_preview import SERPPreviewGenerator
 
+import pytest
+
+
+
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
 # ============================================================================
 
+
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
 
 class TestSERPPreviewGeneratorInterface:
     """Verify the SERPPreviewGenerator interface."""

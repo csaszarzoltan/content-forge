@@ -9,10 +9,18 @@ import inspect
 
 from src.services.jsonld_generator import JSONLDGenerator
 
+import pytest
+
+
+
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
 # ============================================================================
 
+
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
 
 class TestJSONLDGeneratorInterface:
     """Verify the JSONLDGenerator interface."""

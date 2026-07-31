@@ -13,6 +13,10 @@ from __future__ import annotations
 import inspect
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from pydantic import BaseModel
 
 from tests.analytics_test_utils import (
@@ -23,7 +27,6 @@ from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import AnomalyItem, AnomalyResponse, TrendPoint, TrendResponse
 from src.services.analytics import AnalyticsService
 
-pytestmark = pytest.mark.asyncio
 
 
 # ============================================================================

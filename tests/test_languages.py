@@ -13,6 +13,10 @@ import time
 from collections.abc import AsyncGenerator
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 

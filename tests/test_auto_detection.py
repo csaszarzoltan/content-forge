@@ -22,7 +22,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
+
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
 from src.schemas.content import GenerationResponse
 from src.services.generator import ContentGenerator, GenerationResult

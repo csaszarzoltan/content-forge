@@ -10,6 +10,10 @@ import inspect
 from collections.abc import AsyncGenerator
 
 import pytest
+
+# Mark as integration (uses TestClient/AsyncClient)
+pytestmark = pytest.mark.integration
+
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,

@@ -14,6 +14,10 @@ from __future__ import annotations
 import inspect
 
 import pytest
+
+# Mark as quick (unit tests)
+pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+
 from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -28,7 +32,6 @@ from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import ContentScoreResponse, ScoreBreakdown
 from src.services.content_scoring import ContentScoringService
 
-pytestmark = pytest.mark.asyncio
 
 GRADE_BOUNDARIES = {"A": 90.0, "B": 75.0, "C": 60.0, "D": 45.0, "F": 0.0}
 

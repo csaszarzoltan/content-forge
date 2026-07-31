@@ -13,6 +13,10 @@ import inspect
 import pytest
 
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 class TestPublishServiceInterface:
     """Verify the PublishService interface."""
 

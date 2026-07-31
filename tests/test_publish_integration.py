@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
 
+
+
+# Mark as integration (uses TestClient/AsyncClient)
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 class TestPublishIntegration:
     """Integration tests for the publish pipeline end-to-end."""

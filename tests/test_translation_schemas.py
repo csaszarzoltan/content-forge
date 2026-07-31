@@ -11,6 +11,10 @@ import typing
 
 import pytest
 
+
+# Mark as quick (unit tests)
+pytestmark = pytest.mark.quick
+
 from src.schemas.translation import (
     TranslateRequest,
     TranslateResponse,
