@@ -94,9 +94,15 @@ def main() -> None:
     print(f"  Subject-like opening: {email['generated_text'][:150]}...")
     print()
 
-    # 5. Verify content list via analytics (will be stub data)
-    summary = client.get_analytics_summary()
-    print(f"Total generations (analytics): {summary['total_generations']}")
+    # 5. Track an impression and verify it shows up in the analytics dashboard
+    client.track_event(
+        generation_id=blog["id"],
+        event_type="impression",
+        channel="web",
+        value=100,
+    )
+    dash = client.get_dashboard()
+    print(f"Total impressions (analytics): {dash['totals']['impressions']}")
 
     client.close()
 

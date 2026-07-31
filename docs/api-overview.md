@@ -15,7 +15,7 @@ Root endpoint — returns API metadata.
 ```json
 {
   "message": "ContentForge API",
-  "version": "0.3.0"
+  "version": "0.9.0"
 }
 ```
 
@@ -28,7 +28,7 @@ Health check for deployment monitoring and load balancers.
 ```json
 {
   "status": "healthy",
-  "version": "0.3.0",
+  "version": "0.9.0",
   "timestamp": "2026-07-22T19:55:00+00:00",
   "checks": {
     "database": "ok",
@@ -359,56 +359,40 @@ Cancel a scheduled post.
 
 ### `GET /analytics/content/{generation_id}`
 
-Retrieve performance and compliance analytics for a specific generation.
-
-**Response** (200 OK):
-```json
-{
-  "generation_id": "gen_a1b2c3d4e5f6",
-  "content_type": "blog",
-  "brand_voice_id": null,
-  "compliance": {
-    "overall": 0.0,
-    "vocabulary": 0.0,
-    "readability": 0.0,
-    "tone": 0.0,
-    "violations": []
-  },
-  "performance": {
-    "views": 0,
-    "engagement_rate": 0.0,
-    "shares": 0,
-    "comments": 0,
-    "avg_read_time_seconds": 0
-  },
-  "model_used": "gpt-4o",
-  "tokens_used": 0,
-  "created_at": "2026-07-22T19:55:00+00:00",
-  "updated_at": null
-}
-```
-
-**Error** (404):
-```json
-{"detail": "Generation not found"}
-```
-
----
+> **Removed in v0.9.0** — superseded by `GET /api/v1/analytics/content/{generation_id}`
+> (see [Analytics Dashboard](analytics-dashboard.md) for the current API).
 
 ### `GET /analytics/summary`
 
-Get aggregate analytics across all content.
+> **Removed in v0.9.0** — superseded by `GET /api/v1/analytics/dashboard`
+> (see [Analytics Dashboard](analytics-dashboard.md) for the current API).
 
-**Response** (200 OK):
-```json
-{
-  "total_generations": 0,
-  "avg_compliance": 0.0,
-  "content_type_breakdown": {},
-  "total_views": 0,
-  "avg_engagement_rate": 0.0
-}
-```
+### Analytics Dashboard API — `/api/v1/analytics/*`
+
+ContentForge v0.9.0 replaces the legacy analytics stub with an event-log based
+dashboard. All endpoints are unauthenticated and accept the optional
+`date_from` / `date_to` window parameters (default: last 30 days).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/analytics/track` | Record an event — `{generation_id, channel, event_type, value, user_identifier?, metadata?, occurred_at?}` → `{status: "ok", event_id}` (201) |
+| `GET` | `/api/v1/analytics/dashboard` | Aggregated metrics + channel/content-type breakdowns + top-5 content + daily time series |
+| `GET` | `/api/v1/analytics/content/{generation_id}` | Per-content performance and compliance |
+| `GET` | `/api/v1/analytics/channels` | Cross-channel comparison, sorted by `metric` (`impressions`, `clicks`, `shares`, `comments`, `conversions`, `engagement_rate`) |
+| `GET` | `/api/v1/analytics/ab-results` | A/B variant ↔ analytics correlation (`test_id` required) |
+| `GET` | `/api/v1/analytics/export` | Daily aggregates as CSV or JSON (`format=csv\|json`) |
+| `GET` | `/api/v1/analytics/score/{generation_id}` | Deterministic content score (0–100) + grade |
+| `GET` | `/api/v1/analytics/trends` | 7d/30d/90d daily trend series with anomaly flags |
+| `GET` | `/api/v1/analytics/anomalies` | Statistically flagged days (`\|z\| ≥ 2.0`, ≥ 7 data points) |
+
+**Event types:** `impression`, `click`, `share`, `comment`, `conversion`, `read_time`.
+**Channels:** `twitter`, `linkedin`, `medium`, `blog`, `email`, `web`, `other`.
+
+**Errors:** unknown `generation_id` / `test_id` → `404`; invalid channel,
+metric, period, format, or inverted date window → `422`.
+
+Full request/response examples, the content scoring formula, and usage
+walkthroughs live in the [Analytics Dashboard guide](analytics-dashboard.md).
 
 ---
 

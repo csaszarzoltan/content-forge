@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-1209%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-1541%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -28,7 +28,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P1   | **LLM integration** | OpenAI-compatible provider with configurable model, base URL, and content guard |
 | P1   | **Content generation** | Template-driven generation with brand voice injection and validation |
 | P1   | **Scheduling** | In-memory scheduling service with lifecycle management and status tracking |
-| P2   | **Analytics** | Content performance metrics tracking with summary aggregation |
+| P0   | **Analytics Dashboard** | Event-log based content performance tracking — impressions, clicks, engagement, channel comparison, content scoring, A/B correlation, CSV/JSON export, trends + anomaly detection |
 | P1   | **Social Media Publishing** | Pluggable platform connectors (Twitter/X, LinkedIn) with rate limiting, retry, and status tracking |
 
 ## Installation
@@ -45,7 +45,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 760 tests pass
+pytest          # 1541 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -403,6 +403,61 @@ print(status.json())
 
 See the [Social Media Publishing Guide](docs/social-publishing.md) for full connector API, configuration, rate limit details, and production readiness considerations.
 
+## 📊 Content Performance Analytics Dashboard
+
+ContentForge v0.9.0 completes the create → optimize → publish → **analyze**
+pipeline with an event-log based analytics layer. Track impressions, clicks,
+shares, comments, conversions, and read-time events per content piece across
+channels, then query aggregated dashboards, per-channel comparisons, A/B test
+correlation, deterministic content scores, historical trends, and anomaly
+detection — all under `/api/v1/analytics` with zero new dependencies.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Event tracking** | `POST /api/v1/analytics/track` — append-only `analytics_events` log (impression, click, share, comment, conversion, read_time) |
+| P0   | **Dashboard API** | `GET /api/v1/analytics/dashboard` — aggregated metrics, channel/content-type breakdowns, top content, daily time series |
+| P0   | **Per-content analytics** | `GET /api/v1/analytics/content/{id}` — performance + compliance per generation |
+| P0   | **Channel comparison** | `GET /api/v1/analytics/channels` — per-channel metrics sorted by any metric, with best-channel detection |
+| P0   | **Content scoring** | `GET /api/v1/analytics/score/{id}` — deterministic weighted score (engagement 35%, SEO 25%, readability 20%, compliance 20%), grades A–F |
+| P1   | **A/B test correlation** | `GET /api/v1/analytics/ab-results` — merges A/B variant results with real analytics conversion data + significance note |
+| P1   | **Export** | `GET /api/v1/analytics/export` — CSV or JSON export of daily aggregates |
+| P1   | **Trends & anomalies** | `GET /api/v1/analytics/trends` / `GET /api/v1/analytics/anomalies` — 7d/30d/90d series, z-score anomaly flags (|z| ≥ 2.0, ≥ 7 points) |
+
+### Usage
+
+```python
+import httpx
+
+base = "http://localhost:8000/api/v1/analytics"
+
+# Track an event (no auth required)
+httpx.post(f"{base}/track", json={
+    "generation_id": "gen_a1b2c3d4e5f6",
+    "channel": "twitter",
+    "event_type": "click",
+    "value": 1,
+}).json()
+# {"status": "ok", "event_id": "9750950a-..."}
+
+# Query the dashboard (default window: last 30 days)
+dash = httpx.get(f"{base}/dashboard").json()
+print(dash["totals"])            # impressions, clicks, shares, ... engagement_rate
+
+# Compare channels and export
+httpx.get(f"{base}/channels", params={"metric": "engagement_rate"}).json()
+export = httpx.get(f"{base}/export", params={"format": "csv"}).json()
+open(export["filename"], "w").write(export["data"])
+```
+
+Error mapping: unknown `generation_id`/`test_id` → **404**; invalid channel,
+metric, period, format, or inverted date window → **422**.
+
+See the [Analytics Dashboard Guide](docs/analytics-dashboard.md) for the full
+API reference with request/response examples, the scoring formula, and the
+[analytics example](examples/api_analytics.py).
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -422,7 +477,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Content Generation API](docs/content-generation.md) | `POST /content/generate` — template-driven content generation with voice injection |
 | [Brand Voice API](docs/brand-voice-api.md) | `GET/POST/PUT/DELETE /brand-voices` — brand voice CRUD endpoints |
 | [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
-|| [Analytics API](docs/analytics.md) | `GET/POST /analytics` — content performance metrics and summaries |
+|| [Analytics Dashboard](docs/analytics-dashboard.md) | `POST /api/v1/analytics/track`, `GET /dashboard`, `/content/{id}`, `/channels`, `/ab-results`, `/score/{id}`, `/export`, `/trends`, `/anomalies` — event tracking, content scoring, channel comparison, A/B correlation |
 || [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
 || [Social Media Publishing](docs/social-publishing.md) | Platform connectors, rate limiting, publish API, production readiness |
 || [Language Detection](docs/language-detection.md) | Auto-detect input language with fast-langdetect, confidence scoring, batch detection |
@@ -441,7 +496,7 @@ Ready-to-run examples in [examples/](examples/):
 - [api_brand_voice.py](examples/api_brand_voice.py) — Brand voice API endpoint usage
 - [api_content_generation.py](examples/api_content_generation.py) — Content generation API workflows
 - [api_scheduling.py](examples/api_scheduling.py) — Scheduled post management via API
-- [api_analytics.py](examples/api_analytics.py) — Analytics API metrics and summaries
+- [api_analytics.py](examples/api_analytics.py) — Analytics dashboard walkthrough: track events, dashboard, channel comparison, scoring, trends, export
 - [multilingual_generation.py](examples/multilingual_generation.py) — End-to-end multi-language pipeline (detection → templates → scoring → scheduling)
 
 ## Changelog
@@ -451,7 +506,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 1209 tests (interface + behavioral)
+pytest              # 1541 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```

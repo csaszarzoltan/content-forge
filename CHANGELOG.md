@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.9.0] — 2026-07-31
+
+### Features
+- **Content Performance Analytics Dashboard** — event-log based analytics that completes the create → optimize → publish → analyze pipeline
+- **Event tracking API** — `POST /api/v1/analytics/track` appends impressions, clicks, shares, comments, conversions, and read-time events to the `analytics_events` table (404 for unknown generation; 422 for invalid channel or `occurred_at` >24h in the future)
+- **Dashboard API** — `GET /api/v1/analytics/dashboard` aggregates metrics over a date window (default 30d) with channel/content-type breakdowns, top-5 content, and a daily time series
+- **Per-content analytics** — `GET /api/v1/analytics/content/{id}` returns performance, compliance snapshot, and per-channel breakdown for one generation
+- **Channel comparison** — `GET /api/v1/analytics/channels` sorts channels by any metric (`impressions`, `clicks`, `shares`, `comments`, `conversions`, `engagement_rate`) and reports the best channel
+- **Content scoring** — `GET /api/v1/analytics/score/{id}` computes a deterministic weighted score (`0.35·engagement + 0.25·seo + 0.20·readability + 0.20·compliance`) with A–F grades; missing sub-scores drop out and weights renormalize
+- **A/B test correlation** — `GET /api/v1/analytics/ab-results` merges A/B variant results with real analytics conversion data and a chi-squared significance note
+- **Export** — `GET /api/v1/analytics/export` exports daily aggregates as CSV or JSON (stdlib only, no new dependencies)
+- **Trends & anomalies** — `GET /api/v1/analytics/trends` (7d/30d/90d daily series with anomaly flags) and `GET /api/v1/analytics/anomalies` (z-score detection, |z| ≥ 2.0, ≥ 7 points required)
+- **Content operations workspaces** — six accessible browser workspaces: campaign creation, governance approvals, explainable brand voice, channel preview and publish recovery, localization QA, and provenance auditing
+- **Versioned `/api/v1` automation contracts** for campaign, approval, publish batch, localization, and provenance resources
+- **SQLite-backed workflow state** with explicit transitions, partial-success preservation, idempotent channel retry selection, conflict-of-interest approval protection, locale quality gates, and secret-redacted provenance export
+- **Responsive workspace styling** with skip navigation, live status messaging, visible focus, mobile reflow, empty states, and recovery guidance
+
+### Tests
+- 237 new analytics tests (184 interface + 53 behavioral) across 5 modules; full suite **1541 passing, 27 skipped, 0 failed** — ruff clean
+- Handler-level regression tests pin the POST /track error mapping (unknown generation → 404, invalid channel / future `occurred_at` → 422, valid → 201)
+- Deterministic product workflow tests and offline fallback behavior for language detection and readability scoring
+
+### Docs
+- New [Analytics Dashboard guide](docs/analytics-dashboard.md) — setup, all 9 endpoints with request/response examples, content scoring explanation, channel comparison usage, A/B test correlation, export options, historical trends, anomaly detection
+- README updated: analytics dashboard feature section, module reference, examples list, test badge (1541 passing)
+- Rewrote `examples/api_analytics.py` for the v0.9.0 analytics API; `examples/api_client.py` gained 9 analytics client methods
+- `docs/analytics.md` marked superseded (legacy stub routes removed in favor of `/api/v1/analytics`)
+
+### Fixes
+- `POST /api/v1/analytics/track` now returns **422** (not 404) for invalid channel and `occurred_at` more than 24 hours in the future; 404 is reserved for unknown generations
+- Repaired the malformed `pyproject.toml`, removed duplicate dependencies, and aligned application and package versions at 0.9.0
+- Constrained `bcrypt` below version 5 for Passlib compatibility
+- Replaced runtime NLTK corpus dependency in readability scoring with deterministic local formulas
+- Added a cached offline language detector fallback when the optional model cannot be downloaded
+
 ## [0.8.0] — 2026-07-27
 
 ### Features
@@ -152,19 +187,3 @@
 ### Features
 - Initial ContentForge scaffold with FastAPI
 
-## [0.9.0] - 2026-07-30
-
-### Added
-
-- Six accessible content operations workspaces: campaign creation, governance approvals, explainable brand voice, channel preview and publish recovery, localization QA, and provenance auditing.
-- Versioned `/api/v1` automation contracts for campaign, approval, publish batch, localization, and provenance resources.
-- SQLite-backed workflow state with explicit transitions, partial-success preservation, idempotent channel retry selection, conflict-of-interest approval protection, locale quality gates, and secret-redacted provenance export.
-- Responsive workspace styling with skip navigation, live status messaging, visible focus, mobile reflow, empty states, and recovery guidance.
-- Deterministic product workflow tests and offline fallback behavior for language detection and readability scoring.
-
-### Fixed
-
-- Repaired the malformed `pyproject.toml`, removed duplicate dependencies, and aligned application and package versions at 0.9.0.
-- Constrained `bcrypt` below version 5 for Passlib compatibility.
-- Replaced runtime NLTK corpus dependency in readability scoring with deterministic local formulas.
-- Added a cached offline language detector fallback when the optional model cannot be downloaded.
