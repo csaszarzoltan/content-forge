@@ -692,6 +692,29 @@ class TestTrackEventBehavioral:
         with pytest.raises(ValueError):
             await svc.track_event(db_session, request)
 
+    async def test_track_event_invalid_channel_422(self, db_session):
+        """Handler maps invalid channel to HTTP 422 (brief §4 T2)."""
+        await seed_generation(db_session, "gen_1")
+        request = TrackEventRequest(
+            generation_id="gen_1", channel="myspace", event_type="click"
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            await track_endpoint(request, db=db_session)
+        assert exc_info.value.status_code == 422
+
+    async def test_track_event_future_occurred_at_422(self, db_session):
+        """Handler maps occurred_at >24h in future to HTTP 422 (brief §4 T2)."""
+        await seed_generation(db_session, "gen_1")
+        request = TrackEventRequest(
+            generation_id="gen_1",
+            channel="twitter",
+            event_type="click",
+            occurred_at=datetime.now(UTC) + timedelta(hours=25),
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            await track_endpoint(request, db=db_session)
+        assert exc_info.value.status_code == 422
+
     async def test_track_event_invalid_event_type_rejected(self, db_session):
         """event_type outside ANALYTICS_EVENT_TYPES -> 422 (schema Literal)."""
         with pytest.raises(ValidationError):

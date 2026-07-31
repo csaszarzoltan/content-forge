@@ -61,7 +61,10 @@ async def track_event(
     try:
         return await _service().track_event(db, request)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        # Distinguish "generation not found" (404) from validation errors (422)
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/dashboard")
