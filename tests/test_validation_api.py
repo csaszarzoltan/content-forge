@@ -1,12 +1,12 @@
 """Pre-development tests for constraint validation REST API endpoints.
 
 Interface tests: router exists, routes registered, schemas importable.
-Behavioral tests: endpoint handlers raise NotImplementedError.
+Behavioral tests: endpoint handlers return correct responses.
 """
 from __future__ import annotations
 
-
 import pytest
+from fastapi import FastAPI
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
@@ -21,6 +21,13 @@ from src.schemas.constraints import (
     ValidateResponse,
     ValidationError,
 )
+
+# ---------------------------------------------------------------------------
+# Minimal app for testing (required by FastAPI TestClient)
+# ---------------------------------------------------------------------------
+_test_app = FastAPI()
+_test_app.include_router(router)
+_client = TestClient(_test_app, raise_server_exceptions=False)
 
 # ---------------------------------------------------------------------------
 # Interface tests — must PASS immediately
@@ -294,78 +301,16 @@ class TestPlatformSummaryInterface:
 
 
 # ---------------------------------------------------------------------------
-# Behavioral tests — must FAIL (NotImplementedError)
+# Behavioral tests — implemented after code delivery
 # ---------------------------------------------------------------------------
 
 class TestEndpointBehavior:
-    """Behavioral: endpoint handlers raise NotImplementedError."""
-
-    @pytest.mark.unit
-    @pytest.mark.asyncio
-    async def test_get_constraints_handler_not_implemented(self):
-        from src.routers.constraints import router as r
-        # Find the GET /api/v1/constraints handler
-        for route in r.routes:
-            if hasattr(route, "path") and route.path == "/api/v1/constraints" and hasattr(route, "endpoint"):
-                if "GET" in (route.methods or set()):
-                    with pytest.raises(NotImplementedError):
-                        await route.endpoint()
-                    return
-        pytest.skip("GET /api/v1/constraints route not found")
-
-    @pytest.mark.unit
-    @pytest.mark.asyncio
-    async def test_get_constraints_platform_handler_not_implemented(self):
-        from src.routers.constraints import router as r
-        for route in r.routes:
-            if hasattr(route, "path") and route.path == "/api/v1/constraints/{platform}" and hasattr(route, "endpoint"):
-                if "GET" in (route.methods or set()):
-                    with pytest.raises(NotImplementedError):
-                        await route.endpoint(platform="twitter")
-                    return
-        pytest.skip("GET /api/v1/constraints/{platform} route not found")
-
-    @pytest.mark.unit
-    @pytest.mark.asyncio
-    async def test_post_validate_handler_not_implemented(self):
-        from src.routers.constraints import router as r
-        for route in r.routes:
-            if hasattr(route, "path") and route.path == "/api/v1/validate" and hasattr(route, "endpoint"):
-                if "POST" in (route.methods or set()):
-                    body = ValidateRequest(platforms=["twitter"], text="Hello")
-                    with pytest.raises(NotImplementedError):
-                        await route.endpoint(body=body)
-                    return
-        pytest.skip("POST /api/v1/validate route not found")
-
-    @pytest.mark.unit
-    @pytest.mark.asyncio
-    async def test_post_validate_cross_platform_handler_not_implemented(self):
-        from src.routers.constraints import router as r
-        for route in r.routes:
-            if hasattr(route, "path") and route.path == "/api/v1/validate/cross-platform" and hasattr(route, "endpoint"):
-                if "POST" in (route.methods or set()):
-                    body = CrossPlatformRequest(text="Hi", platforms=["twitter", "linkedin"])
-                    with pytest.raises(NotImplementedError):
-                        await route.endpoint(body=body)
-                    return
-        pytest.skip("POST /api/v1/validate/cross-platform route not found")
-
-
-class TestEndpointFutureBehavior:
-    """Future behavioral tests — skip during RED phase (HTTP 500 from NotImplementedError)."""
-
-    def _is_red_phase(self, resp) -> bool:
-        """Detect RED phase: handler raised NotImplementedError => HTTP 500."""
-        return resp.status_code == 500
+    """Behavioral: endpoint handlers return correct responses."""
 
     @pytest.mark.unit
     def test_get_constraints_returns_all_platforms(self):
         """GET /api/v1/constraints returns summaries of all platforms."""
-        client = TestClient(router, raise_server_exceptions=False)
-        resp = client.get("/api/v1/constraints")
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.get("/api/v1/constraints")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["platforms"]) == 5
@@ -373,10 +318,7 @@ class TestEndpointFutureBehavior:
     @pytest.mark.unit
     def test_get_constraints_platform_returns_detail(self):
         """GET /api/v1/constraints/twitter returns full constraints."""
-        client = TestClient(router, raise_server_exceptions=False)
-        resp = client.get("/api/v1/constraints/twitter")
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.get("/api/v1/constraints/twitter")
         assert resp.status_code == 200
         data = resp.json()
         assert data["display_name"] == "Twitter/X"
@@ -384,20 +326,14 @@ class TestEndpointFutureBehavior:
     @pytest.mark.unit
     def test_get_constraints_unknown_platform_404(self):
         """GET /api/v1/constraints/myspace returns 404."""
-        client = TestClient(router, raise_server_exceptions=False)
-        resp = client.get("/api/v1/constraints/myspace")
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.get("/api/v1/constraints/myspace")
         assert resp.status_code == 404
 
     @pytest.mark.unit
     def test_post_validate_returns_per_platform(self):
         """POST /api/v1/validate with valid text returns per-platform results."""
-        client = TestClient(router, raise_server_exceptions=False)
         body = {"platforms": ["twitter", "linkedin"], "text": "Hello"}
-        resp = client.post("/api/v1/validate", json=body)
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.post("/api/v1/validate", json=body)
         assert resp.status_code == 200
         data = resp.json()
         assert "twitter" in data["platforms"]
@@ -406,22 +342,16 @@ class TestEndpointFutureBehavior:
     @pytest.mark.unit
     def test_post_validate_over_limit_fails(self):
         """POST /api/v1/validate with text over Twitter limit returns valid=false."""
-        client = TestClient(router, raise_server_exceptions=False)
         body = {"platforms": ["twitter"], "text": "x" * 300}
-        resp = client.post("/api/v1/validate", json=body)
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.post("/api/v1/validate", json=body)
         data = resp.json()
         assert data["valid"] is False
 
     @pytest.mark.unit
     def test_post_validate_cross_platform(self):
         """POST /api/v1/validate/cross-platform checks all targets."""
-        client = TestClient(router, raise_server_exceptions=False)
         body = {"text": "Hi", "platforms": ["twitter", "linkedin", "instagram"]}
-        resp = client.post("/api/v1/validate/cross-platform", json=body)
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.post("/api/v1/validate/cross-platform", json=body)
         assert resp.status_code == 200
         data = resp.json()
         assert "compatible_all" in data
@@ -429,15 +359,12 @@ class TestEndpointFutureBehavior:
     @pytest.mark.unit
     def test_post_validate_with_media(self):
         """POST /api/v1/validate with media checks format compatibility."""
-        client = TestClient(router, raise_server_exceptions=False)
         body = {
             "platforms": ["instagram"],
             "text": "Photo",
             "media": [{"type": "image", "filename": "pic.png", "size_bytes": 1024, "format": "png"}],
         }
-        resp = client.post("/api/v1/validate", json=body)
-        if self._is_red_phase(resp):
-            pytest.skip("Not implemented yet — RED phase")
+        resp = _client.post("/api/v1/validate", json=body)
         data = resp.json()
         # Instagram rejects PNG
         assert data["platforms"]["instagram"]["media_acceptable"] is False

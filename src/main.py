@@ -35,6 +35,7 @@ from src.routers.schedule import router as schedule_router
 from src.routers.seo import router as seo_router
 from src.routers.translate import router as translate_router
 from src.routers.workspaces import router as workspaces_router
+from src.routers.constraints import router as constraints_router  # noqa: F401
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 

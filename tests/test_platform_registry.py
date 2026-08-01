@@ -96,63 +96,12 @@ class TestConstraintRegistryInterface:
 # ---------------------------------------------------------------------------
 
 class TestConstraintRegistryBehavior:
-    """Behavioral: all methods raise NotImplementedError until implemented."""
-
-    @pytest.mark.unit
-    def test_load_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            reg.load()
-
-    @pytest.mark.unit
-    def test_get_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            reg.get("twitter")
-
-    @pytest.mark.unit
-    def test_all_platforms_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            reg.all_platforms()
-
-    @pytest.mark.unit
-    def test_platform_names_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            reg.platform_names()
-
-    @pytest.mark.unit
-    def test_version_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            _ = reg.version
-
-    @pytest.mark.unit
-    def test_update_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        constraints = PlatformConstraints(
-            display_name="Test",
-            text=TextConstraints(max_chars=100),
-        )
-        with pytest.raises(NotImplementedError):
-            reg.update("twitter", constraints)
-
-    @pytest.mark.unit
-    def test_export_raises_not_implemented(self):
-        reg = ConstraintRegistry()
-        with pytest.raises(NotImplementedError):
-            reg.export()
-
-    # Future behavioral tests (skip during RED phase, active after implementation)
+    """Behavioral: registry loads, queries, and updates correctly."""
 
     @pytest.mark.unit
     def test_load_populates_platforms(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         platforms = reg.platform_names()
         assert "twitter" in platforms
         assert "linkedin" in platforms
@@ -162,71 +111,50 @@ class TestConstraintRegistryBehavior:
 
     @pytest.mark.unit
     def test_get_twitter_returns_text_constraints(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         twitter = reg.get("twitter")
         assert twitter.text.max_chars == 280
 
     @pytest.mark.unit
     def test_get_linkedin_returns_text_constraints(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         linkedin = reg.get("linkedin")
         assert linkedin.text.max_chars == 3000
 
     @pytest.mark.unit
     def test_get_instagram_rejects_png(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         instagram = reg.get("instagram")
         assert "png" in instagram.image.rejected_formats
 
     @pytest.mark.unit
     def test_get_unknown_platform_raises(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         with pytest.raises(KeyError):
             reg.get("myspace")
 
     @pytest.mark.unit
     def test_all_platforms_returns_5(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         all_p = reg.all_platforms()
         assert len(all_p) == 5
 
     @pytest.mark.unit
     def test_version_returns_string(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         assert isinstance(reg.version, str)
         assert reg.version.startswith("1.")
 
     @pytest.mark.unit
     def test_export_returns_dict(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         result = reg.export()
         assert isinstance(result, dict)
         assert "version" in result
@@ -234,11 +162,8 @@ class TestConstraintRegistryBehavior:
 
     @pytest.mark.unit
     def test_update_modifies_platform(self):
-        try:
-            reg = ConstraintRegistry()
-            reg.load()
-        except NotImplementedError:
-            pytest.skip("Not implemented yet — RED phase")
+        reg = ConstraintRegistry()
+        reg.load()
         new_constraints = PlatformConstraints(
             display_name="Twitter/X (Updated)",
             text=TextConstraints(max_chars=280),
