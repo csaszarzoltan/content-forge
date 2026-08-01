@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.10.0] — 2026-08-01
+
+### Features
+- **Platform Validation Engine** — validate content against real platform constraints before publishing; supports Twitter/X, LinkedIn, Instagram, Facebook, and TikTok
+- **Constraint registry** — JSON-backed registry (`src/constraints/data/registry.json`) with text, image, video, and carousel constraints per platform; versioned and machine-readable
+- **Validation API** — `POST /api/v1/validate` validates a single piece of content against a target platform; `POST /api/v1/validate/cross-platform` validates across all platforms simultaneously
+- **Constraint query API** — `GET /api/v1/constraints` returns all platforms; `GET /api/v1/constraints/{platform}` returns constraints for one platform
+- **Constraint preview** — `GET /api/v1/constraints/{platform}/preview` renders a human-readable summary of platform limits
+- **Cross-platform validation** — detect content that fails any platform's constraints in a single call; response includes per-platform pass/fail with detailed violation messages
+- **Validation engine service** — `ConstraintValidator` service with structured error reporting, constraint normalization, and platform-aware scoring
+
+### Fixes
+- Constraint validator and router updates for edge cases in media constraint checking and error message formatting
+- Remediated main-profile session pollution in test suite (pytest markers)
+
+### Tests
+- 100+ new validation tests across platform registry, validation engine, and validation API modules; full suite **1783 passing, 27 skipped, 0 failed** — ruff clean
+- Platform registry tests verify all 5 platforms load correctly with expected constraint shapes
+- Validation engine tests cover text limits, image formats, video constraints, carousel rules, and cross-platform aggregation
+- Validation API tests verify HTTP status codes, error response schemas, and cross-platform endpoint behavior
+
+### Docs
+- README updated: Platform Validation Engine feature added to feature table, test badge updated (1783 passing)
+- New [Platform Validation guide](docs/platform-validation.md) — overview, supported platforms, API reference, constraint registry format, usage examples
+
 ## [0.9.0] — 2026-07-31
 
 ### Features

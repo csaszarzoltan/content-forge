@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-1541%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-1783%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -30,6 +30,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P1   | **Scheduling** | In-memory scheduling service with lifecycle management and status tracking |
 | P0   | **Analytics Dashboard** | Event-log based content performance tracking — impressions, clicks, engagement, channel comparison, content scoring, A/B correlation, CSV/JSON export, trends + anomaly detection |
 | P1   | **Social Media Publishing** | Pluggable platform connectors (Twitter/X, LinkedIn) with rate limiting, retry, and status tracking |
+| P0   | **Platform Validation Engine** | Validate content against real platform constraints (Twitter/X, LinkedIn, Instagram, Facebook, TikTok) before publishing |
 
 ## Installation
 
@@ -45,7 +46,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 1541 tests pass
+pytest          # 1783 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -126,6 +127,22 @@ resp = httpx.post("http://localhost:8000/content/generate", json={
 })
 print(resp.json())
 ```
+
+### 6. Validate content against platform constraints
+
+```bash
+# Validate a tweet against Twitter/X constraints
+curl -X POST http://localhost:8000/api/v1/validate \
+  -H 'Content-Type: application/json' \
+  -d '{"platform": "twitter", "content": "Check out our new feature!", "media": []}'
+
+# Cross-platform validation
+curl -X POST http://localhost:8000/api/v1/validate/cross-platform \
+  -H 'Content-Type: application/json' \
+  -d '{"content": "Longform content here...", "media": []}'
+```
+
+See the [Platform Validation guide](docs/platform-validation.md) for the full API reference and constraint registry format.
 
 See the [API Overview](docs/api-overview.md) for the complete endpoint reference.
 
