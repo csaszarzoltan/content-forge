@@ -111,6 +111,7 @@ app.include_router(ab_router)
 app.include_router(analytics_router)
 app.include_router(seo_router)
 app.include_router(workspaces_router)
+app.include_router(constraints_router)
 app.mount(
     "/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static"
 )

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from src.constraints.registry import ConstraintRegistry
 from src.schemas.constraints import (
@@ -84,3 +84,15 @@ async def validate_cross_platform(body: CrossPlatformRequest):
     v = _get_validator()
     result = v.check_cross_platform(body.text, body.media, body.platforms)
     return result
+
+
+@router.get("/constraints/{platform}/preview")
+async def preview_content(platform: str, text: str = Query(..., description="Content to preview")):
+    """Preview how content will render on a platform."""
+    v = _get_validator()
+    reg = v._get_registry()
+    try:
+        reg.get(platform)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Platform '{platform}' not found")
+    return v.preview(platform, text)

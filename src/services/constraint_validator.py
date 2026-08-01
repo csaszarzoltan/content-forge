@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from src.constraints.models import PlatformConstraints
 from src.constraints.registry import ConstraintRegistry
 from src.schemas.constraints import (
     MediaAttachment,
@@ -41,7 +42,7 @@ class ConstraintValidator:
             self._registry = reg
         return self._registry
 
-    def _get_constraints(self, platform: str):
+    def _get_constraints(self, platform: str) -> PlatformConstraints:
         """Get PlatformConstraints for a platform."""
         return self._get_registry().get(platform)
 
