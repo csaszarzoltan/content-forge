@@ -36,7 +36,7 @@ def test_voice_rule_retains_evidence_and_conflict(tmp_path: Path) -> None:
     ops.add_voice_rule(profile, "tone", "direct", "Direct and concise.", conflict=True)
     page = render_workspace("voice", ops)
     assert "Direct and concise." in page
-    assert "CONFLICT" in page
+    assert "Conflict" in page
     assert "Activate profile" not in page
 
 
@@ -55,7 +55,7 @@ def test_low_localization_score_blocks_bulk_approval_only_for_locale(tmp_path: P
     ops.record_locale(job, "fr", "Texte", 0.92)
     assert ops.approvable_locales(job) == ["fr"]
     page = render_workspace("localization", ops)
-    assert "REVIEW_REQUIRED" in page and "APPROVED" in page
+    assert "Review required" in page and "Approved" in page
 
 
 def test_provenance_export_redacts_secrets_and_keeps_human_edits(tmp_path: Path) -> None:
@@ -68,13 +68,14 @@ def test_provenance_export_redacts_secrets_and_keeps_human_edits(tmp_path: Path)
     assert "[REDACTED]" in exported
 
 
-def test_all_workspaces_have_accessible_states_and_recovery(tmp_path: Path) -> None:
+def test_all_workspaces_have_accessible_status_and_no_false_recovery(tmp_path: Path) -> None:
     ops = store(tmp_path)
     for page in ("campaigns", "approvals", "voice", "publish", "localization", "provenance"):
         html = render_workspace(page, ops)
         assert "Skip to content" in html
         assert 'aria-live="polite"' in html
-        assert "Try again" in html
+        assert "Nothing here yet" in html
+        assert "The last stable state is preserved" not in html
 
 
 def test_public_workspace_routes_are_registered() -> None:

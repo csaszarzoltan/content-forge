@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
-from src.product_ops import ContentOpsStore, render_workspace
+from src.product_ops import ContentOpsStore, render_campaign_detail, render_workspace
 
 router = APIRouter()
 _DB = Path(os.getenv("CONTENTFORGE_OPS_DB", "/tmp/contentforge_ops.db"))
@@ -55,6 +55,30 @@ def workspace(page: str) -> HTMLResponse:
         return HTMLResponse(render_workspace(page, _store()))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="workspace_not_found") from exc
+
+
+@router.get("/workspace/campaigns/{campaign_id}", response_class=HTMLResponse)
+def campaign_detail(campaign_id: str) -> HTMLResponse:
+    """Show one campaign with human-readable state and contextual next action."""
+    try:
+        return HTMLResponse(render_campaign_detail(campaign_id, _store()))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="campaign_not_found") from exc
+
+
+@router.post("/workspace/campaigns/create", response_class=HTMLResponse)
+async def create_campaign_from_workspace(request: Request) -> Response:
+    """Create a campaign from the accessible HTML form without JavaScript."""
+    from urllib.parse import parse_qs
+
+    values = parse_qs((await request.body()).decode("utf-8"), keep_blank_values=True)
+    name = values.get("name", [""])[0].strip()
+    brief = values.get("brief", [""])[0].strip()
+    channels = [item.strip().lower() for item in values.get("channels", [""])[0].split(",") if item.strip()]
+    if not name or not brief or not channels or len(name) > 160 or len(brief) > 4000 or len(channels) > 20:
+        return HTMLResponse(render_workspace("campaigns", _store(), "Check the campaign name, brief, and channels.", True), status_code=422)
+    campaign_id = _store().create_campaign(name, channels)
+    return RedirectResponse(f"/workspace/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/api/v1/campaigns", status_code=201)

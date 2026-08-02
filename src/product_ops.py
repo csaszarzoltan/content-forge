@@ -264,6 +264,18 @@ class ContentOpsStore:
             ]
         return json.dumps(data, sort_keys=True)
 
+    def attention_summary(self) -> dict[str, int]:
+        """Return small, actionable queue counts for workspace navigation."""
+        with self._db() as db:
+            pending = db.execute("SELECT COUNT(*) FROM approvals WHERE state='PENDING'").fetchone()[0]
+            retryable = db.execute("SELECT COUNT(*) FROM deliveries WHERE state IN ('FAILED','RETRYABLE')").fetchone()[0]
+            locale_review = db.execute("SELECT COUNT(*) FROM locale_variants WHERE state='REVIEW_REQUIRED'").fetchone()[0]
+        return {
+            "pending_approvals": int(pending),
+            "retryable_deliveries": int(retryable),
+            "locales_to_review": int(locale_review),
+        }
+
     def rows(self, table: str) -> list[dict[str, Any]]:
         allowed = {
             "campaigns",
@@ -286,97 +298,101 @@ def _esc(v: Any) -> str:
     return html.escape(str(v), quote=True)
 
 
-def _layout(page: str, body: str) -> str:
+STATE_COPY = {
+    "DRAFT": ("Draft", "Add or generate channel assets"),
+    "PARTIAL": ("Partially ready", "Resolve failed assets while keeping successful work"),
+    "REVIEW_READY": ("Ready for review", "Submit the current asset version for approval"),
+    "FAILED": ("Needs attention", "Review the error and retry only the failed work"),
+    "PENDING": ("Awaiting review", "An assigned reviewer must make a decision"),
+    "RETRYABLE": ("Retry available", "Retry this channel without republishing successful channels"),
+    "APPROVED": ("Approved", "This item can continue to the next workflow stage"),
+    "REVIEW_REQUIRED": ("Review required", "A reviewer must check this locale"),
+}
+
+
+def _notice(notice: str | None, error: bool) -> str:
+    if not notice:
+        return ""
+    role = "alert" if error else "status"
+    kind = " notice-error" if error else " notice-success"
+    return f'<section class="notice{kind}" role="{role}"><p>{_esc(notice)}</p></section>'
+
+
+def _layout(page: str, body: str, notice: str | None = None, error: bool = False) -> str:
     title, subtitle = PAGES[page]
     nav = "".join(
         f'<a href="/workspace/{slug}"{" aria-current=page" if slug == page else ""}>{_esc(label)}</a>'
         for slug, (label, _) in PAGES.items()
     )
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{_esc(title)} | ContentForge</title><link rel="stylesheet" href="/static/workspaces.css"></head><body><a class="skip" href="#main">Skip to content</a><header><strong>ContentForge</strong><span>Content operations</span></header><div class="shell"><nav aria-label="Workspaces">{nav}</nav><main id="main" tabindex="-1"><p class="eyebrow">Workspace</p><h1>{_esc(title)}</h1><p>{_esc(subtitle)}</p><div class="live" aria-live="polite">Ready</div>{body}<section class="recovery"><h2>Recovery</h2><p>The last stable state is preserved when a dependency fails.</p><button>Try again</button></section></main></div></body></html>"""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{_esc(title)} | ContentForge</title><link rel="stylesheet" href="/static/workspaces.css"></head><body><a class="skip" href="#main">Skip to content</a><header><strong>ContentForge</strong><span>Content operations</span></header><div class="shell"><nav aria-label="Workspaces">{nav}</nav><main id="main" tabindex="-1"><p class="eyebrow">Workspace</p><h1>{_esc(title)}</h1><p>{_esc(subtitle)}</p><div class="live" aria-live="polite">Ready</div>{_notice(notice, error)}{body}</main></div></body></html>"""
 
 
-def _cards(rows: list[dict[str, Any]], keys: list[str], empty: str) -> str:
+def _cards(rows: list[dict[str, Any]], keys: list[str], empty: str, link_base: str | None = None) -> str:
     if not rows:
-        return f'<div class="empty"><h2>Empty state</h2><p>{_esc(empty)}</p></div>'
-    return (
-        '<div class="cards">'
-        + "".join(
-            "<article>"
-            + "".join(
-                f"<p><strong>{_esc(k.replace('_', ' ').title())}:</strong> {_esc(r.get(k, ''))}</p>"
-                for k in keys
-            )
-            + "</article>"
-            for r in rows
+        return f'<div class="empty"><h2>Nothing here yet</h2><p>{_esc(empty)}</p></div>'
+    cards = []
+    for row in rows:
+        state = str(row.get("state", ""))
+        label, action = STATE_COPY.get(state, (state.replace("_", " ").title(), "Open for details"))
+        fields = "".join(
+            f"<p><strong>{_esc(k.replace('_', ' ').title())}:</strong> {_esc(label if k == 'state' else row.get(k, ''))}</p>"
+            for k in keys
         )
-        + "</div>"
-    )
+        next_step = f'<p class="next-action"><strong>Next:</strong> {_esc(action)}</p>' if state else ""
+        link = f'<a class="card-action" href="{_esc(link_base)}/{_esc(row.get("id", ""))}">Open campaign<span class="sr-only"> {_esc(row.get("name", ""))}</span></a>' if link_base else ""
+        cards.append(f"<article>{fields}{next_step}{link}</article>")
+    return '<div class="cards">' + "".join(cards) + "</div>"
 
 
-def render_workspace(page: str, store: ContentOpsStore) -> str:
+def render_workspace(page: str, store: ContentOpsStore, notice: str | None = None, error: bool = False) -> str:
     if page not in PAGES:
         raise KeyError(page)
+    summary = store.attention_summary()
+    queue = (
+        '<aside class="attention" aria-label="Work requiring attention">'
+        f'<strong>{summary["pending_approvals"]} pending approval{"s" if summary["pending_approvals"] != 1 else ""}</strong>'
+        f'<span>{summary["retryable_deliveries"]} delivery retries</span>'
+        f'<span>{summary["locales_to_review"]} locales to review</span></aside>'
+    )
     if page == "campaigns":
-        body = (
-            '<section class=panel><h2>New campaign</h2><label>Campaign brief<textarea></textarea></label><label>Channels<input placeholder="LinkedIn, X"></label><button class=primary>Generate assets</button></section>'
-            + _cards(
-                store.rows("campaigns"),
-                ["name", "state"],
-                "Create a campaign to turn one brief into channel-ready assets.",
-            )
+        body = queue + (
+            '<section class="panel"><h2>New campaign</h2><p>Create a reusable campaign context before generating channel assets.</p>'
+            '<form method="post" action="/workspace/campaigns/create">'
+            '<label>Campaign name<input name="name" required maxlength="160" autocomplete="off"></label>'
+            '<label>Campaign brief<textarea name="brief" required maxlength="4000" placeholder="Goal, audience, key message, and call to action"></textarea></label>'
+            '<label>Channels<input name="channels" required aria-describedby="channels-help" placeholder="linkedin, twitter"></label>'
+            '<p id="channels-help" class="help">Enter comma-separated channel names. You can refine each asset later.</p>'
+            '<button class="primary" type="submit">Create campaign</button></form></section>'
+            + _cards(store.rows("campaigns"), ["name", "state"], "Create a campaign to turn one brief into channel-ready assets.", "/workspace/campaigns")
         )
     elif page == "approvals":
-        body = (
-            "<section class=panel><div class=heading><h2>Governance queue</h2><label>Risk filter<select><option>All</option><option>HIGH</option></select></label></div>"
-            + _cards(
-                store.rows("approvals"),
-                ["asset_id", "risk", "state", "findings"],
-                "New compliance or brand findings will appear here.",
-            )
-            + "</section>"
-        )
+        body = queue + "<section class=panel><div class=heading><h2>Governance queue</h2><label>Risk filter<select><option>All</option><option>HIGH</option></select></label></div>" + _cards(store.rows("approvals"), ["asset_id", "risk", "state", "findings"], "New compliance or brand findings will appear here.") + "</section>"
     elif page == "voice":
         rules = store.rows("voice_rules")
         conflict = any(r["state"] == "CONFLICT" for r in rules)
-        action = "" if conflict else "<button class=primary>Activate profile</button>"
-        body = (
-            "<section class=panel><h2>Evidence-backed rules</h2>"
-            + action
-            + _cards(
-                rules,
-                ["kind", "value", "evidence", "state"],
-                "Import representative content to extract explainable voice rules.",
-            )
-            + "</section>"
-        )
+        guidance = '<p class="notice notice-error" role="status">Resolve conflicting rules before activation.</p>' if conflict else "<button class=primary>Activate profile</button>"
+        body = queue + "<section class=panel><h2>Evidence-backed rules</h2>" + guidance + _cards(rules, ["kind", "value", "evidence", "state"], "Import representative content to extract explainable voice rules.") + "</section>"
     elif page == "publish":
-        body = (
-            "<section class=panel><h2>Channel previews</h2><div class=preview><article>LinkedIn preview</article><article>X preview</article></div>"
-            + _cards(
-                store.rows("deliveries"),
-                ["channel", "state", "remote_id"],
-                "Choose an approved asset to validate channels and credentials.",
-            )
-            + "</section>"
-        )
+        body = queue + "<section class=panel><h2>Channel previews</h2><p class=help>Select an approved asset to populate previews and run platform validation.</p><div class=preview><article><h3>LinkedIn preview</h3><p>No asset selected.</p></article><article><h3>X preview</h3><p>No asset selected.</p></article></div>" + _cards(store.rows("deliveries"), ["channel", "state", "remote_id"], "Choose an approved asset to validate channels and credentials.") + "</section>"
     elif page == "localization":
-        body = (
-            "<section class=panel><h2>Locale matrix</h2>"
-            + _cards(
-                store.rows("locale_variants"),
-                ["locale", "score", "state", "content"],
-                "Select source content and target locales to start translation QA.",
-            )
-            + "</section>"
-        )
+        body = queue + "<section class=panel><h2>Locale matrix</h2>" + _cards(store.rows("locale_variants"), ["locale", "score", "state", "content"], "Select source content and target locales to start translation QA.") + "</section>"
     else:
-        body = (
-            "<section class=panel><h2>Provenance ledger</h2><p>Model, prompt template, voice version, human edits, approvals, and delivery form one audit trail.</p>"
-            + _cards(
-                store.rows("provenance"),
-                ["asset_id", "model", "voice_version", "state"],
-                "Provenance records appear after the first generated asset.",
-            )
-            + "</section>"
-        )
-    return _layout(page, body)
+        body = queue + "<section class=panel><h2>Provenance ledger</h2><p>Model, prompt template, voice version, human edits, approvals, and delivery form one audit trail.</p>" + _cards(store.rows("provenance"), ["asset_id", "model", "voice_version", "state"], "Provenance records appear after the first generated asset.") + "</section>"
+    return _layout(page, body, notice, error)
+
+
+def render_campaign_detail(campaign_id: str, store: ContentOpsStore) -> str:
+    campaign = store.campaign(campaign_id)
+    state = str(campaign["state"])
+    label, action = STATE_COPY.get(state, (state.replace("_", " ").title(), "Review campaign"))
+    channels = json.loads(campaign["channels"])
+    assets = campaign["assets"]
+    progress = f"{len(assets)} of {len(channels)} channel assets created"
+    body = (
+        f'<p><a href="/workspace/campaigns">Back to campaigns</a></p>'
+        f'<section class="panel context"><p class="eyebrow">Campaign</p><h2>{_esc(campaign["name"])}</h2>'
+        f'<p><span class="status">{_esc(label)}</span></p><p class="next-action"><strong>Next:</strong> {_esc(action)}</p>'
+        f'<p aria-label="Campaign progress">{_esc(progress)}</p></section>'
+        + _cards(assets, ["channel", "state", "content"], "No assets yet. Generate or add the first channel asset.")
+    )
+    return _layout("campaigns", body)

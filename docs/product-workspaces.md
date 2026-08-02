@@ -29,3 +29,9 @@ Workspace pages provide skip navigation, semantic landmarks, visible focus, live
 ## Security boundary
 
 The workflow store contains operational metadata, not platform credentials. Existing encrypted token storage remains responsible for connector credentials. Production deployments must add tenant identifiers and object-level authorization to every repository query before enabling shared multi-tenant use.
+
+## v0.11 actionable workspace update
+
+The Campaign workspace now supports a complete server-rendered create-and-open interaction without JavaScript. Valid submissions use post/redirect/get and lead to a stable campaign detail page. Invalid submissions return an accessible operation alert. Campaign cards link to context, technical states are translated into plain-language labels with next steps, and operational attention counts expose pending approvals, retryable deliveries, and locale reviews.
+
+Recovery content is now shown only after an actual operation error. This avoids implying a failure when the system is healthy and improves the credibility of status feedback.
