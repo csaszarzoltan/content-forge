@@ -262,6 +262,84 @@ class ContentForgeClient:
         r.raise_for_status()
         return r.json()
 
+    # ── AI visibility (v0.14.0) ───────────────────────────────────────
+
+    def get_ai_visibility(
+        self, content_id: str, days: int = 30
+    ) -> dict[str, Any]:
+        """GET /api/v1/ai-visibility/{content_id} — per-content AI visibility snapshot.
+
+        Returns summary cards plus per-engine metrics (mentions, citations,
+        citation_rate, share_of_voice, mention_rate, sentiment, referral
+        traffic) for all four engines, zero-filled when there is no data.
+        days must be 7, 30, or 90.
+        """
+        r = self._client.get(
+            f"/api/v1/ai-visibility/{content_id}", params={"days": days}
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def get_ai_visibility_trends(
+        self,
+        days: int = 30,
+        engine: str | None = None,
+        metric: str | None = None,
+    ) -> dict[str, Any]:
+        """GET /api/v1/ai-visibility/trends — Chart.js-ready trend series.
+
+        ``dates`` maps to Chart.js labels; each entry in ``series`` is one
+        dataset (engine + metric). ``totals`` has all four metric keys.
+        """
+        params: dict[str, Any] = {"days": days}
+        if engine:
+            params["engine"] = engine
+        if metric:
+            params["metric"] = metric
+        r = self._client.get("/api/v1/ai-visibility/trends", params=params)
+        r.raise_for_status()
+        return r.json()
+
+    def ingest_ai_referral(
+        self,
+        generation_id: str,
+        engine: str,
+        referrer_url: str,
+        landing_path: str = "/",
+        converted: bool = False,
+        conversion_value: float = 0.0,
+        occurred_at: str | None = None,
+    ) -> dict[str, Any]:
+        """POST /api/v1/ai-visibility/referral — record one AI-referred visit.
+
+        engine: chatgpt, perplexity, gemini, or google_ai_overviews.
+        Returns {"status": "ok", "referral_id": "..."} (201).
+        """
+        body: dict[str, Any] = {
+            "generation_id": generation_id,
+            "engine": engine,
+            "referrer_url": referrer_url,
+            "landing_path": landing_path,
+            "converted": converted,
+            "conversion_value": conversion_value,
+        }
+        if occurred_at is not None:
+            body["occurred_at"] = occurred_at
+        r = self._client.post("/api/v1/ai-visibility/referral", json=body)
+        r.raise_for_status()
+        return r.json()
+
+    def refresh_ai_visibility(self, content_id: str) -> dict[str, Any]:
+        """POST /api/v1/ai-visibility/{content_id}/refresh — one poll cycle.
+
+        Returns a PollResult: engines_polled, queries_run, mentions_recorded,
+        errors. Runs even when the background poller is disabled; providers
+        without configured API keys degrade gracefully.
+        """
+        r = self._client.post(f"/api/v1/ai-visibility/{content_id}/refresh")
+        r.raise_for_status()
+        return r.json()
+
     @staticmethod
     def _window_params(
         date_from: str | None, date_to: str | None

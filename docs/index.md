@@ -76,6 +76,7 @@ print(engine.render("launch", profile))
 - [README.md](../README.md) — Project overview and quick start
 - [CHANGELOG.md](../CHANGELOG.md) — Version history
 - [Analytics Dashboard](analytics-dashboard.md) — Content performance tracking, scoring, export, trends
+- [AI Visibility](ai-visibility.md) — AI assistant mentions/citations, share of voice, referral traffic, Chart.js dashboard
 - [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples
 

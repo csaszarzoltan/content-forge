@@ -396,6 +396,33 @@ walkthroughs live in the [Analytics Dashboard guide](analytics-dashboard.md).
 
 ---
 
+### AI Visibility API — `/api/v1/ai-visibility/*`
+
+ContentForge v0.14.0 adds AI visibility tracking: mentions, citations, share
+of voice, and referral traffic from AI assistants (ChatGPT, Perplexity,
+Gemini, Google AI Overviews). All endpoints are unauthenticated (the auth
+dependency is optional).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/ai-visibility/{content_id}` | Per-content snapshot — `summary` cards, per-engine metrics for all four engines, daily `time_series` (`days=7\|30\|90`, default 30) |
+| `GET` | `/api/v1/ai-visibility/trends` | Chart.js-ready trend series — `dates` → labels, `series` → datasets (`days`, optional `engine`, `metric` filters) |
+| `POST` | `/api/v1/ai-visibility/referral` | Ingest an AI-referred visit — `{generation_id, engine, referrer_url, landing_path?, converted?, conversion_value?, occurred_at?}` → `{status: "ok", referral_id}` (201) |
+| `POST` | `/api/v1/ai-visibility/{content_id}/refresh` | On-demand poll cycle for one content piece → `PollResult` (engines polled, queries run, mentions recorded, errors) |
+
+**Engines:** `chatgpt`, `perplexity`, `gemini`, `google_ai_overviews`.
+**Metrics:** `citation_rate`, `share_of_voice`, `mention_rate`,
+`ai_referral_traffic`.
+
+**Errors:** unknown `generation_id` → `404`; invalid `days` (only 7/30/90
+accepted), unknown `engine`, or unknown `metric` → `422`.
+
+Metric definitions, provider configuration (API keys, poller settings), and a
+Chart.js dashboard example live in the
+[AI Visibility guide](ai-visibility.md).
+
+---
+
 ### `POST /api/v1/publish`
 
 Publish generated content to a social media platform.

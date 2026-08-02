@@ -123,6 +123,14 @@ Expected response:
 | `TWITTER_ACCESS_TOKEN_SECRET` | No | `""` | OAuth 1.0a user access token secret for Twitter/X. |
 | `LINKEDIN_CLIENT_ID` | No | `""` | LinkedIn OAuth 2.0 client ID. |
 | `LINKEDIN_CLIENT_SECRET` | No | `""` | LinkedIn OAuth 2.0 client secret. |
+| `AI_VISIBILITY_POLL_ENABLED` | No | `false` | Start the AI visibility background polling loop on startup. Off by default — `POST /api/v1/ai-visibility/{content_id}/refresh` works regardless. |
+| `AI_VISIBILITY_POLL_INTERVAL_SECONDS` | No | `86400` | Seconds between background AI visibility poll cycles (default: once per day). |
+| `AI_VISIBILITY_POLL_QUERIES_PER_CONTENT` | No | `5` | Probe queries each engine receives per content piece per poll. |
+| `AI_VISIBILITY_CONTENT_BASE_URL` | No | `""` | Public content origin — the poller builds the canonical target URL as `<base>/generations/{id}` for citation detection. Falls back to a reserved `.example` placeholder when empty. |
+| `PERPLEXITY_API_KEY` | No | `""` | Enables the Perplexity AI visibility provider (real HTTP API). |
+| `GEMINI_API_KEY` | No | `""` | Enables the Gemini AI visibility provider (real HTTP API). |
+| `CHATGPT_SEARCH_API_KEY` | No | `""` | Enables the ChatGPT AI visibility provider (structured LLM prompt). |
+| `GOOGLE_AI_SEARCH_API_KEY` | No | `""` | Enables the Google AI Overviews provider (structured LLM prompt). |
 
 ---
 

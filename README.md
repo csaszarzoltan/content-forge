@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-1783%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-1966%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -31,6 +31,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P0   | **Analytics Dashboard** | Event-log based content performance tracking — impressions, clicks, engagement, channel comparison, content scoring, A/B correlation, CSV/JSON export, trends + anomaly detection |
 | P1   | **Social Media Publishing** | Pluggable platform connectors (Twitter/X, LinkedIn) with rate limiting, retry, and status tracking |
 | P0   | **Platform Validation Engine** | Validate content against real platform constraints (Twitter/X, LinkedIn, Instagram, Facebook, TikTok) before publishing |
+| P1   | **AI Visibility Metrics** | Track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews) with per-content snapshots, Chart.js-ready trends, and optional background polling |
 
 ## Installation
 
@@ -46,7 +47,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 1783 tests pass
+pytest          # 1966 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -475,6 +476,67 @@ See the [Analytics Dashboard Guide](docs/analytics-dashboard.md) for the full
 API reference with request/response examples, the scoring formula, and the
 [analytics example](examples/api_analytics.py).
 
+## 🤖 AI Visibility Metrics
+
+ContentForge v0.14.0 tracks how often your content is **mentioned and cited
+by AI assistants** — ChatGPT, Perplexity, Gemini, and Google AI Overviews —
+plus the traffic those assistants refer back to your site. Poll the engines
+(background loop or on-demand refresh), ingest AI-referred visits webhook-style,
+and query per-content snapshots and Chart.js-ready trends under
+`/api/v1/ai-visibility` — no authentication required.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P1   | **Engine providers** | `AIEngineProvider` abstraction over all four engines — Perplexity and Gemini via real HTTP APIs, ChatGPT and Google AI Overviews via structured LLM prompts; graceful degradation when a key is missing |
+| P0   | **Per-content snapshot** | `GET /api/v1/ai-visibility/{content_id}` — mentions, citations, `citation_rate`, `share_of_voice`, `mention_rate`, sentiment, referral traffic and conversions per engine (all four engines always present, zero-filled) |
+| P0   | **Trends feed** | `GET /api/v1/ai-visibility/trends` — Chart.js-ready 7d/30d/90d series (`dates` → labels, `series` → datasets) with per-metric totals |
+| P0   | **Referral ingestion** | `POST /api/v1/ai-visibility/referral` — record an AI-referred visit (201), webhook-style and unauthenticated |
+| P1   | **On-demand refresh** | `POST /api/v1/ai-visibility/{content_id}/refresh` — run one poll cycle for a content piece, returning a `PollResult`; works with the background poller disabled |
+| P1   | **Background polling** | Opt-in asyncio loop (`AI_VISIBILITY_POLL_ENABLED=true`), interval and queries-per-content configurable; per-engine errors never abort the cycle |
+
+### Usage
+
+```bash
+# Per-content visibility snapshot (last 30 days)
+curl "http://localhost:8000/api/v1/ai-visibility/{content_id}"
+
+# Chart.js-ready trend series
+curl "http://localhost:8000/api/v1/ai-visibility/trends?days=30&metric=citation_rate"
+
+# Record an AI-referred visit
+curl -X POST http://localhost:8000/api/v1/ai-visibility/referral \
+  -H 'Content-Type: application/json' \
+  -d '{"generation_id": "gen_a1b2c3d4e5f6", "engine": "chatgpt", "referrer_url": "https://chatgpt.com/c/abc123"}'
+
+# On-demand visibility refresh (no API keys needed to run the cycle)
+curl -X POST http://localhost:8000/api/v1/ai-visibility/{content_id}/refresh
+```
+
+```python
+import httpx
+
+base = "http://localhost:8000/api/v1/ai-visibility"
+content_id = "gen_a1b2c3d4e5f6"
+
+# Snapshot: mentions, citations, share of voice, referral traffic
+snap = httpx.get(f"{base}/{content_id}", params={"days": 30}).json()
+print(snap["summary"]["total_mentions"], snap["summary"]["ai_referral_traffic"])
+
+# Trends: dates -> Chart.js labels, series -> datasets
+trends = httpx.get(f"{base}/trends", params={"days": 30}).json()
+print(trends["period"], trends["totals"])
+```
+
+Error mapping: unknown `generation_id` → **404**; invalid `days` (only 7/30/90
+accepted), unknown `engine`, or unknown `metric` → **422**.
+
+See the [AI Visibility Guide](docs/ai-visibility.md) for the metric
+definitions, the four-table data model, provider configuration, and a Chart.js
+dashboard example — plus the runnable
+[ai-visibility example](examples/api_ai_visibility.py).
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -495,6 +557,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Brand Voice API](docs/brand-voice-api.md) | `GET/POST/PUT/DELETE /brand-voices` — brand voice CRUD endpoints |
 | [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
 || [Analytics Dashboard](docs/analytics-dashboard.md) | `POST /api/v1/analytics/track`, `GET /dashboard`, `/content/{id}`, `/channels`, `/ab-results`, `/score/{id}`, `/export`, `/trends`, `/anomalies` — event tracking, content scoring, channel comparison, A/B correlation |
+| [AI Visibility](docs/ai-visibility.md) | `GET /api/v1/ai-visibility/{content_id}`, `/trends`, `POST /referral`, `POST /{content_id}/refresh` — metric definitions, provider configuration, Chart.js dashboard |
 || [Deployment](docs/deployment.md) | Railway + Docker deployment guide, environment config, health checks |
 || [Social Media Publishing](docs/social-publishing.md) | Platform connectors, rate limiting, publish API, production readiness |
 || [Language Detection](docs/language-detection.md) | Auto-detect input language with fast-langdetect, confidence scoring, batch detection |
@@ -514,6 +577,7 @@ Ready-to-run examples in [examples/](examples/):
 - [api_content_generation.py](examples/api_content_generation.py) — Content generation API workflows
 - [api_scheduling.py](examples/api_scheduling.py) — Scheduled post management via API
 - [api_analytics.py](examples/api_analytics.py) — Analytics dashboard walkthrough: track events, dashboard, channel comparison, scoring, trends, export
+- [api_ai_visibility.py](examples/api_ai_visibility.py) — AI visibility walkthrough: ingest referrals for all four engines, on-demand refresh, per-content snapshot, trends feed
 - [multilingual_generation.py](examples/multilingual_generation.py) — End-to-end multi-language pipeline (detection → templates → scoring → scheduling)
 
 ## Changelog
@@ -523,7 +587,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 1541 tests (interface + behavioral)
+pytest              # 1966 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```

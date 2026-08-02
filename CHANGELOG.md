@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.14.0] — 2026-08-02
+
+### Features
+- **AI Visibility Metrics** — track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews)
+- **Per-content snapshot** — `GET /api/v1/ai-visibility/{content_id}` returns summary cards, per-engine metrics for all four engines (zero-filled when no data), sentiment, and a daily time series over a 7/30/90-day window
+- **Trends feed** — `GET /api/v1/ai-visibility/trends` returns a Chart.js-ready series (`dates` → labels, `series` → datasets) with per-metric totals, filterable by engine and metric
+- **Referral ingestion** — `POST /api/v1/ai-visibility/referral` records an AI-referred visit webhook-style (201), unauthenticated, with optional conversion tracking
+- **On-demand refresh** — `POST /api/v1/ai-visibility/{content_id}/refresh` runs one poll cycle for a content piece and returns a `PollResult`; works with the background poller disabled
+- **Engine providers** — `AIEngineProvider` abstraction over all four engines: Perplexity and Gemini via real HTTP APIs (`sonar` / `gemini-2.0-flash`), ChatGPT and Google AI Overviews via structured LLM prompts; unconfigured providers degrade gracefully and provider errors never leak credentials
+- **Background polling** — opt-in asyncio loop (`AI_VISIBILITY_POLL_ENABLED=true`) with configurable interval and queries per content; per-engine failures are collected in `PollResult.errors` and never abort the cycle
+- **Four new tables** — `ai_raw_mentions` (append-only mention log), `ai_engine_metrics` (per-content/per-engine daily aggregates), `ai_referral_traffic` (AI-referred visits), `ai_trend_aggregates` (cross-content daily rollups)
+
+### Fixes
+- API keys no longer leak into provider error messages on HTTP/request failures (Perplexity/Gemini error paths report generic status-only text)
+- `days` is validated (7/30/90) before any date arithmetic, so extreme values return 422 instead of an unhandled `OverflowError`
+- Poller loop exceptions are logged so a silently dead poller is diagnosable
+- `AI_VISIBILITY_CONTENT_BASE_URL` is honored when building canonical content URLs for citation detection
+- `POST /{content_id}/refresh` is registered in OpenAPI
+
+### Tests
+- 157 passing AI visibility tests (metrics, models, schemas, providers, poller, service, API, review fixes); full suite **1966 passing, 27 skipped, 1 failed** — the single failure is the documented pre-written spec contradiction accepted by tech-lead review
+
+### Docs
+- New [AI Visibility guide](docs/ai-visibility.md) — metric definitions, data model, provider configuration, API reference, Chart.js dashboard example
+- README updated: AI visibility feature row and section, module reference entry, examples list, test badge (1966 passing)
+- New [AI visibility example](examples/api_ai_visibility.py) plus 4 AI visibility client methods in `examples/api_client.py`
+- API overview, deployment environment table, docs index, and `.env.example` updated with AI visibility endpoints and configuration
+
+## [0.13.0] - 2026-08-02
+- Reworked Publish Center around navigable delivery batches.
+- Added per-channel delivery details and remote identifiers.
+- Added safe retry requests scoped only to failed or retryable channels.
+- Preserved successful delivery records to prevent duplicate publication.
+- Added TDD coverage for partial-success recovery and fully published batches.
+
+## [0.12.0] - 2026-08-02
+- Added actionable approval detail pages and decision forms.
+- Added approval validation, accessible errors, and high-risk self-approval protection in browser flows.
+- Continued campaign workspace navigation, user-centered states, attention summaries, and contextual recovery.
+
 ## [0.10.0] — 2026-08-01
 
 ### Features
@@ -211,16 +251,3 @@
 
 ### Features
 - Initial ContentForge scaffold with FastAPI
-
-
-### [0.12.0] - 2026-08-02
-- Added actionable approval detail pages and decision forms.
-- Added approval validation, accessible errors, and high-risk self-approval protection in browser flows.
-- Continued campaign workspace navigation, user-centered states, attention summaries, and contextual recovery.
-
-### [0.13.0] - 2026-08-02
-- Reworked Publish Center around navigable delivery batches.
-- Added per-channel delivery details and remote identifiers.
-- Added safe retry requests scoped only to failed or retryable channels.
-- Preserved successful delivery records to prevent duplicate publication.
-- Added TDD coverage for partial-success recovery and fully published batches.
