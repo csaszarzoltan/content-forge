@@ -27,6 +27,20 @@ PAGES = {
     "provenance": ("Trust & audit", "Trace model output, human edits, approval, and publication."),
 }
 
+# Static per-table SELECTs for ContentOpsStore.rows(). Table names are allowlisted
+# (see rows()) and never interpolated into SQL, so the queries stay literal strings.
+_TABLE_SELECTS = {
+    "campaigns": "SELECT * FROM campaigns ORDER BY rowid DESC",
+    "approvals": "SELECT * FROM approvals ORDER BY rowid DESC",
+    "voice_profiles": "SELECT * FROM voice_profiles ORDER BY rowid DESC",
+    "voice_rules": "SELECT * FROM voice_rules ORDER BY rowid DESC",
+    "publish_batches": "SELECT * FROM publish_batches ORDER BY rowid DESC",
+    "deliveries": "SELECT * FROM deliveries ORDER BY rowid DESC",
+    "localization_jobs": "SELECT * FROM localization_jobs ORDER BY rowid DESC",
+    "locale_variants": "SELECT * FROM locale_variants ORDER BY rowid DESC",
+    "provenance": "SELECT * FROM provenance ORDER BY rowid DESC",
+}
+
 
 class ContentOpsStore:
     """Persist campaign operations with explicit workflow invariants."""
@@ -301,21 +315,11 @@ class ContentOpsStore:
         return {"pending_approvals": int(pending), "retryable_deliveries": int(retries), "locales_to_review": int(locales)}
 
     def rows(self, table: str) -> list[dict[str, Any]]:
-        allowed = {
-            "campaigns",
-            "approvals",
-            "voice_profiles",
-            "voice_rules",
-            "publish_batches",
-            "deliveries",
-            "localization_jobs",
-            "locale_variants",
-            "provenance",
-        }
-        if table not in allowed:
+        query = _TABLE_SELECTS.get(table)
+        if query is None:
             raise ValueError("TABLE_INVALID")
         with self._db() as db:
-            return [dict(x) for x in db.execute(f"SELECT * FROM {table} ORDER BY rowid DESC")]
+            return [dict(x) for x in db.execute(query)]
 
 
 def _esc(v: Any) -> str:
