@@ -170,6 +170,9 @@ class ChatGPTProvider(AIEngineProvider):
         except ProviderError:
             raise
         except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+            # B1 audit (tech-lead): no HTTP request URL exists for this
+            # provider — the api_key is never interpolated into the prompt or
+            # any message; json.loads errors carry only the LLM output.
             raise ProviderError(f"ChatGPT visibility check failed: {exc}") from exc
 
     async def validate_credentials(self) -> bool:
@@ -234,6 +237,21 @@ class PerplexityProvider(AIEngineProvider, _HTTPProviderMixin):
             )
         except ProviderError:
             raise
+        except httpx.HTTPStatusError as exc:
+            # B1 (tech-lead review): httpx error strings can embed the full
+            # request URL INCLUDING the ?key= query param — never interpolate
+            # the exception into the ProviderError message or the API key
+            # leaks into PollResult.errors. Generic status-only text instead.
+            raise ProviderError(
+                f"Perplexity visibility check failed (HTTP {exc.response.status_code})"
+            ) from exc
+        except httpx.RequestError as exc:
+            # B1: RequestError strings also carry the request URL; keep
+            # the message generic (the key travels in the Authorization
+            # header, not the URL, but never risk echoing either).
+            raise ProviderError(
+                "Perplexity visibility check failed (request error)"
+            ) from exc
         except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
             raise ProviderError(f"Perplexity visibility check failed: {exc}") from exc
 
@@ -301,7 +319,23 @@ class GeminiProvider(AIEngineProvider, _HTTPProviderMixin):
             )
         except ProviderError:
             raise
+        except httpx.HTTPStatusError as exc:
+            # B1 (tech-lead review, CRITICAL): the API key travels as a
+            # ?key= query param and httpx error strings can embed the full
+            # request URL WITH the query string — interpolating `exc` here
+            # leaks the key into ProviderError -> PollResult.errors. Use a
+            # generic status-only message; never echo the exception.
+            raise ProviderError(
+                f"Gemini visibility check failed (HTTP {exc.response.status_code})"
+            ) from exc
+        except httpx.RequestError as exc:
+            # B1: RequestError strings also carry the request URL; keep the
+            # message generic (no URL, no query params).
+            raise ProviderError("Gemini visibility check failed (request error)") from exc
         except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+            # B1 audit: only json.loads / response-shape errors reach here —
+            # their messages carry response body text or key names, never the
+            # request URL (HTTP errors are caught above), so no key leak.
             raise ProviderError(f"Gemini visibility check failed: {exc}") from exc
 
     async def validate_credentials(self) -> bool:
@@ -369,6 +403,9 @@ class GoogleAIOverviewsProvider(AIEngineProvider):
         except ProviderError:
             raise
         except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+            # B1 audit (tech-lead): same as ChatGPTProvider — no HTTP URL is
+            # reachable here, only LLM output / json.parse errors, so the
+            # api_key cannot appear in the message.
             raise ProviderError(
                 f"Google AI Overviews visibility check failed: {exc}"
             ) from exc

@@ -315,6 +315,11 @@ class AiVisibilityService:
         """Per-content snapshot over the window; 404 via ValueError when the
         generation is unknown; engine list always contains all four engines
         (zero-filled when no data)."""
+        # B2 (tech-lead review): validate days BEFORE any lookup — otherwise
+        # days=10**15 reaches timedelta(days=days-1) as an unhandled
+        # OverflowError (500). Mirrors get_trends' validation (422 mapping).
+        if days not in AI_TREND_PERIODS:
+            raise ValueError(f"Invalid days: {days!r} (expected 7, 30 or 90)")
         generation = await self._require_generation(db, content_id)
         date_to = _utcnow().date()
         date_from = date_to - timedelta(days=days - 1)

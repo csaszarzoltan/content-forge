@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     AI_VISIBILITY_POLL_ENABLED: bool = False
     AI_VISIBILITY_POLL_INTERVAL_SECONDS: int = 86400
     AI_VISIBILITY_POLL_QUERIES_PER_CONTENT: int = 5
+    # B4 (tech-lead review): base URL for content pieces, used by the poller
+    # to build the canonical target URL for citation detection; empty falls
+    # back to the reserved .example placeholder (tests/dev).
+    AI_VISIBILITY_CONTENT_BASE_URL: str = ""
     PERPLEXITY_API_KEY: str = ""  # empty => Perplexity provider unconfigured
     GEMINI_API_KEY: str = ""  # empty => Gemini provider unconfigured
     CHATGPT_SEARCH_API_KEY: str = ""  # empty => ChatGPT provider unconfigured

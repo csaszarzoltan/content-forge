@@ -12,11 +12,16 @@ Chosen mechanism (decision A3): provider abstraction + background asyncio task
 - ``start()`` spawns an asyncio background task looping with
   ``asyncio.sleep(interval)`` (sleep-first, so the task never polls before the
   interval elapses); ``shutdown()`` cancels it. Mirrors ``SchedulerService``.
+- ``_target_url`` builds the canonical content URL from the
+  ``AI_VISIBILITY_CONTENT_BASE_URL`` setting (env-only, B4 review fix); when
+  the setting is empty it falls back to a reserved ``.example`` placeholder
+  so tests/dev keep a deterministic value.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -29,6 +34,8 @@ from src.ai_visibility.service import AiVisibilityService
 from src.config import Settings, get_settings
 from src.database import DatabaseManager
 from src.models.generation import Generation
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
@@ -79,6 +86,9 @@ class AiVisibilityPoller:
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001 — the loop must never die
+                # B3 (tech-lead review): log the failure so a silently dead
+                # poller is diagnosable; keep looping regardless.
+                logger.exception("ai_visibility poller loop error")
                 continue
 
     async def poll_once(
@@ -152,6 +162,16 @@ class AiVisibilityPoller:
         )
 
     def _target_url(self, generation_id: str) -> str:
-        """Deterministic target URL for a content piece (no URL column on
-        Generation; tests exercise counts, not URL content)."""
+        """Deterministic target URL for a content piece.
+
+        Uses ``AI_VISIBILITY_CONTENT_BASE_URL`` when configured (B4 review
+        fix): production deployments set it to the real content origin so
+        citation detection matches actual URLs. Falls back to the reserved
+        ``.example`` placeholder when the setting is empty (tests/dev — there
+        is no URL column on Generation; the existing poller tests assert
+        counts, not URL content).
+        """
+        base = self._settings.AI_VISIBILITY_CONTENT_BASE_URL
+        if base:
+            return f"{base.rstrip('/')}/generations/{generation_id}"
         return f"https://contentforge.example/generations/{generation_id}"

@@ -13,14 +13,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.dependencies import get_db, get_optional_current_user
 
 from src.ai_visibility.schemas import (
     AIVisibilityTrendsResponse,
     ContentVisibilityResponse,
+    PollResult,
     ReferralIngestRequest,
     ReferralIngestResponse,
 )
@@ -93,3 +95,34 @@ async def get_content_visibility(
         return await _service().get_content_visibility(db, content_id, days=days)
     except ValueError as exc:
         raise _http_error(exc) from exc
+
+
+@router.post("/{content_id}/refresh", response_model=PollResult)
+async def refresh_content_visibility(
+    content_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: "User | None" = Depends(get_optional_current_user),
+) -> PollResult:
+    """On-demand visibility refresh (brief §5 M8 #2).
+
+    Verifies the generation exists (404 via the canonical ValueError mapping),
+    then runs one poll cycle for it. Works standalone: when the background
+    poller is disabled (``app.state.ai_poller`` is None — e.g. the lifespan
+    only builds it when ``AI_VISIBILITY_POLL_ENABLED``), a fresh
+    ``AiVisibilityPoller`` is built from ``ProviderRegistry.from_settings``.
+    """
+    try:
+        await _service()._require_generation(db, content_id)
+    except ValueError as exc:
+        raise _http_error(exc) from exc
+    poller = getattr(request.app.state, "ai_poller", None)
+    if poller is None:
+        from src.ai_visibility.poller import AiVisibilityPoller
+        from src.ai_visibility.providers import ProviderRegistry
+
+        settings = get_settings()
+        poller = AiVisibilityPoller(
+            registry=ProviderRegistry.from_settings(settings), settings=settings
+        )
+    return await poller.poll_once(db, generation_ids=[content_id])
