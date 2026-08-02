@@ -13,6 +13,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import get_settings
 from src.database import Base
+from src.ai_visibility.models import (  # noqa: F401  (register tables on Base.metadata)
+    AIEngineMetrics,
+    AIRawMention,
+    AIReferralTraffic,
+    AITrendAggregate,
+)
 from src.models import (  # noqa: F401
     ABEvent,
     ABTest,
@@ -25,6 +31,7 @@ from src.models import (  # noqa: F401
     User,
 )
 from src.routers.ab_test import router as ab_router
+from src.ai_visibility.router import router as ai_visibility_router
 from src.routers.analytics import router as analytics_router
 from src.routers.auth import router as auth_router
 from src.routers.brand_voice import router as brand_voice_router
@@ -76,8 +83,22 @@ async def lifespan(app: FastAPI):
 
     app.state.scheduler = SchedulerService()
     await app.state.scheduler.start()
+
+    # AI visibility poller (M8 P1): opt-in background polling when enabled.
+    ai_poller = None
+    if settings.AI_VISIBILITY_POLL_ENABLED:
+        from src.ai_visibility.poller import AiVisibilityPoller
+        from src.ai_visibility.providers import ProviderRegistry
+
+        registry = ProviderRegistry.from_settings(settings)
+        ai_poller = AiVisibilityPoller(registry=registry, settings=settings)
+        await ai_poller.start()
+    app.state.ai_poller = ai_poller
+
     yield
     # Shutdown
+    if ai_poller is not None:
+        await ai_poller.shutdown()
     await app.state.scheduler.shutdown()
 
 
@@ -109,6 +130,7 @@ app.include_router(publish_router)
 app.include_router(schedule_router)
 app.include_router(ab_router)
 app.include_router(analytics_router)
+app.include_router(ai_visibility_router)
 app.include_router(seo_router)
 app.include_router(workspaces_router)
 app.include_router(constraints_router)

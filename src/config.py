@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
 
+    # AI visibility polling settings (analysis brief §5 P0 / M4 / M7)
+    AI_VISIBILITY_POLL_ENABLED: bool = False
+    AI_VISIBILITY_POLL_INTERVAL_SECONDS: int = 86400
+    AI_VISIBILITY_POLL_QUERIES_PER_CONTENT: int = 5
+    PERPLEXITY_API_KEY: str = ""  # empty => Perplexity provider unconfigured
+    GEMINI_API_KEY: str = ""  # empty => Gemini provider unconfigured
+    CHATGPT_SEARCH_API_KEY: str = ""  # empty => ChatGPT provider unconfigured
+    GOOGLE_AI_SEARCH_API_KEY: str = ""  # empty => Google AIO provider unconfigured
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
