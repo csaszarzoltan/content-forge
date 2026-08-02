@@ -68,7 +68,7 @@ def test_provenance_export_redacts_secrets_and_keeps_human_edits(tmp_path: Path)
     assert "[REDACTED]" in exported
 
 
-def test_all_workspaces_have_accessible_status_and_no_false_recovery(tmp_path: Path) -> None:
+def test_all_workspaces_have_accessible_states_and_recovery(tmp_path: Path) -> None:
     ops = store(tmp_path)
     for page in ("campaigns", "approvals", "voice", "publish", "localization", "provenance"):
         html = render_workspace(page, ops)

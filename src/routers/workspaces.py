@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
-from src.product_ops import ContentOpsStore, render_campaign_detail, render_workspace
+from src.product_ops import ContentOpsStore, render_approval_detail, render_campaign_detail, render_publish_batch_detail, render_workspace
 
 router = APIRouter()
 _DB = Path(os.getenv("CONTENTFORGE_OPS_DB", "/tmp/contentforge_ops.db"))
@@ -57,28 +57,50 @@ def workspace(page: str) -> HTMLResponse:
         raise HTTPException(status_code=404, detail="workspace_not_found") from exc
 
 
+def _form(body: bytes) -> dict[str, str]:
+    from urllib.parse import parse_qs
+    return {key: values[0] for key, values in parse_qs(body.decode(), keep_blank_values=True).items()}
+
 @router.get("/workspace/campaigns/{campaign_id}", response_class=HTMLResponse)
 def campaign_detail(campaign_id: str) -> HTMLResponse:
-    """Show one campaign with human-readable state and contextual next action."""
-    try:
-        return HTMLResponse(render_campaign_detail(campaign_id, _store()))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="campaign_not_found") from exc
+    try: return HTMLResponse(render_campaign_detail(campaign_id, _store()))
+    except KeyError as exc: raise HTTPException(404, "campaign_not_found") from exc
 
+@router.post("/workspace/campaigns/create")
+async def create_campaign_form(request: Request) -> Response:
+    data=_form(await request.body()); name=data.get("name","").strip(); brief=data.get("brief","").strip(); channels=[x.strip().lower() for x in data.get("channels","").split(",") if x.strip()]
+    if not name or not brief or not channels: return HTMLResponse(render_workspace("campaigns",_store(),"Check the campaign name, brief, and channels.",True),422)
+    campaign_id=_store().create_campaign(name,channels); return RedirectResponse(f"/workspace/campaigns/{campaign_id}",303)
 
-@router.post("/workspace/campaigns/create", response_class=HTMLResponse)
-async def create_campaign_from_workspace(request: Request) -> Response:
-    """Create a campaign from the accessible HTML form without JavaScript."""
-    from urllib.parse import parse_qs
+@router.get("/workspace/approvals/{request_id}", response_class=HTMLResponse)
+def approval_detail(request_id: str) -> HTMLResponse:
+    try: return HTMLResponse(render_approval_detail(request_id,_store()))
+    except KeyError as exc: raise HTTPException(404,"approval_not_found") from exc
 
-    values = parse_qs((await request.body()).decode("utf-8"), keep_blank_values=True)
-    name = values.get("name", [""])[0].strip()
-    brief = values.get("brief", [""])[0].strip()
-    channels = [item.strip().lower() for item in values.get("channels", [""])[0].split(",") if item.strip()]
-    if not name or not brief or not channels or len(name) > 160 or len(brief) > 4000 or len(channels) > 20:
-        return HTMLResponse(render_workspace("campaigns", _store(), "Check the campaign name, brief, and channels.", True), status_code=422)
-    campaign_id = _store().create_campaign(name, channels)
-    return RedirectResponse(f"/workspace/campaigns/{campaign_id}", status_code=303)
+@router.post("/workspace/approvals/{request_id}/decision")
+async def approval_decision(request_id: str, request: Request) -> Response:
+    data=_form(await request.body()); reviewer=data.get("reviewer","").strip(); decision=data.get("decision",""); reason=data.get("reason","").strip()
+    if not reviewer or decision not in {"APPROVED","NEEDS_CHANGES","REJECTED"} or not reason:
+        return HTMLResponse(render_approval_detail(request_id,_store(),"Reviewer, decision, and reason are required.",True),422)
+    try: _store().decide_approval(request_id,reviewer,decision,reason)
+    except PermissionError: return HTMLResponse(render_approval_detail(request_id,_store(),"High-risk content cannot be approved by its requester.",True),403)
+    except KeyError as exc: raise HTTPException(404,"approval_not_found") from exc
+    return RedirectResponse(f"/workspace/approvals/{request_id}",303)
+
+@router.get("/workspace/publish/{batch_id}", response_class=HTMLResponse)
+def publish_batch_detail(batch_id: str) -> HTMLResponse:
+    try: return HTMLResponse(render_publish_batch_detail(batch_id,_store()))
+    except KeyError as exc: raise HTTPException(404,"publish_batch_not_found") from exc
+
+@router.post("/workspace/publish/{batch_id}/retry")
+async def publish_batch_retry(batch_id: str, request: Request) -> Response:
+    await request.body()
+    try: channels=_store().request_publish_retry(batch_id)
+    except KeyError as exc: raise HTTPException(404,"publish_batch_not_found") from exc
+    except ValueError: return HTMLResponse(render_publish_batch_detail(batch_id,_store(),"This batch has no failed channels to retry.",True),409)
+    scope=", ".join(channels)
+    return HTMLResponse(render_publish_batch_detail(batch_id,_store(),f"Retry queued for: {scope}. Successful channels were preserved."),202)
+
 
 
 @router.post("/api/v1/campaigns", status_code=201)

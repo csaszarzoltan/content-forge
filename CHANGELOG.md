@@ -212,3 +212,15 @@
 ### Features
 - Initial ContentForge scaffold with FastAPI
 
+
+### [0.12.0] - 2026-08-02
+- Added actionable approval detail pages and decision forms.
+- Added approval validation, accessible errors, and high-risk self-approval protection in browser flows.
+- Continued campaign workspace navigation, user-centered states, attention summaries, and contextual recovery.
+
+### [0.13.0] - 2026-08-02
+- Reworked Publish Center around navigable delivery batches.
+- Added per-channel delivery details and remote identifiers.
+- Added safe retry requests scoped only to failed or retryable channels.
+- Preserved successful delivery records to prevent duplicate publication.
+- Added TDD coverage for partial-success recovery and fully published batches.

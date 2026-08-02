@@ -577,14 +577,8 @@ uv build
 
 The isolated workflow suite is `tests/test_product_workspaces.py`. The full suite deliberately unsets the host `ENVIRONMENT` variable so configuration-default tests remain deterministic.
 
-## Actionable content operations workspaces (v0.11.0)
+## Actionable approval workflow (v0.12.0)
+Approval queue cards now open contextual review pages. Reviewers can approve, request changes, or reject with a reason; the browser flow enforces the existing high-risk self-review rule and returns accessible operation feedback.
 
-The six browser workspaces now provide an actionable, user-centered campaign entry flow. The campaign workspace includes a real server-validated form, post/redirect/get behavior, navigable campaign cards, contextual detail pages, human-readable states, next-step guidance, attention counts, and honest error recovery. The implementation remains server-rendered and works without JavaScript.
-
-Start the application and open:
-
-```text
-http://localhost:8000/workspace/campaigns
-```
-
-See [Workspace UX implementation report](docs/WORKSPACE_UX_IMPLEMENTATION_REPORT.md) and [next-version product requirements](docs/NEXT_VERSION_PRODUCT_ANALYSIS_AND_REQUIREMENTS.md).
+## Safe publish recovery (v0.13.0)
+The Publish Center now provides delivery-batch detail pages with per-channel outcomes. A retry request includes only failed or retryable channels, preserves successful deliveries, and clearly explains the recovery scope before the user acts.
