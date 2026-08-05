@@ -6,3 +6,16 @@ __pycache__/
 # runtime DB
 *.db
 contentforge.db
+
+# Frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local runtime state
+*.db
+.env
+.env.*
+!.env.example
+coverage.xml
+htmlcov/

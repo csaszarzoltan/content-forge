@@ -61,8 +61,17 @@ class ContentOpsStore:
                 CREATE TABLE IF NOT EXISTS locale_variants(id TEXT PRIMARY KEY,job_id TEXT,locale TEXT,content TEXT,score REAL,state TEXT,UNIQUE(job_id,locale));
                 CREATE TABLE IF NOT EXISTS provenance(id TEXT PRIMARY KEY,asset_id TEXT,model TEXT,prompt TEXT,voice_version TEXT,state TEXT,created_at REAL);
                 CREATE TABLE IF NOT EXISTS provenance_events(id TEXT PRIMARY KEY,record_id TEXT,kind TEXT,payload TEXT,created_at REAL);
+                CREATE TABLE IF NOT EXISTS asset_revisions(id TEXT PRIMARY KEY,asset_id TEXT,version INTEGER,content TEXT,author TEXT,created_at REAL,UNIQUE(asset_id,version));
                 """
             )
+            campaign_columns = {row[1] for row in db.execute("PRAGMA table_info(campaigns)")}
+            if "brief" not in campaign_columns:
+                db.execute("ALTER TABLE campaigns ADD COLUMN brief TEXT NOT NULL DEFAULT ''")
+            asset_columns = {row[1] for row in db.execute("PRAGMA table_info(assets)")}
+            if "title" not in asset_columns:
+                db.execute("ALTER TABLE assets ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+            if "version" not in asset_columns:
+                db.execute("ALTER TABLE assets ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
 
     def _db(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
@@ -73,17 +82,147 @@ class ContentOpsStore:
     def _id() -> str:
         return uuid.uuid4().hex
 
-    def create_campaign(self, name: str, channels: list[str]) -> str:
+    def create_campaign(self, name: str, channels: list[str], brief: str = "") -> str:
+        """Create a campaign with a durable brief and normalized channels."""
         clean = sorted({x.strip() for x in channels if x.strip()})
         if not name.strip() or not clean:
             raise ValueError("CAMPAIGN_INPUT_INVALID")
         campaign_id = self._id()
         with self._db() as db:
             db.execute(
-                "INSERT INTO campaigns VALUES (?,?,?,?)",
-                (campaign_id, name, "DRAFT", json.dumps(clean)),
+                "INSERT INTO campaigns(id,name,state,channels,brief) VALUES (?,?,?,?,?)",
+                (campaign_id, name.strip(), "DRAFT", json.dumps(clean), brief.strip()),
             )
         return campaign_id
+
+    def create_asset(
+        self,
+        campaign_id: str,
+        channel: str,
+        content: str,
+        title: str,
+        state: str = "DRAFT",
+        author: str = "system",
+    ) -> str:
+        """Create an editable asset and immutable first revision."""
+        if state not in {"DRAFT", "IN_EDITING", "WAITING_APPROVAL", "APPROVED"}:
+            raise ValueError("ASSET_STATE_INVALID")
+        if not content.strip() or not title.strip():
+            raise ValueError("ASSET_INPUT_INVALID")
+        asset_id = self._id()
+        revision_id = self._id()
+        with self._db() as db:
+            campaign = db.execute("SELECT id FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
+            if not campaign:
+                raise KeyError(campaign_id)
+            db.execute(
+                "INSERT INTO assets(id,campaign_id,channel,content,state,title,version) VALUES (?,?,?,?,?,?,1)",
+                (asset_id, campaign_id, channel, content, state, title),
+            )
+            db.execute(
+                "INSERT INTO asset_revisions VALUES (?,?,?,?,?,?)",
+                (revision_id, asset_id, 1, content, author, time.time()),
+            )
+        return asset_id
+
+    def save_revision(
+        self, asset_id: str, content: str, expected_version: int, author: str
+    ) -> dict[str, Any]:
+        """Autosave new content with optimistic concurrency protection."""
+        if not content.strip() or not author.strip():
+            raise ValueError("ASSET_REVISION_INPUT_INVALID")
+        with self._db() as db:
+            asset = db.execute("SELECT version FROM assets WHERE id=?", (asset_id,)).fetchone()
+            if not asset:
+                raise KeyError(asset_id)
+            if asset[0] != expected_version:
+                raise ValueError("ASSET_VERSION_CONFLICT")
+            version = expected_version + 1
+            revision_id = self._id()
+            db.execute(
+                "INSERT INTO asset_revisions VALUES (?,?,?,?,?,?)",
+                (revision_id, asset_id, version, content, author, time.time()),
+            )
+            db.execute(
+                "UPDATE assets SET content=?,version=?,state='IN_EDITING' WHERE id=?",
+                (content, version, asset_id),
+            )
+        return {
+            "id": revision_id,
+            "asset_id": asset_id,
+            "version": version,
+            "content": content,
+            "author": author,
+        }
+
+    def revisions(self, asset_id: str) -> list[dict[str, Any]]:
+        """List immutable revisions newest first."""
+        with self._db() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    "SELECT * FROM asset_revisions WHERE asset_id=? ORDER BY version DESC",
+                    (asset_id,),
+                )
+            ]
+
+    def restore_revision(
+        self, asset_id: str, version: int, expected_version: int, author: str
+    ) -> dict[str, Any]:
+        """Restore historical content by appending a new revision."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT content FROM asset_revisions WHERE asset_id=? AND version=?",
+                (asset_id, version),
+            ).fetchone()
+            if not row:
+                raise KeyError((asset_id, version))
+            content = row[0]
+        return self.save_revision(asset_id, content, expected_version, author)
+
+    def campaign_readiness(self, campaign_id: str) -> dict[str, Any]:
+        """Explain channel readiness for the campaign cockpit."""
+        campaign = self.campaign(campaign_id)
+        channels = json.loads(campaign["channels"])
+        ready = sorted(
+            {asset["channel"] for asset in campaign["assets"] if asset["state"] == "APPROVED"}
+        )
+        blockers = [
+            f"Create an approved asset for {channel}"
+            for channel in channels
+            if channel not in ready
+        ]
+        score = round(100 * len(ready) / len(channels)) if channels else 0
+        return {"score": score, "ready_channels": ready, "blockers": blockers}
+
+    def my_work(self) -> list[dict[str, Any]]:
+        """Return actionable approval and publishing recovery work."""
+        items: list[dict[str, Any]] = []
+        with self._db() as db:
+            for row in db.execute(
+                "SELECT id,risk,asset_id FROM approvals WHERE state='PENDING' ORDER BY rowid"
+            ):
+                items.append(
+                    {
+                        "kind": "approval",
+                        "id": row[0],
+                        "priority": row[1],
+                        "asset_id": row[2],
+                        "action": "Review content",
+                    }
+                )
+            for row in db.execute(
+                "SELECT DISTINCT b.id FROM publish_batches b JOIN deliveries d ON d.batch_id=b.id WHERE d.state IN ('FAILED','RETRYABLE') ORDER BY b.rowid"
+            ):
+                items.append(
+                    {
+                        "kind": "publish_failure",
+                        "id": row[0],
+                        "priority": "HIGH",
+                        "action": "Recover publication",
+                    }
+                )
+        return items
 
     def record_asset(self, campaign_id: str, channel: str, content: str, state: str) -> str:
         if state not in {"READY", "FAILED"}:
@@ -91,7 +230,7 @@ class ContentOpsStore:
         asset_id = self._id()
         with self._db() as db:
             db.execute(
-                "INSERT INTO assets VALUES (?,?,?,?,?)",
+                "INSERT INTO assets(id,campaign_id,channel,content,state) VALUES (?,?,?,?,?)",
                 (asset_id, campaign_id, channel, content, state),
             )
             states = [
@@ -217,7 +356,12 @@ class ContentOpsStore:
                 raise KeyError(batch_id)
             result = dict(row)
             result["channels"] = json.loads(result["channels"])
-            result["deliveries"] = [dict(x) for x in db.execute("SELECT * FROM deliveries WHERE batch_id=? ORDER BY channel", (batch_id,))]
+            result["deliveries"] = [
+                dict(x)
+                for x in db.execute(
+                    "SELECT * FROM deliveries WHERE batch_id=? ORDER BY channel", (batch_id,)
+                )
+            ]
             return result
 
     def request_publish_retry(self, batch_id: str) -> list[str]:
@@ -309,10 +453,20 @@ class ContentOpsStore:
 
     def attention_summary(self) -> dict[str, int]:
         with self._db() as db:
-            pending = db.execute("SELECT COUNT(*) FROM approvals WHERE state='PENDING'").fetchone()[0]
-            retries = db.execute("SELECT COUNT(*) FROM deliveries WHERE state IN ('FAILED','RETRYABLE')").fetchone()[0]
-            locales = db.execute("SELECT COUNT(*) FROM locale_variants WHERE state='REVIEW_REQUIRED'").fetchone()[0]
-        return {"pending_approvals": int(pending), "retryable_deliveries": int(retries), "locales_to_review": int(locales)}
+            pending = db.execute("SELECT COUNT(*) FROM approvals WHERE state='PENDING'").fetchone()[
+                0
+            ]
+            retries = db.execute(
+                "SELECT COUNT(*) FROM deliveries WHERE state IN ('FAILED','RETRYABLE')"
+            ).fetchone()[0]
+            locales = db.execute(
+                "SELECT COUNT(*) FROM locale_variants WHERE state='REVIEW_REQUIRED'"
+            ).fetchone()[0]
+        return {
+            "pending_approvals": int(pending),
+            "retryable_deliveries": int(retries),
+            "locales_to_review": int(locales),
+        }
 
     def rows(self, table: str) -> list[dict[str, Any]]:
         query = _TABLE_SELECTS.get(table)
@@ -325,72 +479,211 @@ class ContentOpsStore:
 def _esc(v: Any) -> str:
     return html.escape(str(v), quote=True)
 
+
 STATE_COPY = {
-    "DRAFT": ("Draft", "Add or generate channel assets"), "PARTIAL": ("Partially ready", "Resolve failed assets while keeping successful work"),
-    "PENDING": ("Awaiting review", "An assigned reviewer must make a decision"), "APPROVED": ("Approved", "Continue to publishing"),
-    "NEEDS_CHANGES": ("Changes requested", "Update the asset and resubmit it"), "REJECTED": ("Rejected", "Review the decision reason"),
-    "RETRYABLE": ("Retry available", "Retry without republishing successful channels"), "REVIEW_REQUIRED": ("Review required", "A reviewer must check this locale"),
+    "DRAFT": ("Draft", "Add or generate channel assets"),
+    "PARTIAL": ("Partially ready", "Resolve failed assets while keeping successful work"),
+    "PENDING": ("Awaiting review", "An assigned reviewer must make a decision"),
+    "APPROVED": ("Approved", "Continue to publishing"),
+    "NEEDS_CHANGES": ("Changes requested", "Update the asset and resubmit it"),
+    "REJECTED": ("Rejected", "Review the decision reason"),
+    "RETRYABLE": ("Retry available", "Retry without republishing successful channels"),
+    "REVIEW_REQUIRED": ("Review required", "A reviewer must check this locale"),
     "CONFLICT": ("Conflict", "Resolve conflicting rules before activation"),
 }
 
+
 def _notice(message: str | None, error: bool = False) -> str:
-    if not message: return ""
+    if not message:
+        return ""
     role = "alert" if error else "status"
     kind = "notice-error" if error else "notice-success"
     return f'<section class="notice {kind}" role="{role}"><p>{_esc(message)}</p></section>'
 
+
 def _layout(page: str, body: str, notice: str | None = None, error: bool = False) -> str:
     title, subtitle = PAGES[page]
-    nav = "".join(f'<a href="/workspace/{slug}"{" aria-current=page" if slug == page else ""}>{_esc(label)}</a>' for slug, (label, _) in PAGES.items())
-    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+_esc(title)+' | ContentForge</title><link rel="stylesheet" href="/static/workspaces.css"></head><body><a class="skip" href="#main">Skip to content</a><header><strong>ContentForge</strong><span>Content operations</span></header><div class="shell"><nav aria-label="Workspaces">'+nav+'</nav><main id="main" tabindex="-1"><p class="eyebrow">Workspace</p><h1>'+_esc(title)+'</h1><p>'+_esc(subtitle)+'</p><div class="live" aria-live="polite">Ready</div>'+_notice(notice,error)+body+'</main></div></body></html>'
+    nav = "".join(
+        f'<a href="/workspace/{slug}"{" aria-current=page" if slug == page else ""}>{_esc(label)}</a>'
+        for slug, (label, _) in PAGES.items()
+    )
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
+        + _esc(title)
+        + ' | ContentForge</title><link rel="stylesheet" href="/static/workspaces.css"></head><body><a class="skip" href="#main">Skip to content</a><header><strong>ContentForge</strong><span>Content operations</span></header><div class="shell"><nav aria-label="Workspaces">'
+        + nav
+        + '</nav><main id="main" tabindex="-1"><p class="eyebrow">Workspace</p><h1>'
+        + _esc(title)
+        + "</h1><p>"
+        + _esc(subtitle)
+        + '</p><div class="live" aria-live="polite">Ready</div>'
+        + _notice(notice, error)
+        + body
+        + "</main></div></body></html>"
+    )
 
-def _cards(rows: list[dict[str, Any]], keys: list[str], empty: str, link_base: str | None = None, action_label: str = "Open") -> str:
-    if not rows: return f'<div class="empty"><h2>Nothing here yet</h2><p>{_esc(empty)}</p></div>'
-    cards=[]
+
+def _cards(
+    rows: list[dict[str, Any]],
+    keys: list[str],
+    empty: str,
+    link_base: str | None = None,
+    action_label: str = "Open",
+) -> str:
+    if not rows:
+        return f'<div class="empty"><h2>Nothing here yet</h2><p>{_esc(empty)}</p></div>'
+    cards = []
     for row in rows:
-        state=str(row.get("state", "")); label,nxt=STATE_COPY.get(state,(state.replace("_"," ").title(),"Open for details"))
-        fields="".join(f'<p><strong>{_esc(k.replace("_"," ").title())}:</strong> {_esc(label if k=="state" else row.get(k,""))}</p>' for k in keys)
-        link=f'<a class="card-action" href="{_esc(link_base)}/{_esc(row.get("id",""))}">{_esc(action_label)}</a>' if link_base else ""
-        cards.append(f'<article>{fields}<p class="next-action"><strong>Next:</strong> {_esc(nxt)}</p>{link}</article>')
-    return '<div class="cards">'+"".join(cards)+'</div>'
+        state = str(row.get("state", ""))
+        label, nxt = STATE_COPY.get(state, (state.replace("_", " ").title(), "Open for details"))
+        fields = "".join(
+            f"<p><strong>{_esc(k.replace('_', ' ').title())}:</strong> {_esc(label if k == 'state' else row.get(k, ''))}</p>"
+            for k in keys
+        )
+        link = (
+            f'<a class="card-action" href="{_esc(link_base)}/{_esc(row.get("id", ""))}">{_esc(action_label)}</a>'
+            if link_base
+            else ""
+        )
+        cards.append(
+            f'<article>{fields}<p class="next-action"><strong>Next:</strong> {_esc(nxt)}</p>{link}</article>'
+        )
+    return '<div class="cards">' + "".join(cards) + "</div>"
+
 
 def _attention(store: ContentOpsStore) -> str:
-    x=store.attention_summary(); plural="s" if x["pending_approvals"] != 1 else ""
+    x = store.attention_summary()
+    plural = "s" if x["pending_approvals"] != 1 else ""
     return f'<aside class="attention" aria-label="Work requiring attention"><strong>{x["pending_approvals"]} pending approval{plural}</strong><span>{x["retryable_deliveries"]} delivery retries</span><span>{x["locales_to_review"]} locales to review</span></aside>'
 
-def render_workspace(page: str, store: ContentOpsStore, notice: str | None = None, error: bool = False) -> str:
-    if page not in PAGES: raise KeyError(page)
-    q=_attention(store)
-    if page=="campaigns": body=q+'<section class="panel"><h2>New campaign</h2><form method="post" action="/workspace/campaigns/create"><label>Campaign name<input name="name" required maxlength="160"></label><label>Campaign brief<textarea name="brief" required maxlength="4000"></textarea></label><label>Channels<input name="channels" required aria-describedby="channels-help"></label><p id="channels-help" class="help">Enter comma-separated channels.</p><button class="primary">Create campaign</button></form></section>'+_cards(store.rows("campaigns"),["name","state"],"Create a campaign.","/workspace/campaigns","Open campaign")
-    elif page=="approvals": body=q+'<section class="panel"><h2>Governance queue</h2>'+_cards(store.rows("approvals"),["asset_id","risk","state","findings"],"New approval requests appear here.","/workspace/approvals","Review request")+'</section>'
-    elif page=="voice": body=q+'<section class="panel"><h2>Evidence-backed rules</h2>'+_cards(store.rows("voice_rules"),["kind","value","evidence","state"],"Import representative content.")+'</section>'
-    elif page=="publish": body=q+'<section class="panel"><h2>Delivery batches</h2><p class="help">Open a batch to inspect channel outcomes and retry only failed channels.</p>'+_cards(store.rows("publish_batches"),["asset_id","state"],"Published and retryable batches will appear here.","/workspace/publish","Open delivery batch")+'</section>'
-    elif page=="localization": body=q+'<section class="panel"><h2>Locale matrix</h2>'+_cards(store.rows("locale_variants"),["locale","score","state","content"],"Start translation QA.")+'</section>'
-    else: body=q+'<section class="panel"><h2>Provenance ledger</h2>'+_cards(store.rows("provenance"),["asset_id","model","voice_version","state"],"Records appear after generation.")+'</section>'
-    return _layout(page,body,notice,error)
+
+def render_workspace(
+    page: str, store: ContentOpsStore, notice: str | None = None, error: bool = False
+) -> str:
+    if page not in PAGES:
+        raise KeyError(page)
+    q = _attention(store)
+    if page == "campaigns":
+        body = (
+            q
+            + '<section class="panel"><h2>New campaign</h2><form method="post" action="/workspace/campaigns/create"><label>Campaign name<input name="name" required maxlength="160"></label><label>Campaign brief<textarea name="brief" required maxlength="4000"></textarea></label><label>Channels<input name="channels" required aria-describedby="channels-help"></label><p id="channels-help" class="help">Enter comma-separated channels.</p><button class="primary">Create campaign</button></form></section>'
+            + _cards(
+                store.rows("campaigns"),
+                ["name", "state"],
+                "Create a campaign.",
+                "/workspace/campaigns",
+                "Open campaign",
+            )
+        )
+    elif page == "approvals":
+        body = (
+            q
+            + '<section class="panel"><h2>Governance queue</h2>'
+            + _cards(
+                store.rows("approvals"),
+                ["asset_id", "risk", "state", "findings"],
+                "New approval requests appear here.",
+                "/workspace/approvals",
+                "Review request",
+            )
+            + "</section>"
+        )
+    elif page == "voice":
+        body = (
+            q
+            + '<section class="panel"><h2>Evidence-backed rules</h2>'
+            + _cards(
+                store.rows("voice_rules"),
+                ["kind", "value", "evidence", "state"],
+                "Import representative content.",
+            )
+            + "</section>"
+        )
+    elif page == "publish":
+        body = (
+            q
+            + '<section class="panel"><h2>Delivery batches</h2><p class="help">Open a batch to inspect channel outcomes and retry only failed channels.</p>'
+            + _cards(
+                store.rows("publish_batches"),
+                ["asset_id", "state"],
+                "Published and retryable batches will appear here.",
+                "/workspace/publish",
+                "Open delivery batch",
+            )
+            + "</section>"
+        )
+    elif page == "localization":
+        body = (
+            q
+            + '<section class="panel"><h2>Locale matrix</h2>'
+            + _cards(
+                store.rows("locale_variants"),
+                ["locale", "score", "state", "content"],
+                "Start translation QA.",
+            )
+            + "</section>"
+        )
+    else:
+        body = (
+            q
+            + '<section class="panel"><h2>Provenance ledger</h2>'
+            + _cards(
+                store.rows("provenance"),
+                ["asset_id", "model", "voice_version", "state"],
+                "Records appear after generation.",
+            )
+            + "</section>"
+        )
+    return _layout(page, body, notice, error)
+
 
 def render_campaign_detail(campaign_id: str, store: ContentOpsStore) -> str:
-    c=store.campaign(campaign_id); label,nxt=STATE_COPY.get(c["state"],(c["state"],"Review campaign")); channels=json.loads(c["channels"]); assets=c["assets"]
-    body=f'<p><a href="/workspace/campaigns">Back to campaigns</a></p><section class="panel context"><h2>{_esc(c["name"])}</h2><p><span class="status">{_esc(label)}</span></p><p><strong>Next:</strong> {_esc(nxt)}</p><p aria-label="Campaign progress">{len(assets)} of {len(channels)} channel assets created</p></section>'+_cards(assets,["channel","state","content"],"No assets yet.")
-    return _layout("campaigns",body)
+    c = store.campaign(campaign_id)
+    label, nxt = STATE_COPY.get(c["state"], (c["state"], "Review campaign"))
+    channels = json.loads(c["channels"])
+    assets = c["assets"]
+    body = (
+        f'<p><a href="/workspace/campaigns">Back to campaigns</a></p><section class="panel context"><h2>{_esc(c["name"])}</h2><p><span class="status">{_esc(label)}</span></p><p><strong>Next:</strong> {_esc(nxt)}</p><p aria-label="Campaign progress">{len(assets)} of {len(channels)} channel assets created</p></section>'
+        + _cards(assets, ["channel", "state", "content"], "No assets yet.")
+    )
+    return _layout("campaigns", body)
 
-def render_approval_detail(request_id: str, store: ContentOpsStore, notice: str | None = None, error: bool = False) -> str:
-    a=store.approval(request_id); label,nxt=STATE_COPY.get(a["state"],(a["state"],"Review request")); findings="".join(f'<li>{_esc(x)}</li>' for x in a["findings"]) or '<li>No findings recorded.</li>'
-    form=""
-    if a["state"]=="PENDING": form=f'<section class="panel"><h2>Record decision</h2><form method="post" action="/workspace/approvals/{_esc(request_id)}/decision"><label>Reviewer<input name="reviewer" required></label><fieldset><legend>Decision</legend><label><input type="radio" name="decision" value="APPROVED" required> Approve</label><label><input type="radio" name="decision" value="NEEDS_CHANGES"> Request changes</label><label><input type="radio" name="decision" value="REJECTED"> Reject</label></fieldset><label>Reason<textarea name="reason" required maxlength="2000"></textarea></label><button class="primary">Save decision</button></form></section>'
-    body=f'<p><a href="/workspace/approvals">Back to approvals</a></p><section class="panel context"><h2>Asset {_esc(a["asset_id"])}</h2><p><span class="status">{_esc(label)}</span></p><p><strong>Risk:</strong> {_esc(a["risk"])}</p><p><strong>Requester:</strong> {_esc(a["requester"])}</p><h3>Findings</h3><ul>{findings}</ul><p><strong>Next:</strong> {_esc(nxt)}</p></section>'+form
-    return _layout("approvals",body,notice,error)
+
+def render_approval_detail(
+    request_id: str, store: ContentOpsStore, notice: str | None = None, error: bool = False
+) -> str:
+    a = store.approval(request_id)
+    label, nxt = STATE_COPY.get(a["state"], (a["state"], "Review request"))
+    findings = (
+        "".join(f"<li>{_esc(x)}</li>" for x in a["findings"]) or "<li>No findings recorded.</li>"
+    )
+    form = ""
+    if a["state"] == "PENDING":
+        form = f'<section class="panel"><h2>Record decision</h2><form method="post" action="/workspace/approvals/{_esc(request_id)}/decision"><label>Reviewer<input name="reviewer" required></label><fieldset><legend>Decision</legend><label><input type="radio" name="decision" value="APPROVED" required> Approve</label><label><input type="radio" name="decision" value="NEEDS_CHANGES"> Request changes</label><label><input type="radio" name="decision" value="REJECTED"> Reject</label></fieldset><label>Reason<textarea name="reason" required maxlength="2000"></textarea></label><button class="primary">Save decision</button></form></section>'
+    body = (
+        f'<p><a href="/workspace/approvals">Back to approvals</a></p><section class="panel context"><h2>Asset {_esc(a["asset_id"])}</h2><p><span class="status">{_esc(label)}</span></p><p><strong>Risk:</strong> {_esc(a["risk"])}</p><p><strong>Requester:</strong> {_esc(a["requester"])}</p><h3>Findings</h3><ul>{findings}</ul><p><strong>Next:</strong> {_esc(nxt)}</p></section>'
+        + form
+    )
+    return _layout("approvals", body, notice, error)
 
 
-def render_publish_batch_detail(batch_id: str, store: ContentOpsStore, notice: str | None = None, error: bool = False) -> str:
-    batch=store.publish_batch(batch_id); retryable=store.retryable_channels(batch_id)
-    cards=[]
+def render_publish_batch_detail(
+    batch_id: str, store: ContentOpsStore, notice: str | None = None, error: bool = False
+) -> str:
+    batch = store.publish_batch(batch_id)
+    retryable = store.retryable_channels(batch_id)
+    cards = []
     for item in batch["deliveries"]:
-        label,nxt=STATE_COPY.get(item["state"],(item["state"].title(),"Review delivery"))
-        cards.append(f'<article><h3>{_esc(item["channel"].title())}</h3><p><span class="status">{_esc(label)}</span></p><p><strong>Remote ID:</strong> {_esc(item.get("remote_id") or "Not available")}</p><p class="next-action"><strong>Next:</strong> {_esc(nxt)}</p></article>')
-    retry=""
+        label, nxt = STATE_COPY.get(item["state"], (item["state"].title(), "Review delivery"))
+        cards.append(
+            f'<article><h3>{_esc(item["channel"].title())}</h3><p><span class="status">{_esc(label)}</span></p><p><strong>Remote ID:</strong> {_esc(item.get("remote_id") or "Not available")}</p><p class="next-action"><strong>Next:</strong> {_esc(nxt)}</p></article>'
+        )
+    retry = ""
     if retryable:
-        inputs="".join(f'<input type="hidden" name="channels" value="{_esc(channel)}">' for channel in retryable)
-        retry=f'<section class="panel recovery"><h2>Safe recovery</h2><p>Only failed or retryable channels will be queued. Successful deliveries will not be published again.</p><p><strong>Retry scope:</strong> {_esc(", ".join(retryable))}</p><form method="post" action="/workspace/publish/{_esc(batch_id)}/retry">{inputs}<button class="primary">Retry failed channels</button></form></section>'
-    body=f'<p><a href="/workspace/publish">Back to publish center</a></p><section class="panel context"><p class="eyebrow">Delivery batch</p><h2>Asset {_esc(batch["asset_id"])}</h2><p><span class="status">{_esc(batch["state"].replace("_"," ").title())}</span></p></section><div class="cards">{"".join(cards)}</div>{retry}'
-    return _layout("publish",body,notice,error)
+        inputs = "".join(
+            f'<input type="hidden" name="channels" value="{_esc(channel)}">'
+            for channel in retryable
+        )
+        retry = f'<section class="panel recovery"><h2>Safe recovery</h2><p>Only failed or retryable channels will be queued. Successful deliveries will not be published again.</p><p><strong>Retry scope:</strong> {_esc(", ".join(retryable))}</p><form method="post" action="/workspace/publish/{_esc(batch_id)}/retry">{inputs}<button class="primary">Retry failed channels</button></form></section>'
+    body = f'<p><a href="/workspace/publish">Back to publish center</a></p><section class="panel context"><p class="eyebrow">Delivery batch</p><h2>Asset {_esc(batch["asset_id"])}</h2><p><span class="status">{_esc(batch["state"].replace("_", " ").title())}</span></p></section><div class="cards">{"".join(cards)}</div>{retry}'
+    return _layout("publish", body, notice, error)

@@ -9,7 +9,13 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
-from src.product_ops import ContentOpsStore, render_approval_detail, render_campaign_detail, render_publish_batch_detail, render_workspace
+from src.product_ops import (
+    ContentOpsStore,
+    render_approval_detail,
+    render_campaign_detail,
+    render_publish_batch_detail,
+    render_workspace,
+)
 
 router = APIRouter()
 _DB = Path(os.getenv("CONTENTFORGE_OPS_DB", "/tmp/contentforge_ops.db"))
@@ -20,8 +26,28 @@ def _store() -> ContentOpsStore:
 
 
 class CampaignCreate(BaseModel):
+    """Campaign creation contract for the cockpit workflow."""
+
     name: str = Field(min_length=1, max_length=160)
+    brief: str = Field(default="", max_length=10_000)
     channels: list[str] = Field(min_length=1, max_length=20)
+
+
+class AssetCreate(BaseModel):
+    """Create the first editable revision of a campaign asset."""
+
+    channel: str = Field(min_length=1, max_length=48)
+    title: str = Field(min_length=1, max_length=240)
+    content: str = Field(min_length=1, max_length=100_000)
+    author: str = Field(min_length=1, max_length=160)
+
+
+class RevisionSave(BaseModel):
+    """Optimistic autosave contract."""
+
+    content: str = Field(min_length=1, max_length=100_000)
+    expected_version: int = Field(ge=1)
+    author: str = Field(min_length=1, max_length=160)
 
 
 class ApprovalCreate(BaseModel):
@@ -59,53 +85,106 @@ def workspace(page: str) -> HTMLResponse:
 
 def _form(body: bytes) -> dict[str, str]:
     from urllib.parse import parse_qs
-    return {key: values[0] for key, values in parse_qs(body.decode(), keep_blank_values=True).items()}
+
+    return {
+        key: values[0] for key, values in parse_qs(body.decode(), keep_blank_values=True).items()
+    }
+
 
 @router.get("/workspace/campaigns/{campaign_id}", response_class=HTMLResponse)
 def campaign_detail(campaign_id: str) -> HTMLResponse:
-    try: return HTMLResponse(render_campaign_detail(campaign_id, _store()))
-    except KeyError as exc: raise HTTPException(404, "campaign_not_found") from exc
+    try:
+        return HTMLResponse(render_campaign_detail(campaign_id, _store()))
+    except KeyError as exc:
+        raise HTTPException(404, "campaign_not_found") from exc
+
 
 @router.post("/workspace/campaigns/create")
 async def create_campaign_form(request: Request) -> Response:
-    data=_form(await request.body()); name=data.get("name","").strip(); brief=data.get("brief","").strip(); channels=[x.strip().lower() for x in data.get("channels","").split(",") if x.strip()]
-    if not name or not brief or not channels: return HTMLResponse(render_workspace("campaigns",_store(),"Check the campaign name, brief, and channels.",True),422)
-    campaign_id=_store().create_campaign(name,channels); return RedirectResponse(f"/workspace/campaigns/{campaign_id}",303)
+    data = _form(await request.body())
+    name = data.get("name", "").strip()
+    brief = data.get("brief", "").strip()
+    channels = [x.strip().lower() for x in data.get("channels", "").split(",") if x.strip()]
+    if not name or not brief or not channels:
+        return HTMLResponse(
+            render_workspace(
+                "campaigns", _store(), "Check the campaign name, brief, and channels.", True
+            ),
+            422,
+        )
+    campaign_id = _store().create_campaign(name, channels)
+    return RedirectResponse(f"/workspace/campaigns/{campaign_id}", 303)
+
 
 @router.get("/workspace/approvals/{request_id}", response_class=HTMLResponse)
 def approval_detail(request_id: str) -> HTMLResponse:
-    try: return HTMLResponse(render_approval_detail(request_id,_store()))
-    except KeyError as exc: raise HTTPException(404,"approval_not_found") from exc
+    try:
+        return HTMLResponse(render_approval_detail(request_id, _store()))
+    except KeyError as exc:
+        raise HTTPException(404, "approval_not_found") from exc
+
 
 @router.post("/workspace/approvals/{request_id}/decision")
 async def approval_decision(request_id: str, request: Request) -> Response:
-    data=_form(await request.body()); reviewer=data.get("reviewer","").strip(); decision=data.get("decision",""); reason=data.get("reason","").strip()
-    if not reviewer or decision not in {"APPROVED","NEEDS_CHANGES","REJECTED"} or not reason:
-        return HTMLResponse(render_approval_detail(request_id,_store(),"Reviewer, decision, and reason are required.",True),422)
-    try: _store().decide_approval(request_id,reviewer,decision,reason)
-    except PermissionError: return HTMLResponse(render_approval_detail(request_id,_store(),"High-risk content cannot be approved by its requester.",True),403)
-    except KeyError as exc: raise HTTPException(404,"approval_not_found") from exc
-    return RedirectResponse(f"/workspace/approvals/{request_id}",303)
+    data = _form(await request.body())
+    reviewer = data.get("reviewer", "").strip()
+    decision = data.get("decision", "")
+    reason = data.get("reason", "").strip()
+    if not reviewer or decision not in {"APPROVED", "NEEDS_CHANGES", "REJECTED"} or not reason:
+        return HTMLResponse(
+            render_approval_detail(
+                request_id, _store(), "Reviewer, decision, and reason are required.", True
+            ),
+            422,
+        )
+    try:
+        _store().decide_approval(request_id, reviewer, decision, reason)
+    except PermissionError:
+        return HTMLResponse(
+            render_approval_detail(
+                request_id, _store(), "High-risk content cannot be approved by its requester.", True
+            ),
+            403,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, "approval_not_found") from exc
+    return RedirectResponse(f"/workspace/approvals/{request_id}", 303)
+
 
 @router.get("/workspace/publish/{batch_id}", response_class=HTMLResponse)
 def publish_batch_detail(batch_id: str) -> HTMLResponse:
-    try: return HTMLResponse(render_publish_batch_detail(batch_id,_store()))
-    except KeyError as exc: raise HTTPException(404,"publish_batch_not_found") from exc
+    try:
+        return HTMLResponse(render_publish_batch_detail(batch_id, _store()))
+    except KeyError as exc:
+        raise HTTPException(404, "publish_batch_not_found") from exc
+
 
 @router.post("/workspace/publish/{batch_id}/retry")
 async def publish_batch_retry(batch_id: str, request: Request) -> Response:
     await request.body()
-    try: channels=_store().request_publish_retry(batch_id)
-    except KeyError as exc: raise HTTPException(404,"publish_batch_not_found") from exc
-    except ValueError: return HTMLResponse(render_publish_batch_detail(batch_id,_store(),"This batch has no failed channels to retry.",True),409)
-    scope=", ".join(channels)
-    return HTMLResponse(render_publish_batch_detail(batch_id,_store(),f"Retry queued for: {scope}. Successful channels were preserved."),202)
-
+    try:
+        channels = _store().request_publish_retry(batch_id)
+    except KeyError as exc:
+        raise HTTPException(404, "publish_batch_not_found") from exc
+    except ValueError:
+        return HTMLResponse(
+            render_publish_batch_detail(
+                batch_id, _store(), "This batch has no failed channels to retry.", True
+            ),
+            409,
+        )
+    scope = ", ".join(channels)
+    return HTMLResponse(
+        render_publish_batch_detail(
+            batch_id, _store(), f"Retry queued for: {scope}. Successful channels were preserved."
+        ),
+        202,
+    )
 
 
 @router.post("/api/v1/campaigns", status_code=201)
 def create_campaign(body: CampaignCreate) -> dict[str, str]:
-    campaign_id = _store().create_campaign(body.name, body.channels)
+    campaign_id = _store().create_campaign(body.name, body.channels, body.brief)
     return {"id": campaign_id, "state": "DRAFT"}
 
 
@@ -143,3 +222,55 @@ def export_provenance(record_id: str) -> Response:
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="provenance_not_found") from exc
+
+
+@router.post("/api/v1/campaigns/{campaign_id}/assets", status_code=201)
+def create_campaign_asset(campaign_id: str, body: AssetCreate) -> dict[str, object]:
+    """Create an asset and its immutable first revision."""
+    try:
+        asset_id = _store().create_asset(
+            campaign_id, body.channel, body.content, body.title, author=body.author
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="campaign_not_found") from exc
+    return {"id": asset_id, "version": 1, "state": "DRAFT"}
+
+
+@router.get("/api/v1/campaigns/{campaign_id}/cockpit")
+def get_campaign_cockpit(campaign_id: str) -> dict[str, object]:
+    """Return campaign context, assets, readiness, and blockers."""
+    try:
+        store = _store()
+        return {
+            "campaign": store.campaign(campaign_id),
+            "readiness": store.campaign_readiness(campaign_id),
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="campaign_not_found") from exc
+
+
+@router.put("/api/v1/assets/{asset_id}/autosave")
+def autosave_asset(asset_id: str, body: RevisionSave) -> dict[str, object]:
+    """Autosave a new asset revision using optimistic concurrency."""
+    try:
+        return _store().save_revision(asset_id, body.content, body.expected_version, body.author)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="asset_not_found") from exc
+    except ValueError as exc:
+        if str(exc) == "ASSET_VERSION_CONFLICT":
+            raise HTTPException(status_code=409, detail="asset_version_conflict") from exc
+        raise HTTPException(status_code=422, detail="invalid_revision") from exc
+
+
+@router.get("/api/v1/assets/{asset_id}/revisions")
+def get_asset_revisions(asset_id: str) -> dict[str, object]:
+    """Return immutable revision history newest first."""
+    revisions = _store().revisions(asset_id)
+    return {"items": revisions, "count": len(revisions)}
+
+
+@router.get("/api/v1/my-work")
+def get_my_work() -> dict[str, object]:
+    """Return the current actionable approval and recovery queue."""
+    items = _store().my_work()
+    return {"items": items, "count": len(items)}

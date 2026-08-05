@@ -646,3 +646,47 @@ Approval queue cards now open contextual review pages. Reviewers can approve, re
 
 ## Safe publish recovery (v0.13.0)
 The Publish Center now provides delivery-batch detail pages with per-channel outcomes. A retry request includes only failed or retryable channels, preserves successful deliveries, and clearly explains the recovery scope before the user acts.
+
+## v0.11 Campaign Cockpit and versioned editor
+
+ContentForge now includes the first research-driven **brief-to-publish vertical slice**:
+
+- **Campaign Cockpit:** a campaign brief, channel asset pipeline, explainable readiness score, and concrete blockers in one context-preserving view. This addresses the research finding that teams lose time and confidence when campaign context is fragmented across tools.
+- **Versioned content editor:** every save appends an immutable revision, and optimistic concurrency returns a friendly conflict instead of silently overwriting another editor's work. This addresses unclear publishable versions and unsafe editing.
+- **My Work API:** pending approvals and failed publications appear as actionable work items. This addresses the need for a unified queue and operation-specific recovery.
+
+### Run the modern web UI
+
+Terminal 1, API:
+
+```bash
+uvicorn src.main:app --reload
+```
+
+Terminal 2, React + TypeScript UI:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. The Vite development server proxies `/api` to the FastAPI server. The real flow is: create campaign → see readiness blockers → create channel asset → edit → save a new immutable revision. Errors preserve the draft and provide a retry-oriented message.
+
+### API endpoints added in v0.11
+
+- `POST /api/v1/campaigns`
+- `POST /api/v1/campaigns/{campaign_id}/assets`
+- `GET /api/v1/campaigns/{campaign_id}/cockpit`
+- `PUT /api/v1/assets/{asset_id}/autosave`
+- `GET /api/v1/assets/{asset_id}/revisions`
+- `GET /api/v1/my-work`
+
+### Frontend verification
+
+```bash
+cd frontend
+npm test
+npm run lint
+npm run build
+```

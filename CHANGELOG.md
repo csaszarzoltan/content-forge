@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.11.0] - 2026-08-05
+
+### Features
+- Added a responsive Vite + React + TypeScript Campaign Cockpit with polished onboarding, campaign context, readiness blockers, asset pipeline, content editor, and friendly recovery UI.
+- Added durable campaign briefs, editable assets, immutable revision history, restore support, and optimistic autosave conflict protection.
+- Added explainable channel readiness and a unified My Work queue for pending approvals and failed publications.
+
+### Fixes
+- Preserved compatibility with existing SQLite workspace databases through additive schema migration.
+- Normalized short invalid AI visibility queries to the documented provider error contract.
+- Pinned bcrypt to the passlib-compatible release used by the verified authentication suite.
+
+### Tests
+- Added domain, real SQLite I/O, API contract, revision conflict, readiness, queue, and frontend helper tests.
+- Verified the complete Python suite and the frontend test, lint, and production build pipelines.
+
+### Docs
+- Documented the v0.11 user flow, frontend commands, and every new API endpoint.
+- Added `FEATURES-DONE.md` for machine-readable delivery tracking.
+
 ## [0.14.0] — 2026-08-02
 
 ### Features

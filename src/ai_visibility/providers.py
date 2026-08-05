@@ -72,9 +72,7 @@ class AIEngineProvider(ABC):
         """Return the engine identifier (one of AI_ENGINES)."""
 
     @abstractmethod
-    async def check_visibility(
-        self, query: str, target_url: str
-    ) -> EngineVisibilityResult:
+    async def check_visibility(self, query: str, target_url: str) -> EngineVisibilityResult:
         """Check whether ``target_url`` is cited/mentioned in an answer to
         ``query``, with sentiment. Raises ProviderError on failure."""
 
@@ -119,8 +117,8 @@ class ChatGPTProvider(AIEngineProvider):
     PROMPT_TEMPLATE = (
         "You are a search-answer auditor. Query: {query}\n"
         "Target URL: {target_url}\n"
-        "In one JSON object with keys \"mentioned\" (bool), \"cited\" (bool), "
-        "\"sentiment\" (one of positive|neutral|negative|unknown), respond "
+        'In one JSON object with keys "mentioned" (bool), "cited" (bool), '
+        '"sentiment" (one of positive|neutral|negative|unknown), respond '
         "whether the target URL is cited in a ChatGPT answer to the query, "
         "whether the brand is mentioned without a link, and the sentiment. "
         "No other text."
@@ -134,9 +132,9 @@ class ChatGPTProvider(AIEngineProvider):
     def engine(self) -> str:
         return "chatgpt"
 
-    async def check_visibility(
-        self, query: str, target_url: str
-    ) -> EngineVisibilityResult:
+    async def check_visibility(self, query: str, target_url: str) -> EngineVisibilityResult:
+        if len(query.strip()) < 2:
+            raise ProviderError("ChatGPT visibility query must contain at least two characters")
         if not self._api_key or self._llm_provider is None:
             return EngineVisibilityResult(
                 engine=self.engine,
@@ -169,7 +167,7 @@ class ChatGPTProvider(AIEngineProvider):
             )
         except ProviderError:
             raise
-        except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+        except Exception as exc:
             # B1 audit (tech-lead): no HTTP request URL exists for this
             # provider — the api_key is never interpolated into the prompt or
             # any message; json.loads errors carry only the LLM output.
@@ -197,9 +195,7 @@ class PerplexityProvider(AIEngineProvider, _HTTPProviderMixin):
     def engine(self) -> str:
         return "perplexity"
 
-    async def check_visibility(
-        self, query: str, target_url: str
-    ) -> EngineVisibilityResult:
+    async def check_visibility(self, query: str, target_url: str) -> EngineVisibilityResult:
         if not self._api_key:
             return self._graceful(query)
         try:
@@ -216,9 +212,7 @@ class PerplexityProvider(AIEngineProvider, _HTTPProviderMixin):
                 ],
             }
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    self.ENDPOINT, headers=self._headers(), json=body
-                )
+                resp = await client.post(self.ENDPOINT, headers=self._headers(), json=body)
                 resp.raise_for_status()
                 data = resp.json()
             text = data["choices"][0]["message"]["content"] or ""
@@ -249,10 +243,8 @@ class PerplexityProvider(AIEngineProvider, _HTTPProviderMixin):
             # B1: RequestError strings also carry the request URL; keep
             # the message generic (the key travels in the Authorization
             # header, not the URL, but never risk echoing either).
-            raise ProviderError(
-                "Perplexity visibility check failed (request error)"
-            ) from exc
-        except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+            raise ProviderError("Perplexity visibility check failed (request error)") from exc
+        except Exception as exc:
             raise ProviderError(f"Perplexity visibility check failed: {exc}") from exc
 
     async def validate_credentials(self) -> bool:
@@ -267,8 +259,7 @@ class GeminiProvider(AIEngineProvider, _HTTPProviderMixin):
     """
 
     ENDPOINT = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.0-flash:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     )
     MODEL = "gemini-2.0-flash"
 
@@ -279,9 +270,7 @@ class GeminiProvider(AIEngineProvider, _HTTPProviderMixin):
     def engine(self) -> str:
         return "gemini"
 
-    async def check_visibility(
-        self, query: str, target_url: str
-    ) -> EngineVisibilityResult:
+    async def check_visibility(self, query: str, target_url: str) -> EngineVisibilityResult:
         if not self._api_key:
             return self._graceful(query)
         try:
@@ -291,15 +280,11 @@ class GeminiProvider(AIEngineProvider, _HTTPProviderMixin):
             }
             params = {"key": self._api_key}
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    self.ENDPOINT, params=params, json=body
-                )
+                resp = await client.post(self.ENDPOINT, params=params, json=body)
                 resp.raise_for_status()
                 data = resp.json()
             candidate = data["candidates"][0]
-            text = "".join(
-                p.get("text", "") for p in candidate["content"]["parts"]
-            )
+            text = "".join(p.get("text", "") for p in candidate["content"]["parts"])
             grounding = candidate.get("groundingMetadata", {})
             cited_urls = [
                 chunk.get("uri", "")
@@ -332,7 +317,7 @@ class GeminiProvider(AIEngineProvider, _HTTPProviderMixin):
             # B1: RequestError strings also carry the request URL; keep the
             # message generic (no URL, no query params).
             raise ProviderError("Gemini visibility check failed (request error)") from exc
-        except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+        except Exception as exc:
             # B1 audit: only json.loads / response-shape errors reach here —
             # their messages carry response body text or key names, never the
             # request URL (HTTP errors are caught above), so no key leak.
@@ -353,8 +338,8 @@ class GoogleAIOverviewsProvider(AIEngineProvider):
     PROMPT_TEMPLATE = (
         "You are a search-answer auditor. Query: {query}\n"
         "Target URL: {target_url}\n"
-        "In one JSON object with keys \"mentioned\" (bool), \"cited\" (bool), "
-        "\"sentiment\" (one of positive|neutral|negative|unknown), respond "
+        'In one JSON object with keys "mentioned" (bool), "cited" (bool), '
+        '"sentiment" (one of positive|neutral|negative|unknown), respond '
         "whether a Google AI Overview for the query cites the target URL, "
         "mentions the brand without a link, or neither. No other text."
     )
@@ -367,9 +352,7 @@ class GoogleAIOverviewsProvider(AIEngineProvider):
     def engine(self) -> str:
         return "google_ai_overviews"
 
-    async def check_visibility(
-        self, query: str, target_url: str
-    ) -> EngineVisibilityResult:
+    async def check_visibility(self, query: str, target_url: str) -> EngineVisibilityResult:
         if not self._api_key or self._llm_provider is None:
             return EngineVisibilityResult(
                 engine=self.engine,
@@ -402,13 +385,11 @@ class GoogleAIOverviewsProvider(AIEngineProvider):
             )
         except ProviderError:
             raise
-        except Exception as exc:  # noqa: BLE001 — normalize to ProviderError
+        except Exception as exc:
             # B1 audit (tech-lead): same as ChatGPTProvider — no HTTP URL is
             # reachable here, only LLM output / json.parse errors, so the
             # api_key cannot appear in the message.
-            raise ProviderError(
-                f"Google AI Overviews visibility check failed: {exc}"
-            ) from exc
+            raise ProviderError(f"Google AI Overviews visibility check failed: {exc}") from exc
 
     async def validate_credentials(self) -> bool:
         return bool(self._api_key) and self._llm_provider is not None
@@ -432,9 +413,7 @@ class ProviderRegistry:
         self.register(ChatGPTProvider(api_key=settings.CHATGPT_SEARCH_API_KEY))
         self.register(PerplexityProvider(api_key=settings.PERPLEXITY_API_KEY))
         self.register(GeminiProvider(api_key=settings.GEMINI_API_KEY))
-        self.register(
-            GoogleAIOverviewsProvider(api_key=settings.GOOGLE_AI_SEARCH_API_KEY)
-        )
+        self.register(GoogleAIOverviewsProvider(api_key=settings.GOOGLE_AI_SEARCH_API_KEY))
 
     def register(self, provider: AIEngineProvider) -> None:
         """Register a provider instance (raises for unknown engine)."""
@@ -455,9 +434,7 @@ class ProviderRegistry:
         return [engine for engine in AI_ENGINES if engine in self._providers]
 
     @classmethod
-    def from_settings(
-        cls, settings: Settings, llm_provider: Any | None = None
-    ) -> "ProviderRegistry":
+    def from_settings(cls, settings: Settings, llm_provider: Any | None = None) -> ProviderRegistry:
         """Build a registry from settings; register only configured engines.
 
         ``llm_provider`` is forwarded to the prompt-based engines (ChatGPT,
@@ -472,9 +449,7 @@ class ProviderRegistry:
             registry.register(GeminiProvider(api_key=settings.GEMINI_API_KEY))
         if settings.CHATGPT_SEARCH_API_KEY:
             registry.register(
-                ChatGPTProvider(
-                    api_key=settings.CHATGPT_SEARCH_API_KEY, llm_provider=llm_provider
-                )
+                ChatGPTProvider(api_key=settings.CHATGPT_SEARCH_API_KEY, llm_provider=llm_provider)
             )
         if settings.GOOGLE_AI_SEARCH_API_KEY:
             registry.register(
