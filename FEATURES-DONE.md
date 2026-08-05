@@ -1,11 +1,13 @@
 ## Features Done (this pass)
-- Campaign Cockpit: Persists campaign briefs and returns campaign assets, channel readiness, and actionable blockers in one API context.
-- Modern React workspace: Adds a responsive Vite, React, and TypeScript SaaS interface with onboarding, cockpit, empty states, and friendly errors.
-- Versioned content editor: Creates immutable asset revisions with optimistic concurrency protection against silent overwrites.
-- Revision history and restore: Lists revisions newest-first and restores old content by appending a new auditable version.
-- Explainable readiness: Calculates approved channel coverage and names each missing approved channel asset.
-- My Work queue: Surfaces pending approvals and failed publications as actionable recovery items.
-- SQLite compatibility migration: Adds brief, title, version, and revision storage without dropping existing workspace records.
+- Campaign Cockpit: Persists campaign briefs and returns assets, readiness, and actionable blockers in one API context.
+- Modern React workspace: Adds responsive onboarding, cockpit, asset editing, empty states, and friendly recovery messaging.
+- Versioned content editor: Creates immutable revisions with optimistic concurrency protection.
+- Revision-bound approval: Binds every review request and decision to one exact asset version.
+- Approval invalidation: Editing pending or approved content automatically supersedes outdated approval decisions.
+- Approval audit trail: Records review request, reviewer decision, reason, risk, and revision version.
+- Request review UI: Lets creators send the current editor version to approval from the React workflow.
+- My Work queue: Surfaces pending approvals and failed publications with next actions.
+- SQLite compatibility migration: Adds brief, title, version, revisions, approval version, and audit tables without dropping records.
 ## Sources
-- research-findings.md items addressed: end-to-end campaign workflow, context-preserving campaign cockpit, safe editing/versioning, actionable feedback, unified My Work queue
-- CHANGELOG.md section this maps to: 0.11.0
+- research-findings.md items addressed: campaign cockpit, safe editing/versioning, contextual approval, auditability, actionable feedback, unified My Work queue
+- CHANGELOG.md section this maps to: 0.12.0

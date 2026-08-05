@@ -37,3 +37,21 @@ Returns immutable revisions newest-first.
 `GET /api/v1/my-work`
 
 Returns pending approvals and failed or retryable publications with their next action.
+
+## Request revision-bound approval
+
+`POST /api/v1/assets/{asset_id}/approval`
+
+Binds `requester`, `risk`, and `findings` to the current immutable asset version.
+
+## Decide approval
+
+`POST /api/v1/approvals/{request_id}/decision`
+
+Accepts `reviewer`, `decision`, and mandatory `reason`. A changed asset returns HTTP 409 `approval_revision_stale`.
+
+## Asset audit
+
+`GET /api/v1/assets/{asset_id}/audit`
+
+Returns approval requests and decisions in chronological order.

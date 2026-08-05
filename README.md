@@ -690,3 +690,13 @@ npm test
 npm run lint
 npm run build
 ```
+
+## v0.12 Revision-bound approvals
+
+The React editor can now send the current asset version for review. Approval requests are bound to an exact immutable revision. Editing the asset automatically supersedes pending or approved decisions, so changed content cannot inherit an outdated approval. Review decisions and reasons are written to the asset audit trail.
+
+New endpoints:
+
+- `POST /api/v1/assets/{asset_id}/approval`
+- `POST /api/v1/approvals/{request_id}/decision`
+- `GET /api/v1/assets/{asset_id}/audit`

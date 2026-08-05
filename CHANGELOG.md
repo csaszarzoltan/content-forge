@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0] - 2026-08-05
+
+### Features
+- Added revision-bound approval requests and human decisions.
+- Added approval audit events and asset-level audit API.
+- Added Request review to the React content editor.
+
+### Safety
+- Editing an approved or pending revision supersedes its approval automatically.
+- Stale approval decisions return HTTP 409 instead of approving changed content.
+- High-risk self-approval remains blocked.
+
+### Tests
+- Added domain, real SQLite, API, stale-decision, request-changes, and audit lifecycle coverage.
+
+
 ## [0.11.0] - 2026-08-05
 
 ### Features

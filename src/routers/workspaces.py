@@ -274,3 +274,59 @@ def get_my_work() -> dict[str, object]:
     """Return the current actionable approval and recovery queue."""
     items = _store().my_work()
     return {"items": items, "count": len(items)}
+
+
+class AssetApprovalCreate(BaseModel):
+    """Request review for the current asset revision."""
+
+    requester: str = Field(min_length=1, max_length=160)
+    risk: str = Field(pattern="^(LOW|MEDIUM|HIGH)$")
+    findings: list[str] = Field(default_factory=list)
+
+
+class AssetApprovalDecision(BaseModel):
+    """Record a human decision for a revision-bound approval."""
+
+    reviewer: str = Field(min_length=1, max_length=160)
+    decision: str = Field(pattern="^(APPROVED|NEEDS_CHANGES|REJECTED)$")
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/api/v1/assets/{asset_id}/approval", status_code=201)
+def request_asset_review(asset_id: str, body: AssetApprovalCreate) -> dict[str, object]:
+    """Bind a new review request to the asset's current version."""
+    try:
+        request_id = _store().request_asset_approval(
+            asset_id, body.requester, body.risk, body.findings
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="asset_not_found") from exc
+    request = _store().approval(request_id)
+    return {
+        "id": request_id,
+        "state": request["state"],
+        "revision_version": request["revision_version"],
+    }
+
+
+@router.post("/api/v1/approvals/{request_id}/decision")
+def decide_asset_review(request_id: str, body: AssetApprovalDecision) -> dict[str, str]:
+    """Approve, reject, or request changes for the bound revision."""
+    try:
+        _store().decide_asset_approval(request_id, body.reviewer, body.decision, body.reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="approval_not_found") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="approval_self_review") from exc
+    except ValueError as exc:
+        if str(exc) == "APPROVAL_REVISION_STALE":
+            raise HTTPException(status_code=409, detail="approval_revision_stale") from exc
+        raise HTTPException(status_code=422, detail="invalid_approval_decision") from exc
+    return {"id": request_id, "state": body.decision}
+
+
+@router.get("/api/v1/assets/{asset_id}/audit")
+def get_asset_audit(asset_id: str) -> dict[str, object]:
+    """Return the chronological approval audit trail for an asset."""
+    items = _store().audit_events(asset_id)
+    return {"items": items, "count": len(items)}

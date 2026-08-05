@@ -72,6 +72,13 @@ class ContentOpsStore:
                 db.execute("ALTER TABLE assets ADD COLUMN title TEXT NOT NULL DEFAULT ''")
             if "version" not in asset_columns:
                 db.execute("ALTER TABLE assets ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+            approval_columns = {row[1] for row in db.execute("PRAGMA table_info(approvals)")}
+            if "revision_version" not in approval_columns:
+                db.execute("ALTER TABLE approvals ADD COLUMN revision_version INTEGER")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS audit_events("
+                "id TEXT PRIMARY KEY,entity_id TEXT,kind TEXT,payload TEXT,created_at REAL)"
+            )
 
     def _db(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
@@ -146,6 +153,11 @@ class ContentOpsStore:
             db.execute(
                 "UPDATE assets SET content=?,version=?,state='IN_EDITING' WHERE id=?",
                 (content, version, asset_id),
+            )
+            db.execute(
+                "UPDATE approvals SET state='SUPERSEDED' "
+                "WHERE asset_id=? AND state IN ('PENDING','APPROVED')",
+                (asset_id,),
             )
         return {
             "id": revision_id,
@@ -259,13 +271,111 @@ class ContentOpsStore:
             ]
             return result
 
+    def asset(self, asset_id: str) -> dict[str, Any]:
+        """Return one editable asset."""
+        with self._db() as db:
+            row = db.execute("SELECT * FROM assets WHERE id=?", (asset_id,)).fetchone()
+            if not row:
+                raise KeyError(asset_id)
+            return dict(row)
+
+    def _audit(
+        self, db: sqlite3.Connection, entity_id: str, kind: str, payload: dict[str, Any]
+    ) -> None:
+        db.execute(
+            "INSERT INTO audit_events VALUES (?,?,?,?,?)",
+            (self._id(), entity_id, kind, json.dumps(payload, sort_keys=True), time.time()),
+        )
+
+    def audit_events(self, entity_id: str) -> list[dict[str, Any]]:
+        """Return chronological audit events for an entity."""
+        with self._db() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    "SELECT * FROM audit_events WHERE entity_id=? ORDER BY created_at,rowid",
+                    (entity_id,),
+                )
+            ]
+
+    def request_asset_approval(
+        self, asset_id: str, requester: str, risk: str, findings: list[str]
+    ) -> str:
+        """Request review for the asset's exact current revision."""
+        if risk not in {"LOW", "MEDIUM", "HIGH"}:
+            raise ValueError("APPROVAL_RISK_INVALID")
+        request_id = self._id()
+        with self._db() as db:
+            asset = db.execute("SELECT version FROM assets WHERE id=?", (asset_id,)).fetchone()
+            if not asset:
+                raise KeyError(asset_id)
+            db.execute(
+                "UPDATE approvals SET state='SUPERSEDED' WHERE asset_id=? AND state='PENDING'",
+                (asset_id,),
+            )
+            db.execute(
+                "INSERT INTO approvals(id,asset_id,requester,risk,findings,state,reviewer,reason,revision_version) "
+                "VALUES (?,?,?,?,?,'PENDING',NULL,NULL,?)",
+                (request_id, asset_id, requester, risk, json.dumps(findings), asset[0]),
+            )
+            db.execute("UPDATE assets SET state='WAITING_APPROVAL' WHERE id=?", (asset_id,))
+            self._audit(
+                db,
+                asset_id,
+                "APPROVAL_REQUESTED",
+                {"request_id": request_id, "revision_version": asset[0], "risk": risk},
+            )
+        return request_id
+
+    def decide_asset_approval(
+        self, request_id: str, reviewer: str, decision: str, reason: str
+    ) -> None:
+        """Record a revision-bound decision and update asset readiness."""
+        if decision not in {"APPROVED", "NEEDS_CHANGES", "REJECTED"}:
+            raise ValueError("APPROVAL_DECISION_INVALID")
+        if not reviewer.strip() or not reason.strip():
+            raise ValueError("APPROVAL_DECISION_INPUT_INVALID")
+        with self._db() as db:
+            row = db.execute(
+                "SELECT asset_id,requester,risk,state,revision_version FROM approvals WHERE id=?",
+                (request_id,),
+            ).fetchone()
+            if not row:
+                raise KeyError(request_id)
+            if row[3] != "PENDING":
+                raise ValueError("APPROVAL_REVISION_STALE")
+            asset = db.execute("SELECT version FROM assets WHERE id=?", (row[0],)).fetchone()
+            if not asset or asset[0] != row[4]:
+                db.execute("UPDATE approvals SET state='SUPERSEDED' WHERE id=?", (request_id,))
+                raise ValueError("APPROVAL_REVISION_STALE")
+            if row[1] == reviewer and row[2] == "HIGH" and decision == "APPROVED":
+                raise PermissionError("APPROVAL_SELF_REVIEW")
+            db.execute(
+                "UPDATE approvals SET state=?,reviewer=?,reason=? WHERE id=?",
+                (decision, reviewer, reason, request_id),
+            )
+            asset_state = "APPROVED" if decision == "APPROVED" else "IN_EDITING"
+            db.execute("UPDATE assets SET state=? WHERE id=?", (asset_state, row[0]))
+            self._audit(
+                db,
+                row[0],
+                "APPROVAL_DECIDED",
+                {
+                    "request_id": request_id,
+                    "decision": decision,
+                    "reviewer": reviewer,
+                    "reason": reason,
+                    "revision_version": row[4],
+                },
+            )
+
     def request_approval(
         self, asset_id: str, requester: str, risk: str, findings: list[str]
     ) -> str:
         request_id = self._id()
         with self._db() as db:
             db.execute(
-                "INSERT INTO approvals VALUES (?,?,?,?,?,'PENDING',NULL,NULL)",
+                "INSERT INTO approvals(id,asset_id,requester,risk,findings,state,reviewer,reason) VALUES (?,?,?,?,?,'PENDING',NULL,NULL)",
                 (request_id, asset_id, requester, risk, json.dumps(findings)),
             )
         return request_id
