@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 # ── P0: Core ORM & Schemas ──────────────────────────────────────────────────
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
+pytestmark = [pytest.mark.quick]
 
 from src.brand_kit.guidelines import BrandGuidelinesGenerator
 from src.brand_kit.storage import BrandKitStorage
@@ -274,6 +274,7 @@ class TestColorPaletteBehavioral:
 class TestBrandKitORMBehavioral:
     """Behavioral tests for BrandKit ORM — should fail on stubs."""
 
+    @pytest.mark.asyncio
     async def test_brand_kit_create_and_read(self, db_session):
         """Create a BrandKit, commit, and read it back."""
         kit = BrandKit(
@@ -288,6 +289,7 @@ class TestBrandKitORMBehavioral:
         assert kit.name == "Test Brand"
         assert kit.version == 1
 
+    @pytest.mark.asyncio
     async def test_brand_kit_soft_delete_in_db(self, db_session):
         """soft_delete() should set deleted_at timestamp."""
         kit = BrandKit(name="To Delete")
@@ -296,6 +298,7 @@ class TestBrandKitORMBehavioral:
         kit.soft_delete()
         assert kit.deleted_at is not None
 
+    @pytest.mark.asyncio
     async def test_brand_kit_increment_version_in_db(self, db_session):
         """increment_version() should bump version from 1 to 2."""
         kit = BrandKit(name="Versioned Kit")
@@ -358,15 +361,67 @@ class TestBrandKitStorageBehavioral:
             assert not BrandKitStorage.validate_file_type(f"file{ext}", allowed)
 
     def test_validate_file_type_accepts_logo_extensions(self):
-        """validate_file_type should accept .png, .svg, .jpg, .webp for logos."""
-        allowed = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
-        for ext in (".png", ".svg", ".jpg", ".webp"):
+        """validate_file_type should accept .png, .jpg, .webp for logos.
+
+        R2: .svg was removed from the logo whitelist — SVGs can carry
+        <script> and are served as image/svg+xml from /uploads without a CSP,
+        making them a stored-XSS vector. PNG/JPEG/WebP cover logos.
+        """
+        allowed = {".png", ".jpg", ".jpeg", ".webp"}
+        for ext in (".png", ".jpg", ".webp"):
             assert BrandKitStorage.validate_file_type(f"logo{ext}", allowed)
+
+    def test_validate_file_type_rejects_svg_for_logos(self):
+        """validate_file_type must reject .svg (R2: stored XSS)."""
+        allowed = {".png", ".jpg", ".jpeg", ".webp"}
+        assert not BrandKitStorage.validate_file_type("logo.svg", allowed)
 
     def test_validate_file_type_rejects_exe_for_logos(self):
         """validate_file_type should reject .exe for logos."""
-        allowed = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+        allowed = {".png", ".jpg", ".jpeg", ".webp"}
         assert not BrandKitStorage.validate_file_type("malware.exe", allowed)
+
+    def test_delete_file_rejects_path_escaping_upload_root(self, tmp_path):
+        """H1: delete_file must refuse paths that escape the upload root.
+
+        A bare join+unlink lets delete_file("../../victim.txt") delete a file
+        outside UPLOAD_ROOT. It must raise ValueError and leave the outside
+        file untouched.
+        """
+        import asyncio
+
+        root = tmp_path / "uploads"
+        root.mkdir()
+        outside = tmp_path / "victim.txt"
+        outside.write_text("DO NOT DELETE")
+
+        storage = BrandKitStorage(root)
+
+        async def _run():
+            with pytest.raises(ValueError):
+                await storage.delete_file("../victim.txt")
+            with pytest.raises(ValueError):
+                await storage.delete_file("../../victim.txt")
+            assert outside.exists(), "outside file must be untouched"
+            assert outside.read_text() == "DO NOT DELETE"
+
+        asyncio.run(_run())
+
+    def test_delete_file_removes_file_inside_upload_root(self, tmp_path):
+        """delete_file still works for legitimate in-root paths."""
+        import asyncio
+
+        root = tmp_path / "uploads"
+        target = root / "brand_kit" / "kit-1" / "logos" / "primary.png"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"png")
+        storage = BrandKitStorage(root)
+
+        async def _run():
+            await storage.delete_file("brand_kit/kit-1/logos/primary.png")
+            assert not target.exists()
+
+        asyncio.run(_run())
 
 
 class TestBrandGuidelinesGeneratorBehavioral:
@@ -495,6 +550,7 @@ class TestSchemaErrorCases:
 class TestBrandKitORMCRUD:
     """Brand Kit ORM CRUD: update, multi-brand, brand_voice linkage."""
 
+    @pytest.mark.asyncio
     async def test_brand_kit_update_fields(self, db_session):
         """Create a kit, update name and colors, verify changes persist."""
         kit = BrandKit(name="Original Name", description="old desc")
@@ -514,6 +570,7 @@ class TestBrandKitORMCRUD:
         assert kit.version == 2
         assert kit.colors["primary"] == "#ff0000"
 
+    @pytest.mark.asyncio
     async def test_multi_brand_support(self, db_session):
         """Multiple brand kits can coexist under the same user."""
         user_id = "user-multi-test"
@@ -530,6 +587,7 @@ class TestBrandKitORMCRUD:
         assert kit1.brand_type == "personal"
         assert kit2.brand_type == "business"
 
+    @pytest.mark.asyncio
     async def test_brand_voice_linkage(self, db_session):
         """Brand kit can link to a brand_voice profile via brand_voice_id."""
         kit = BrandKit(
@@ -542,6 +600,7 @@ class TestBrandKitORMCRUD:
 
         assert kit.brand_voice_id == "voice-profile-abc"
 
+    @pytest.mark.asyncio
     async def test_brand_kit_soft_delete_sets_timestamp(self, db_session):
         """soft_delete sets deleted_at; kit still exists in DB."""
         kit = BrandKit(name="To Be Deleted")
@@ -556,6 +615,7 @@ class TestBrandKitORMCRUD:
 
         assert kit.deleted_at is not None
 
+    @pytest.mark.asyncio
     async def test_version_starts_at_one(self, db_session):
         """New brand kit starts at version 1."""
         kit = BrandKit(name="Version Test")
@@ -564,6 +624,7 @@ class TestBrandKitORMCRUD:
         await db_session.refresh(kit)
         assert kit.version == 1
 
+    @pytest.mark.asyncio
     async def test_multiple_version_increments(self, db_session):
         """Multiple increment_version calls stack correctly."""
         kit = BrandKit(name="Multi Inc")
@@ -576,6 +637,7 @@ class TestBrandKitORMCRUD:
         kit.increment_version()
         assert kit.version == 4
 
+    @pytest.mark.asyncio
     async def test_colors_stored_as_json(self, db_session):
         """Colors stored as JSON dict in ORM column."""
         colors = {

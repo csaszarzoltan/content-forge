@@ -99,7 +99,7 @@ files.
 | `secondary` | str \| None | Secondary logo path |
 | `icon` | str \| None | Favicon / icon path |
 | `watermark` | str \| None | Watermark path |
-| `primary_format` | str \| None | e.g. `"png"`, `"svg"` |
+| `primary_format` | str \| None | e.g. `"png"`, `"jpeg"` |
 | `primary_size` | int \| None | File size in bytes |
 
 ---
@@ -230,7 +230,12 @@ Uploads a font or logo file for the specified brand kit.
 | `file_type` | Allowed extensions |
 |-------------|--------------------|
 | `font` | `.ttf`, `.otf`, `.woff`, `.woff2` |
-| `logo` | `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp` |
+| `logo` | `.png`, `.jpg`, `.jpeg`, `.webp` |
+
+> **Security note (R2):** SVG is intentionally NOT accepted for logos. SVGs can
+> carry `<script>` and are served as `image/svg+xml` from the `/uploads` mount
+> without a CSP, so an uploaded SVG would be a stored-XSS vector. Use
+> PNG/JPG/WebP (raster) formats instead.
 
 Files are stored at `<upload_root>/brand_kit/<kit_id>/fonts/` or `logos/`.
 Filenames are sanitized (path traversal rejected, directory components stripped).
@@ -246,7 +251,7 @@ can be used directly as `<img src="/uploads/brand_kit/<id>/logos/primary.png">`.
 | Constraint | Value |
 |------------|-------|
 | Font types | TTF, OTF, WOFF, WOFF2 |
-| Logo types | PNG, JPG, JPEG, SVG, WebP |
+| Logo types | PNG, JPG, JPEG, WebP |
 | Max file size | 10 MB (`MAX_UPLOAD_SIZE_MB`, 413 on oversize) |
 | Path traversal | Rejected (`..` and `\` in filenames) |
 | Filename sanitization | Directory components stripped |

@@ -261,6 +261,83 @@ class TestBrandKitUploadEndpoint:
             app.dependency_overrides.clear()
             await self._drop_db()
 
+    # ── R1 regression: /brand-kit/guidelines must not be shadowed ─────────
+
+    @pytest.mark.asyncio
+    async def test_guidelines_dispatch_without_id_returns_422(self, settings):
+        """GET /brand-kit/guidelines without brand_kit_id must 422, not 404.
+
+        R1: when /{brand_kit_id} is registered before /guidelines, FastAPI
+        dispatches GET /brand-kit/guidelines to get_brand_kit with
+        brand_kit_id="guidelines", which 404s with "Brand kit not found".
+        With the guidelines route registered first, the handler is reached and
+        FastAPI returns 422 for the missing required query parameter.
+        """
+        await self._init_db()
+        client = await self._make_client(settings)
+        try:
+            response = await client.get("/brand-kit/guidelines")
+            assert response.status_code == 422, (
+                f"Expected 422 (guidelines handler reached, param missing), "
+                f"got {response.status_code} body={response.text[:120]!r} — "
+                f"route likely shadowed by /{{brand_kit_id}}"
+            )
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    @pytest.mark.asyncio
+    async def test_guidelines_dispatch_with_existing_kit_returns_html(self, settings):
+        """GET /brand-kit/guidelines?brand_kit_id=<real> returns guidelines HTML.
+
+        R1 end-to-end: the guidelines handler (not get_brand_kit) must serve
+        this path — a 200 with HTML content proves dispatch reaches the right
+        endpoint. A shadowed route would return BrandKitResponse JSON instead.
+        """
+        await self._init_db()
+        kit_id = await self._create_kit("Dispatch Test Kit")
+        client = await self._make_client(settings)
+        try:
+            response = await client.get(
+                "/brand-kit/guidelines", params={"brand_kit_id": kit_id}
+            )
+            assert response.status_code == 200, f"Body: {response.text[:200]}"
+            assert "<!DOCTYPE html>" in response.text or "<html" in response.text, (
+                f"Expected guidelines HTML, got: {response.text[:200]!r}"
+            )
+            assert "Dispatch Test Kit" in response.text
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    # ── R2 regression: SVG uploads must be rejected (stored XSS) ─────────
+
+    @pytest.mark.asyncio
+    async def test_upload_rejects_svg_logo(self, settings):
+        """SVG logos must be rejected with 400 (R2: stored XSS via <script>).
+
+        SVGs can carry <script> and are served as image/svg+xml from the
+        /uploads mount with no CSP, so an uploaded SVG is a stored-XSS vector.
+        The safe fix is to drop .svg from the logo whitelist entirely.
+        """
+        await self._init_db()
+        kit_id = await self._create_kit()
+        client = await self._make_client(settings)
+        try:
+            response = await client.post(
+                "/brand-kit/upload",
+                data={"brand_kit_id": kit_id, "file_type": "logo"},
+                files={"file": ("evil.svg", b"<svg><script>alert(1)</script></svg>", "image/svg+xml")},
+            )
+            assert response.status_code == 400, f"Body: {response.text}"
+            assert "not allowed" in response.json()["detail"].lower()
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
     @pytest.mark.asyncio
     async def test_upload_requires_multipart_payload(self, settings):
         """A request without multipart form data fails validation (422)."""

@@ -5,7 +5,10 @@ import re
 from pathlib import Path
 
 FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
-LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+# R2 (stored XSS): .svg intentionally excluded — SVGs can carry <script> and
+# are served as image/svg+xml from the /uploads mount without a CSP, so an
+# uploaded SVG is a stored-XSS vector. PNG/JPEG/WebP cover logos.
+LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # Pattern for allowed characters in filenames
 _SAFE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_\-. ]*$")
@@ -36,8 +39,17 @@ class BrandKitStorage:
         return str(dest.relative_to(self.upload_root))
 
     async def delete_file(self, file_path: str) -> None:
-        """Delete a file by its relative path."""
+        """Delete a file by its relative path.
+
+        Raises ValueError if the resolved path escapes ``upload_root``
+        (H1: path traversal guard — the path is public API surface even
+        though no endpoint calls it yet).
+        """
         full = self.upload_root / file_path
+        root_resolved = self.upload_root.resolve()
+        full_resolved = full.resolve()
+        if not full_resolved.is_relative_to(root_resolved):
+            raise ValueError(f"Path escapes upload root: {file_path}")
         if full.exists():
             full.unlink()
 

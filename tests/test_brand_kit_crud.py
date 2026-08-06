@@ -149,6 +149,27 @@ class TestBrandKitRouterInterface:
         )
         assert has_upload
 
+    # ── R1 regression: static routes must be registered BEFORE parameterized ──
+
+    def test_guidelines_route_registered_before_param_route(self):
+        """R1: /guidelines must come before /{brand_kit_id} in router.routes.
+
+        FastAPI matches routes in registration order, so a parameterized
+        /{brand_kit_id} registered first would shadow the static /guidelines
+        path (GET /brand-kit/guidelines would dispatch to get_brand_kit with
+        brand_kit_id="guidelines" and 404 "Brand kit not found").
+        """
+        idx_guidelines = next(
+            i for i, r in enumerate(router.routes) if r.path == "/brand-kit/guidelines"
+        )
+        idx_param = next(
+            i for i, r in enumerate(router.routes) if r.path == "/brand-kit/{brand_kit_id}"
+        )
+        assert idx_guidelines < idx_param, (
+            f"/guidelines registered at index {idx_guidelines}, "
+            f"/{{brand_kit_id}} at {idx_param} — static route is shadowed"
+        )
+
 
 # ============================================================================
 # SECTION 2 — BEHAVIORAL TESTS (verify real implementation)

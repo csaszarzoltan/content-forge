@@ -96,23 +96,6 @@ async def list_brand_kits(
     return BrandKitListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.get("/{brand_kit_id}")
-async def get_brand_kit(
-    brand_kit_id: str,
-    db: AsyncSession = Depends(get_db),  # noqa: B008
-) -> BrandKitResponse:
-    """Get a single brand kit by ID."""
-    stmt = select(BrandKit).where(
-        BrandKit.id == brand_kit_id,
-        BrandKit.deleted_at.is_(None),
-    )
-    result = await db.execute(stmt)
-    kit = result.scalar_one_or_none()
-    if kit is None:
-        raise HTTPException(status_code=404, detail="Brand kit not found")
-    return _to_response(kit)
-
-
 @router.get("/guidelines")
 async def generate_guidelines(
     brand_kit_id: str,
@@ -129,6 +112,23 @@ async def generate_guidelines(
         raise HTTPException(status_code=404, detail="Brand kit not found")
     gen = BrandGuidelinesGenerator()
     return gen.generate(_to_response(kit))
+
+
+@router.get("/{brand_kit_id}")
+async def get_brand_kit(
+    brand_kit_id: str,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+) -> BrandKitResponse:
+    """Get a single brand kit by ID."""
+    stmt = select(BrandKit).where(
+        BrandKit.id == brand_kit_id,
+        BrandKit.deleted_at.is_(None),
+    )
+    result = await db.execute(stmt)
+    kit = result.scalar_one_or_none()
+    if kit is None:
+        raise HTTPException(status_code=404, detail="Brand kit not found")
+    return _to_response(kit)
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
