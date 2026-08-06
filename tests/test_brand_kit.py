@@ -732,3 +732,120 @@ class TestBrandKitGuidelinesIntegration:
         assert "Bare minimum" in html
         # No logo section expected
         assert "Logos" not in html or kit.logos.primary is None
+
+
+# ============================================================================
+# SECTION 6 — SECURITY (stored XSS regression, review finding F3)
+# ============================================================================
+
+
+class TestBrandGuidelinesXSS:
+    """Guidelines HTML must escape every user-derived value (F3).
+
+    The frontend renders the guidelines response via ``dangerouslySetInnerHTML``
+    (frontend/src/brandkit.tsx), so any unescaped user-controlled value is a
+    stored-XSS vector executing in every viewer's browser.
+    """
+
+    def _kit_with_payload(self) -> BrandKitResponse:
+        """A kit whose user fields carry script/img injection payloads."""
+        from datetime import UTC, datetime
+
+        return BrandKitResponse(
+            id="xss-kit",
+            name="<script>alert(1)</script>",
+            description='<img src=x onerror="alert(2)">',
+            brand_type='"><script>alert(3)</script>',
+            colors=ColorPalette(
+                primary="#1a73e8",
+                secondary="#ffffff",
+                accent="#ea4335",
+                background="#f8f9fa",
+                text="#202124",
+            ),
+            fonts=FontSet(
+                heading='"><script>alert(4)</script>',
+                body="Roboto</style><script>alert(5)</script>",
+                accent="Product Sans",
+            ),
+            logos=LogoSet(
+                primary="brand_kit/xss-kit/logos/primary.png",
+                icon="brand_kit/xss-kit/logos/icon.svg",
+            ),
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+    def test_xss_payload_in_name_and_description_is_escaped(self):
+        """Raw script/img tags must never appear; escaped forms must."""
+        html = BrandGuidelinesGenerator().generate(self._kit_with_payload())
+
+        # Escaped forms are present
+        assert "&lt;script&gt;" in html
+        assert "&lt;img src=x onerror" in html
+
+        # Raw payloads must NOT appear
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror" not in html
+        assert "onerror=alert(2)" not in html
+        assert "onerror=\"alert(2)\"" not in html
+
+    def test_xss_payload_in_fonts_and_brand_type_is_escaped(self):
+        """Font names and brand_type injected into HTML must be escaped."""
+        html = BrandGuidelinesGenerator().generate(self._kit_with_payload())
+
+        assert "&lt;script&gt;" in html
+        assert "<script>alert(4)</script>" not in html
+        assert "<script>alert(5)</script>" not in html
+        assert "<script>alert(3)</script>" not in html
+        # The </style> breakout must be neutralized
+        assert "</style><script>" not in html
+
+    def test_xss_payload_escaping_through_guidelines_endpoint(self):
+        """Escaping survives the full pipeline: DB -> response -> HTML."""
+        from datetime import UTC, datetime
+
+        kit = BrandKitResponse(
+            id="xss-e2e",
+            name="<script>alert(1)</script>",
+            description='<img src=x onerror="alert(2)">',
+            brand_type="personal",
+            colors=ColorPalette(),
+            fonts=FontSet(),
+            logos=LogoSet(),
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        html = BrandGuidelinesGenerator().generate(kit)
+
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror" not in html
+        assert "onerror=alert(2)" not in html
+
+    def test_benign_values_render_unescaped(self):
+        """Normal brand data must still render as plain text (no double-escape)."""
+        from datetime import UTC, datetime
+
+        kit = BrandKitResponse(
+            id="benign",
+            name="Acme Corp",
+            description="Primary brand identity",
+            brand_type="business",
+            colors=ColorPalette(primary="#1a73e8", accent="#ea4335"),
+            fonts=FontSet(heading="Manrope", body="DM Sans", accent="Inter"),
+            logos=LogoSet(primary="brand_kit/benign/logos/logo.png"),
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        html = BrandGuidelinesGenerator().generate(kit)
+
+        assert "Acme Corp" in html
+        assert "Primary brand identity" in html
+        assert "Manrope" in html
+        assert "DM Sans" in html
+        assert "&lt;" not in html
+        assert "#1a73e8" in html

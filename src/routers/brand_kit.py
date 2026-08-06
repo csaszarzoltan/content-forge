@@ -141,10 +141,10 @@ async def upload_brand_kit_file(
 ) -> dict:
     """Upload a font or logo file for a brand kit.
 
-    The file is validated (extension whitelist + sanitized filename),
-    stored under ``UPLOAD_ROOT/brand_kit/<kit_id>/<fonts|logos>/``, and
-    the brand kit's ``fonts``/``logos`` JSON field is updated with the
-    stored relative path.
+    The file is validated (extension whitelist + sanitized filename + size
+    cap of ``MAX_UPLOAD_SIZE_MB``, 413 on oversized), stored under
+    ``UPLOAD_ROOT/brand_kit/<kit_id>/<fonts|logos>/``, and the brand kit's
+    ``fonts``/``logos`` JSON field is updated with the stored relative path.
     """
     storage = BrandKitStorage(app_settings.UPLOAD_ROOT)
     stmt = select(BrandKit).where(
@@ -175,7 +175,22 @@ async def upload_brand_kit_file(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    data = await file.read()
+    # F5 (DoS): cap upload size. Reject early on Content-Length when present,
+    # then read in bounded chunks so a lying client can't exhaust memory.
+    max_bytes = app_settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if file.size is not None and file.size > max_bytes:
+        raise HTTPException(status_code=413, detail="File too large")
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=413, detail="File too large")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if file_type == "font":
         stored_path = await storage.save_font(brand_kit_id, filename, data)
         fonts = dict(kit.fonts or {})

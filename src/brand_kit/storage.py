@@ -42,8 +42,12 @@ class BrandKitStorage:
             full.unlink()
 
     def get_file_url(self, file_path: str) -> str:
-        """Return the URL for a stored file."""
-        return f"/static/brand_kit/{file_path}"
+        """Return the URL for a stored file.
+
+        Files are stored under ``UPLOAD_ROOT`` which is mounted at ``/uploads``
+        in ``src/main.py``; the returned URL points there (F4 finding).
+        """
+        return f"/uploads/{file_path}"
 
     @staticmethod
     def validate_filename(filename: str) -> str:

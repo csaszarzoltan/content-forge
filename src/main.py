@@ -141,6 +141,39 @@ app.mount(
 )
 
 
+class _UploadsStaticApp:
+    """StaticFiles wrapper whose directory follows the current UPLOAD_ROOT.
+
+    Resolved per request from ``get_settings()`` so the mount tracks config
+    (including test-injected settings) instead of being pinned to whatever
+    ``UPLOAD_ROOT`` was at import time. This makes uploaded brand-kit assets
+    servable under ``/uploads`` (F4 finding).
+    """
+
+    def __init__(self) -> None:
+        self._root: Path | None = None
+        self._static: StaticFiles | None = None
+
+    async def __call__(self, scope, receive, send) -> None:
+        # Prefer the settings the app is actually running with (lifespan
+        # sets app.state.settings; tests override it). The ASGI scope carries
+        # the app instance, so we can read it without import-time coupling.
+        app = scope.get("app")
+        if app is not None and getattr(app.state, "settings", None) is not None:
+            root = Path(app.state.settings.UPLOAD_ROOT)
+        else:
+            root = Path(get_settings().UPLOAD_ROOT)
+        if self._static is None or self._root != root:
+            # UPLOAD_ROOT may be relative — resolve it against the app CWD.
+            root.mkdir(parents=True, exist_ok=True)
+            self._static = StaticFiles(directory=str(root))
+            self._root = root
+        await self._static(scope, receive, send)
+
+
+app.mount("/uploads", _UploadsStaticApp(), name="uploads")
+
+
 @app.get("/")
 async def root():
     """Root endpoint — returns API version info."""

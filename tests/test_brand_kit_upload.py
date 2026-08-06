@@ -88,6 +88,9 @@ class TestBrandKitUploadEndpoint:
         """Create a test client with overridden dependencies."""
         app.dependency_overrides[get_settings_dep] = lambda: settings
         app.dependency_overrides[get_db] = self._override_get_db
+        # The /uploads static mount reads app.state.settings (as the lifespan
+        # sets it in production) so it serves from the same temp upload root.
+        app.state.settings = settings
         transport = ASGITransport(app=app)
         return AsyncClient(transport=transport, base_url="http://test")
 
@@ -271,6 +274,122 @@ class TestBrandKitUploadEndpoint:
             )
             # FastAPI needs a multipart body — JSON payloads are rejected
             assert response.status_code == 422, f"Body: {response.text}"
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    # ── F4: uploaded files must be servable through the app ─────────────────
+
+    @pytest.mark.asyncio
+    async def test_uploaded_logo_is_servable_via_get_file_url(self, settings):
+        """After upload, the stored file is retrievable through the app.
+
+        F4 regression: uploads were written to disk but the returned path was
+        never reachable via HTTP (no mount on the upload root, get_file_url
+        pointed at /static). The full round trip — POST the logo, GET the
+        returned path through the FastAPI app — must return 200 with the
+        exact bytes that were uploaded.
+        """
+        from src.brand_kit.storage import BrandKitStorage
+
+        await self._init_db()
+        kit_id = await self._create_kit()
+        client = await self._make_client(settings)
+        try:
+            logo_bytes = b"\x89PNG\r\n\x1a\nfake logo bytes for F4"
+            response = await client.post(
+                "/brand-kit/upload",
+                data={"brand_kit_id": kit_id, "file_type": "logo"},
+                files={"file": ("primary.png", logo_bytes, "image/png")},
+            )
+            assert response.status_code == 201, f"Body: {response.text}"
+            stored_path = response.json()["path"]
+
+            # storage.get_file_url() returns a working URL for the file
+            url = BrandKitStorage(settings.UPLOAD_ROOT).get_file_url(stored_path)
+            assert url == f"/uploads/{stored_path}"
+
+            fetched = await client.get(url)
+            assert fetched.status_code == 200, f"GET {url} -> {fetched.status_code}"
+            assert fetched.content == logo_bytes
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    @pytest.mark.asyncio
+    async def test_uploaded_font_is_servable_via_get_file_url(self, settings):
+        """Font uploads are equally servable through the app (F4)."""
+        from src.brand_kit.storage import BrandKitStorage
+
+        await self._init_db()
+        kit_id = await self._create_kit()
+        client = await self._make_client(settings)
+        try:
+            font_bytes = b"\x00\x01\x00\x00fake font bytes for F4"
+            response = await client.post(
+                "/brand-kit/upload",
+                data={"brand_kit_id": kit_id, "file_type": "font"},
+                files={"file": ("heading.ttf", font_bytes, "font/ttf")},
+            )
+            assert response.status_code == 201, f"Body: {response.text}"
+            stored_path = response.json()["path"]
+
+            url = BrandKitStorage(settings.UPLOAD_ROOT).get_file_url(stored_path)
+            fetched = await client.get(url)
+            assert fetched.status_code == 200, f"GET {url} -> {fetched.status_code}"
+            assert fetched.content == font_bytes
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    # ── F5: upload size limit ───────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_upload_over_size_limit_returns_413(self, settings):
+        """An upload larger than MAX_UPLOAD_SIZE_MB is rejected with 413.
+
+        The limit is injected via the Settings fixture (1 MB), so a small
+        2 MB payload is already oversized without allocating tens of MB.
+        """
+        await self._init_db()
+        kit_id = await self._create_kit()
+        # Small injected limit — 2 MB payload exceeds it
+        small_limit = settings.model_copy(update={"MAX_UPLOAD_SIZE_MB": 1})
+        client = await self._make_client(small_limit)
+        try:
+            oversize = b"x" * (2 * 1024 * 1024)
+            response = await client.post(
+                "/brand-kit/upload",
+                data={"brand_kit_id": kit_id, "file_type": "logo"},
+                files={"file": ("huge.png", oversize, "image/png")},
+            )
+            assert response.status_code == 413, f"Body: {response.text}"
+            assert response.json()["detail"] == "File too large"
+        finally:
+            await client.aclose()
+            app.dependency_overrides.clear()
+            await self._drop_db()
+
+    @pytest.mark.asyncio
+    async def test_upload_at_limit_boundary_succeeds(self, settings):
+        """An upload exactly at the limit is accepted (boundary check)."""
+        await self._init_db()
+        kit_id = await self._create_kit()
+        small_limit = settings.model_copy(update={"MAX_UPLOAD_SIZE_MB": 1})
+        client = await self._make_client(small_limit)
+        try:
+            # Exactly 1 MB (the limit) — must be accepted
+            boundary = b"y" * (1 * 1024 * 1024)
+            response = await client.post(
+                "/brand-kit/upload",
+                data={"brand_kit_id": kit_id, "file_type": "logo"},
+                files={"file": ("boundary.png", boundary, "image/png")},
+            )
+            assert response.status_code == 201, f"Body: {response.text}"
+            assert response.json()["size"] == len(boundary)
         finally:
             await client.aclose()
             app.dependency_overrides.clear()

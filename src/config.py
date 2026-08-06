@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     HEALTH_CHECK_LLM: bool = False
     # Brand kit asset storage root (fonts, logos)
     UPLOAD_ROOT: str = "uploads"
+    # Max upload size in MB for brand kit assets (logos, fonts); oversized
+    # uploads are rejected with 413 (F5 finding — DoS protection).
+    MAX_UPLOAD_SIZE_MB: int = 10
 
     # JWT authentication settings
     JWT_SECRET: str = "change-me-in-production"

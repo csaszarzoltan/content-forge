@@ -234,6 +234,10 @@ Uploads a font or logo file for the specified brand kit.
 
 Files are stored at `<upload_root>/brand_kit/<kit_id>/fonts/` or `logos/`.
 Filenames are sanitized (path traversal rejected, directory components stripped).
+Uploads larger than `MAX_UPLOAD_SIZE_MB` (default 10 MB) are rejected with
+`413 File too large`. Stored files are served under `/uploads/` (the
+`UPLOAD_ROOT` directory is mounted at `/uploads`), so `logos.primary` paths
+can be used directly as `<img src="/uploads/brand_kit/<id>/logos/primary.png">`.
 
 ---
 
@@ -243,9 +247,10 @@ Filenames are sanitized (path traversal rejected, directory components stripped)
 |------------|-------|
 | Font types | TTF, OTF, WOFF, WOFF2 |
 | Logo types | PNG, JPG, JPEG, SVG, WebP |
+| Max file size | 10 MB (`MAX_UPLOAD_SIZE_MB`, 413 on oversize) |
 | Path traversal | Rejected (`..` and `\` in filenames) |
 | Filename sanitization | Directory components stripped |
-| Storage | Local filesystem under `UPLOAD_ROOT` |
+| Storage | Local filesystem under `UPLOAD_ROOT`, served at `/uploads` |
 
 ---
 
