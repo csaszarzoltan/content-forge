@@ -175,7 +175,7 @@
 - **A/B Testing Framework** — Full statistical A/B test lifecycle with chi-squared significance calculator
 - **ABTestService** — Service layer covering create, track track events, conclude with winner, and result retrieval
 - **AbStatsService** — Chi-squared significance calculator using scipy for statistical validity
-- **6 REST API endpoints** — `POST /api/v1/ab/experiments`, `POST /api/v1/ab/experiments/{id}/track`, `GET /api/v1/ab/experiments/{id}/results`, `POST /api/v1/ab/experiments/{id}/conclude`, `GET /api/v1/ab/experiments`, `GET /api/v1/ab/dashboard`
+- **6 REST API endpoints** — `POST /api/v1/ab/create`, `POST /api/v1/ab/{test_id}/track`, `GET /api/v1/ab/{test_id}/results`, `POST /api/v1/ab/{test_id}/conclude`, `GET /api/v1/ab/list` (and `GET /api/v1/ab/dashboard` — a stats summary endpoint)
 - **Dashboard aggregation** — Summary endpoint for experiment overview with status breakdown
 
 ### Tests
@@ -236,7 +236,7 @@
 - **Translation quality scoring** — BLEU and chrF scoring via `sacrebleu` for automated quality assessment
 - **Translation service** — Dual path (LLM generation + NMT translation) with scoring pipeline
 - **Multilingual scheduling** — Timezone-aware publishing, language-specific calendars, auto-translate on schedule, cross-language dependency chains
-- **New API endpoints** — `POST /api/v1/content/translate` (translate content), `GET /api/v1/languages` (list supported languages with caching via ETag)
+- **New API endpoints** — `POST /content/translate` (translate content), `GET /api/v1/languages` (list supported languages with caching via ETag)
 - **Brand voice templates** — Per-language brand voice templates (de_blog, fr_social, ja_email) with locale-appropriate voice adaptation
 
 ### Documentation

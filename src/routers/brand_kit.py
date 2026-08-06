@@ -1,10 +1,10 @@
 """Brand kit CRUD endpoints.
 
-POST   /brand-kit              — create
-GET    /brand-kit              — list (paginated)
-GET    /brand-kit/{id}         — get by id
-GET    /brand-kit/guidelines   — generate guidelines HTML
-POST   /brand-kit/upload       — upload font/logo file
+POST   /api/v1/brand-kit              — create
+GET    /api/v1/brand-kit              — list (paginated)
+GET    /api/v1/brand-kit/{id}         — get by id
+GET    /api/v1/brand-kit/guidelines   — generate guidelines HTML
+POST   /api/v1/brand-kit/upload       — upload font/logo file
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from src.schemas.brand_kit import (
     BrandKitResponse,
 )
 
-router = APIRouter(prefix="/brand-kit", tags=["brand-kit"])
+router = APIRouter(prefix="/api/v1/brand-kit", tags=["brand-kit"])
 
 
 def _to_response(kit: BrandKit) -> BrandKitResponse:

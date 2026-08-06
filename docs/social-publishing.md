@@ -56,8 +56,8 @@ Every connector implements the same three methods plus the `platform_name` prope
 
 - **Auth:** OAuth 1.0a User Context (signed headers with HMAC-SHA1)
 - **Max characters:** 280 (text longer than 280 is truncated)
-- **API base:** `https://api.twitter.com/2`
-- **Publish endpoint:** `POST /2/tweets`
+- **API base:** `https://api.twitter.com/2` (external Twitter/X API)
+- **Publish endpoint:** `POST https://api.twitter.com/2/tweets` (external Twitter/X API endpoint — the connector calls this from `src/connectors/twitter.py:118`; it is NOT a ContentForge local endpoint)
 - **Credential test:** `GET /2/users/me`
 - **Requires:** API key, API secret, access token, access token secret
 

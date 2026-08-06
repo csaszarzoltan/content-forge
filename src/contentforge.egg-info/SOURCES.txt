@@ -113,6 +113,8 @@ tests/test_approval_workflow_v012.py
 tests/test_auth.py
 tests/test_auto_detection.py
 tests/test_brand_kit.py
+tests/test_brand_kit_crud.py
+tests/test_brand_kit_upload.py
 tests/test_brand_voice.py
 tests/test_brand_voice_crud.py
 tests/test_campaign_cockpit_api_v011.py

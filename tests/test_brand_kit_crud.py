@@ -94,7 +94,7 @@ class TestBrandKitRouterInterface:
 
     def test_router_importable(self):
         assert router is not None
-        assert router.prefix == "/brand-kit"
+        assert router.prefix == "/api/v1/brand-kit"
 
     def test_router_tags(self):
         assert "brand-kit" in router.tags
@@ -102,13 +102,13 @@ class TestBrandKitRouterInterface:
     def test_router_has_routes(self):
         routes = {r.path for r in router.routes}
         # Root path for POST (create) and GET (list)
-        assert "/brand-kit" in routes
+        assert "/api/v1/brand-kit" in routes
         # {brand_kit_id} for GET by id
-        assert "/brand-kit/{brand_kit_id}" in routes
+        assert "/api/v1/brand-kit/{brand_kit_id}" in routes
         # guidelines endpoint
-        assert "/brand-kit/guidelines" in routes
+        assert "/api/v1/brand-kit/guidelines" in routes
         # upload endpoint
-        assert "/brand-kit/upload" in routes
+        assert "/api/v1/brand-kit/upload" in routes
 
     def test_router_has_create_route(self):
         routes = {(r.path, frozenset(r.methods or [])) for r in router.routes}
@@ -120,7 +120,7 @@ class TestBrandKitRouterInterface:
         routes = {(r.path, frozenset(r.methods or [])) for r in router.routes}
         # GET to root
         has_get_root = any(
-            path == "/brand-kit" and methods == frozenset({"GET"})
+            path == "/api/v1/brand-kit" and methods == frozenset({"GET"})
             for path, methods in routes
         )
         assert has_get_root
@@ -128,7 +128,7 @@ class TestBrandKitRouterInterface:
     def test_router_has_get_by_id_route(self):
         routes = {(r.path, frozenset(r.methods or [])) for r in router.routes}
         has_get_id = any(
-            path == "/brand-kit/{brand_kit_id}" and methods == frozenset({"GET"})
+            path == "/api/v1/brand-kit/{brand_kit_id}" and methods == frozenset({"GET"})
             for path, methods in routes
         )
         assert has_get_id
@@ -136,7 +136,7 @@ class TestBrandKitRouterInterface:
     def test_router_has_guidelines_route(self):
         routes = {(r.path, frozenset(r.methods or [])) for r in router.routes}
         has_guidelines = any(
-            path == "/brand-kit/guidelines" and methods == frozenset({"GET"})
+            path == "/api/v1/brand-kit/guidelines" and methods == frozenset({"GET"})
             for path, methods in routes
         )
         assert has_guidelines
@@ -144,7 +144,7 @@ class TestBrandKitRouterInterface:
     def test_router_has_upload_route(self):
         routes = {(r.path, frozenset(r.methods or [])) for r in router.routes}
         has_upload = any(
-            path == "/brand-kit/upload" and methods == frozenset({"POST"})
+            path == "/api/v1/brand-kit/upload" and methods == frozenset({"POST"})
             for path, methods in routes
         )
         assert has_upload
@@ -156,14 +156,14 @@ class TestBrandKitRouterInterface:
 
         FastAPI matches routes in registration order, so a parameterized
         /{brand_kit_id} registered first would shadow the static /guidelines
-        path (GET /brand-kit/guidelines would dispatch to get_brand_kit with
+        path (GET /api/v1/brand-kit/guidelines would dispatch to get_brand_kit with
         brand_kit_id="guidelines" and 404 "Brand kit not found").
         """
         idx_guidelines = next(
-            i for i, r in enumerate(router.routes) if r.path == "/brand-kit/guidelines"
+            i for i, r in enumerate(router.routes) if r.path == "/api/v1/brand-kit/guidelines"
         )
         idx_param = next(
-            i for i, r in enumerate(router.routes) if r.path == "/brand-kit/{brand_kit_id}"
+            i for i, r in enumerate(router.routes) if r.path == "/api/v1/brand-kit/{brand_kit_id}"
         )
         assert idx_guidelines < idx_param, (
             f"/guidelines registered at index {idx_guidelines}, "

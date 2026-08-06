@@ -11,7 +11,7 @@ both *what you say* and *how it looks* from a single platform.
 
 ```bash
 # Create a brand kit
-curl -X POST http://localhost:8000/brand-kit \
+curl -X POST http://localhost:8000/api/v1/brand-kit \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Acme Corp",
@@ -34,7 +34,7 @@ curl -X POST http://localhost:8000/brand-kit \
 
 ```bash
 # Generate brand guidelines HTML
-curl "http://localhost:8000/brand-kit/guidelines?brand_kit_id=<id>"
+curl "http://localhost:8000/api/v1/brand-kit/guidelines?brand_kit_id=<id>"
 ```
 
 ---
@@ -46,7 +46,7 @@ curl "http://localhost:8000/brand-kit/guidelines?brand_kit_id=<id>"
 | Identity | Tone, vocabulary, scenario rules | Colors, fonts, logos |
 | Output | System prompts for LLMs | HTML guidelines, static assets |
 | Module | `src/brand_voice/` | `src/brand_kit/` |
-| API prefix | `/brand-voice` | `/brand-kit` |
+| API prefix | `/api/v1/brand-voice` | `/api/v1/brand-kit` |
 | Links to | — | `brand_voice_id` FK (optional) |
 
 A brand kit can reference a brand voice profile via the optional
@@ -106,14 +106,14 @@ files.
 
 ## API Endpoints
 
-All endpoints are under the `/brand-kit` prefix.
+All endpoints are under the `/api/v1/brand-kit` prefix.
 
 ### Create Brand Kit
 
-**`POST /brand-kit`** → `201 Created`
+**`POST /api/v1/brand-kit`** → `201 Created`
 
 ```bash
-curl -X POST http://localhost:8000/brand-kit \
+curl -X POST http://localhost:8000/api/v1/brand-kit \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Startup Brand",
@@ -175,10 +175,10 @@ curl -X POST http://localhost:8000/brand-kit \
 
 ### List Brand Kits
 
-**`GET /brand-kit?limit=20&offset=0`** → `200 OK`
+**`GET /api/v1/brand-kit?limit=20&offset=0`** → `200 OK`
 
 ```bash
-curl "http://localhost:8000/brand-kit?limit=10"
+curl "http://localhost:8000/api/v1/brand-kit?limit=10"
 ```
 
 ```json
@@ -194,20 +194,20 @@ Soft-deleted kits are excluded from results.
 
 ### Get Brand Kit by ID
 
-**`GET /brand-kit/{brand_kit_id}`** → `200 OK`
+**`GET /api/v1/brand-kit/{brand_kit_id}`** → `200 OK`
 
 ```bash
-curl http://localhost:8000/brand-kit/a1b2c3d4-...
+curl http://localhost:8000/api/v1/brand-kit/a1b2c3d4-...
 ```
 
 Returns `404` if the kit is not found or has been soft-deleted.
 
 ### Generate Brand Guidelines
 
-**`GET /brand-kit/guidelines?brand_kit_id={id}`** → `200 OK` (HTML)
+**`GET /api/v1/brand-kit/guidelines?brand_kit_id={id}`** → `200 OK` (HTML)
 
 ```bash
-curl "http://localhost:8000/brand-kit/guidelines?brand_kit_id=a1b2c3d4-..."
+curl "http://localhost:8000/api/v1/brand-kit/guidelines?brand_kit_id=a1b2c3d4-..."
 ```
 
 Returns a self-contained HTML document with:
@@ -221,7 +221,7 @@ The HTML uses inline CSS and is ready for browser rendering or PDF conversion.
 
 ### Upload File
 
-**`POST /brand-kit/upload?brand_kit_id={id}&file_type=font|logo`** → `201 Created`
+**`POST /api/v1/brand-kit/upload?brand_kit_id={id}&file_type=font|logo`** → `201 Created`
 
 Uploads a font or logo file for the specified brand kit.
 
@@ -267,11 +267,11 @@ and optional brand voice link.
 
 ```python
 # Create two kits
-personal = httpx.post("/brand-kit", json={"name": "Personal Brand", "brand_type": "personal"})
-business = httpx.post("/brand-kit", json={"name": "Work Brand", "brand_type": "business"})
+personal = httpx.post("/api/v1/brand-kit", json={"name": "Personal Brand", "brand_type": "personal"})
+business = httpx.post("/api/v1/brand-kit", json={"name": "Work Brand", "brand_type": "business"})
 
 # List all kits
-kits = httpx.get("/brand-kit").json()
+kits = httpx.get("/api/v1/brand-kit").json()
 print(kits["total"])  # 2
 ```
 
@@ -284,7 +284,7 @@ connect it to a brand voice profile. The guidelines generator will include
 the voice identity in the output document.
 
 ```bash
-curl -X POST http://localhost:8000/brand-kit \
+curl -X POST http://localhost:8000/api/v1/brand-kit \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Full Brand",

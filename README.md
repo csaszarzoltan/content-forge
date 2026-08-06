@@ -162,7 +162,7 @@ ContentForge supports **full multi-language content generation** — detect inpu
 | P1   | **Translation service** | Dual path (LLM generation in target language + NMT-style translation) with quality gate |
 | P1   | **Multilingual scheduling** | Timezone-aware publishing, language-specific calendars, auto-translate on schedule, dependency chains |
 | P0   | **Languages API** | `GET /api/v1/languages` — list supported languages with ETag-based caching |
-| P0   | **Translate API** | `POST /api/v1/content/translate` — translate content between languages with quality scoring |
+|| P0   | **Translate API** | `POST /content/translate` — translate content between languages with quality scoring |
 
 ### Usage
 

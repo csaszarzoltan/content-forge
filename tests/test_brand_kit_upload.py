@@ -114,7 +114,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("primary.png", b"\x89PNG fake image bytes", "image/png")},
             )
@@ -163,7 +163,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "font"},
                 files={"file": ("heading.ttf", b"fake font data", "font/ttf")},
             )
@@ -196,7 +196,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("malware.exe", b"MZ fake exe", "application/octet-stream")},
             )
@@ -215,7 +215,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("../../etc/passwd.png", b"pwned", "image/png")},
             )
@@ -233,7 +233,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "audio"},
                 files={"file": ("song.mp3", b"ID3", "audio/mpeg")},
             )
@@ -251,7 +251,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": "no-such-kit", "file_type": "logo"},
                 files={"file": ("primary.png", b"png", "image/png")},
             )
@@ -276,7 +276,7 @@ class TestBrandKitUploadEndpoint:
         await self._init_db()
         client = await self._make_client(settings)
         try:
-            response = await client.get("/brand-kit/guidelines")
+            response = await client.get("/api/v1/brand-kit/guidelines")
             assert response.status_code == 422, (
                 f"Expected 422 (guidelines handler reached, param missing), "
                 f"got {response.status_code} body={response.text[:120]!r} — "
@@ -300,7 +300,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.get(
-                "/brand-kit/guidelines", params={"brand_kit_id": kit_id}
+                "/api/v1/brand-kit/guidelines", params={"brand_kit_id": kit_id}
             )
             assert response.status_code == 200, f"Body: {response.text[:200]}"
             assert "<!DOCTYPE html>" in response.text or "<html" in response.text, (
@@ -327,7 +327,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("evil.svg", b"<svg><script>alert(1)</script></svg>", "image/svg+xml")},
             )
@@ -346,7 +346,7 @@ class TestBrandKitUploadEndpoint:
         client = await self._make_client(settings)
         try:
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 json={"brand_kit_id": kit_id, "file_type": "logo"},
             )
             # FastAPI needs a multipart body — JSON payloads are rejected
@@ -376,7 +376,7 @@ class TestBrandKitUploadEndpoint:
         try:
             logo_bytes = b"\x89PNG\r\n\x1a\nfake logo bytes for F4"
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("primary.png", logo_bytes, "image/png")},
             )
@@ -406,7 +406,7 @@ class TestBrandKitUploadEndpoint:
         try:
             font_bytes = b"\x00\x01\x00\x00fake font bytes for F4"
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "font"},
                 files={"file": ("heading.ttf", font_bytes, "font/ttf")},
             )
@@ -439,7 +439,7 @@ class TestBrandKitUploadEndpoint:
         try:
             oversize = b"x" * (2 * 1024 * 1024)
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("huge.png", oversize, "image/png")},
             )
@@ -461,7 +461,7 @@ class TestBrandKitUploadEndpoint:
             # Exactly 1 MB (the limit) — must be accepted
             boundary = b"y" * (1 * 1024 * 1024)
             response = await client.post(
-                "/brand-kit/upload",
+                "/api/v1/brand-kit/upload",
                 data={"brand_kit_id": kit_id, "file_type": "logo"},
                 files={"file": ("boundary.png", boundary, "image/png")},
             )
