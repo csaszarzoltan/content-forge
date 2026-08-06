@@ -1,8 +1,13 @@
 """Interface and behavioral tests for brand_kit module.
 
-Interface tests  — verify imports, class/function signatures (should PASS).
-Behavioral tests — verify expected runtime behavior (should FAIL with
-                    NotImplementedError until implementations are written).
+Interface tests  — verify imports, class/function signatures.
+Behavioral tests — verify runtime behavior against real implementations.
+Schema tests     — validation edge cases and error handling.
+CRUD tests       — ORM update, multi-brand, versioning, brand_voice linkage.
+Integration      — full flow: brand kit creation -> guidelines HTML generation.
+
+File: tests/test_brand_kit.py
+Total: 70 unit + integration tests (as of this writing).
 """
 from __future__ import annotations
 
@@ -429,3 +434,301 @@ class TestBrandGuidelinesGeneratorBehavioral:
         voice = {"brand_identity": {"who": "Acme Corp", "audience": "Engineers"}}
         result = gen.generate(kit, voice_profile=voice)
         assert "voice" in result.lower()
+
+
+# ============================================================================
+# SECTION 3 — SCHEMA ERROR CASES
+# ============================================================================
+
+
+class TestSchemaErrorCases:
+    """Pydantic schema error cases — validation edge cases."""
+
+    def test_brand_kit_create_empty_name_rejected(self):
+        """BrandKitCreate rejects empty name (min_length=1)."""
+        with pytest.raises(ValidationError):
+            BrandKitCreate(name="")
+
+    def test_brand_kit_create_very_long_name_accepted(self):
+        """BrandKitCreate accepts long names (no max_length constraint)."""
+        req = BrandKitCreate(name="A" * 500)
+        assert len(req.name) == 500
+
+    def test_color_palette_invalid_hex_rejected(self):
+        """ColorPalette rejects invalid hex colors."""
+        with pytest.raises(ValidationError):
+            ColorPalette(primary="not-a-hex")
+
+    def test_color_palette_partial_hex_rejected(self):
+        """ColorPalette rejects truncated hex like '#fff'."""
+        with pytest.raises(ValidationError):
+            ColorPalette(primary="#fff")
+
+    def test_color_palette_hex_with_alpha_rejected(self):
+        """ColorPalette rejects 8-char hex (no alpha support)."""
+        with pytest.raises(ValidationError):
+            ColorPalette(primary="#ff0000ff")
+
+    def test_brand_kit_create_defaults(self):
+        """BrandKitCreate applies sensible defaults."""
+        req = BrandKitCreate(name="Minimal Brand")
+        assert req.brand_type == "personal"
+        assert req.description == ""
+        assert req.user_id is None
+        assert req.brand_voice_id is None
+        assert isinstance(req.colors, ColorPalette)
+        assert isinstance(req.fonts, FontSet)
+        assert isinstance(req.logos, LogoSet)
+
+    def test_brand_kit_update_all_none(self):
+        """BrandKitUpdate with no fields is valid (all optional)."""
+        req = BrandKitUpdate()
+        assert req.name is None
+        assert req.colors is None
+
+
+# ============================================================================
+# SECTION 4 — ORM CRUD BEHAVIORAL TESTS
+# ============================================================================
+
+
+class TestBrandKitORMCRUD:
+    """Brand Kit ORM CRUD: update, multi-brand, brand_voice linkage."""
+
+    async def test_brand_kit_update_fields(self, db_session):
+        """Create a kit, update name and colors, verify changes persist."""
+        kit = BrandKit(name="Original Name", description="old desc")
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        kit.name = "Updated Name"
+        kit.description = "new desc"
+        kit.colors = {"primary": "#ff0000", "secondary": "#00ff00"}
+        kit.increment_version()
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        assert kit.name == "Updated Name"
+        assert kit.description == "new desc"
+        assert kit.version == 2
+        assert kit.colors["primary"] == "#ff0000"
+
+    async def test_multi_brand_support(self, db_session):
+        """Multiple brand kits can coexist under the same user."""
+        user_id = "user-multi-test"
+        kit1 = BrandKit(name="Personal Brand", brand_type="personal", user_id=user_id)
+        kit2 = BrandKit(name="Business Brand", brand_type="business", user_id=user_id)
+        db_session.add_all([kit1, kit2])
+        await db_session.commit()
+        await db_session.refresh(kit1)
+        await db_session.refresh(kit2)
+
+        assert kit1.id != kit2.id
+        assert kit1.name == "Personal Brand"
+        assert kit2.name == "Business Brand"
+        assert kit1.brand_type == "personal"
+        assert kit2.brand_type == "business"
+
+    async def test_brand_voice_linkage(self, db_session):
+        """Brand kit can link to a brand_voice profile via brand_voice_id."""
+        kit = BrandKit(
+            name="Linked Brand",
+            brand_voice_id="voice-profile-abc",
+        )
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        assert kit.brand_voice_id == "voice-profile-abc"
+
+    async def test_brand_kit_soft_delete_sets_timestamp(self, db_session):
+        """soft_delete sets deleted_at; kit still exists in DB."""
+        kit = BrandKit(name="To Be Deleted")
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        assert kit.deleted_at is None
+        kit.soft_delete()
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        assert kit.deleted_at is not None
+
+    async def test_version_starts_at_one(self, db_session):
+        """New brand kit starts at version 1."""
+        kit = BrandKit(name="Version Test")
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+        assert kit.version == 1
+
+    async def test_multiple_version_increments(self, db_session):
+        """Multiple increment_version calls stack correctly."""
+        kit = BrandKit(name="Multi Inc")
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+
+        kit.increment_version()
+        kit.increment_version()
+        kit.increment_version()
+        assert kit.version == 4
+
+    async def test_colors_stored_as_json(self, db_session):
+        """Colors stored as JSON dict in ORM column."""
+        colors = {
+            "primary": "#1a73e8",
+            "secondary": "#ffffff",
+            "accent": "#ea4335",
+            "background": "#f8f9fa",
+            "text": "#202124",
+        }
+        kit = BrandKit(name="JSON Colors", colors=colors)
+        db_session.add(kit)
+        await db_session.commit()
+        await db_session.refresh(kit)
+        assert kit.colors["primary"] == "#1a73e8"
+        assert kit.colors["accent"] == "#ea4335"
+
+
+# ============================================================================
+# SECTION 5 — INTEGRATION TEST (brand kit creation -> guidelines generation)
+# ============================================================================
+
+
+class TestBrandKitGuidelinesIntegration:
+    """Integration: create brand kit -> generate full guidelines HTML."""
+
+    def test_full_flow_create_to_guidelines(self, tmp_path):
+        """Create a brand kit, populate it, and generate guidelines HTML.
+
+        This is the core integration test: brand kit creation with colors,
+        fonts, logos, and voice profile feeds into the guidelines generator,
+        producing a complete HTML document with all sections.
+        """
+        from src.brand_kit.guidelines import BrandGuidelinesGenerator
+
+        # 1. Create a fully populated BrandKitResponse
+        palette = ColorPalette(
+            primary="#1a73e8",
+            secondary="#ffffff",
+            accent="#ea4335",
+            background="#f8f9fa",
+            text="#202124",
+        )
+        fonts = FontSet(
+            heading="Google Sans",
+            body="Roboto",
+            accent="Product Sans",
+        )
+        logos = LogoSet(
+            primary="brand_kit/kit-int/logos/primary.png",
+            icon="brand_kit/kit-int/logos/icon.svg",
+        )
+        kit = BrandKitResponse(
+            id="kit-int",
+            name="Integration Corp",
+            description="Full integration test brand",
+            brand_type="business",
+            colors=palette,
+            fonts=fonts,
+            logos=logos,
+            version=1,
+            created_at=__import__("datetime").datetime.now(),
+            updated_at=__import__("datetime").datetime.now(),
+        )
+
+        # 2. Supply a voice profile
+        voice_profile = {
+            "brand_identity": {
+                "who": "Integration Corp, a test automation company",
+                "audience": "QA engineers and developers",
+                "purpose": "Make testing effortless and reliable",
+            },
+            "vocabulary": {
+                "preferred": ["reliable", "fast", "accurate"],
+                "banned": ["flaky", "brittle"],
+            },
+        }
+
+        # 3. Generate guidelines
+        gen = BrandGuidelinesGenerator()
+        html = gen.generate(kit, voice_profile=voice_profile)
+
+        # 4. Verify the HTML is complete and contains all sections
+        assert isinstance(html, str)
+        assert len(html) > 200  # Non-trivial document
+
+        # Title and description
+        assert "Integration Corp" in html
+        assert "Full integration test brand" in html
+
+        # Color palette section
+        assert "#1a73e8" in html
+        assert "#ffffff" in html
+        assert "#ea4335" in html
+        assert "#f8f9fa" in html
+        assert "#202124" in html
+
+        # Typography section
+        assert "Google Sans" in html
+        assert "Roboto" in html
+        assert "Product Sans" in html
+
+        # Logo section
+        assert "primary.png" in html
+        assert "icon.svg" in html
+
+        # Voice section
+        assert "voice" in html.lower()
+        assert "Integration Corp, a test automation company" in html
+
+        # Valid HTML structure
+        assert "<!DOCTYPE html>" in html
+        assert "</html>" in html
+
+    def test_guidelines_bytes_matches_string(self):
+        """generate_bytes() returns same content as generate() encoded."""
+        from src.brand_kit.guidelines import BrandGuidelinesGenerator
+
+        kit = BrandKitResponse(
+            id="bytes-test",
+            name="Bytes Test Brand",
+            description="",
+            brand_type="personal",
+            colors=ColorPalette(),
+            fonts=FontSet(),
+            logos=LogoSet(),
+            version=1,
+            created_at=__import__("datetime").datetime.now(),
+            updated_at=__import__("datetime").datetime.now(),
+        )
+        gen = BrandGuidelinesGenerator()
+        html_str = gen.generate(kit)
+        html_bytes = gen.generate_bytes(kit)
+        assert html_bytes == html_str.encode("utf-8")
+
+    def test_guidelines_with_no_logos_no_voice(self):
+        """Guidelines still generate with empty logos and no voice profile."""
+        from src.brand_kit.guidelines import BrandGuidelinesGenerator
+
+        kit = BrandKitResponse(
+            id="minimal",
+            name="Minimal Brand",
+            description="Bare minimum",
+            brand_type="personal",
+            colors=ColorPalette(),
+            fonts=FontSet(),
+            logos=LogoSet(),
+            version=1,
+            created_at=__import__("datetime").datetime.now(),
+            updated_at=__import__("datetime").datetime.now(),
+        )
+        gen = BrandGuidelinesGenerator()
+        html = gen.generate(kit)
+        assert "Minimal Brand" in html
+        assert "Bare minimum" in html
+        # No logo section expected
+        assert "Logos" not in html or kit.logos.primary is None

@@ -13,7 +13,8 @@ Requires-Dist: python-jose[cryptography]==3.5.0
 Requires-Dist: passlib[bcrypt]==1.7.4
 Requires-Dist: fast-langdetect==1.0.1
 Requires-Dist: sacrebleu==2.6.0
-Requires-Dist: scipy==1.18.0
+Requires-Dist: scipy==1.17.1; python_version < "3.12"
+Requires-Dist: scipy==1.18.0; python_version >= "3.12"
 Requires-Dist: textstat==0.7.12
 Requires-Dist: httpx==0.28.1
 Requires-Dist: cryptography==50.0.0

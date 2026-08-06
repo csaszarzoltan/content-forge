@@ -34,6 +34,7 @@ from src.routers.ab_test import router as ab_router
 from src.ai_visibility.router import router as ai_visibility_router
 from src.routers.analytics import router as analytics_router
 from src.routers.auth import router as auth_router
+from src.routers.brand_kit import router as brand_kit_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.content import router as content_router
 from src.routers.languages import router as languages_router
@@ -122,6 +123,7 @@ app.add_middleware(
 
 # Register routers
 app.include_router(auth_router)
+app.include_router(brand_kit_router)
 app.include_router(brand_voice_router)
 app.include_router(content_router)
 app.include_router(languages_router)

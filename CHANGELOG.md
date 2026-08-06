@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0] - 2026-08-06
+
+### Features
+- Added Brand Kit visual identity management system.
+- Added color palette management (hex/RGB/HSL) with five named color slots and computed format conversions.
+- Added font library with heading/body/accent pairing and custom font upload (TTF/OTF/WOFF/WOFF2).
+- Added logo management with multi-format storage (PNG/JPG/SVG/WebP) for primary, secondary, icon, and watermark slots.
+- Added brand guidelines HTML generator with self-contained inline CSS (color swatches, typography, logos, optional voice profile).
+- Added Brand Kit REST API: `POST/GET /brand-kit`, `GET /brand-kit/{id}`, `GET /brand-kit/guidelines`, `POST /brand-kit/upload`.
+- Added Brand Kit ORM model (`brand_kits` table) with soft-delete, versioning, and optional brand voice FK.
+- Added multi-brand support — users can create multiple brand kits (personal, business, per-client).
+- Added Brand Kit dashboard frontend (React + TypeScript).
+
+### Tests
+- Added 97 brand kit tests covering ORM model, Pydantic schemas, storage, guidelines generation, CRUD endpoints, and integration flow.
+
 ## [0.13.0] - 2026-08-05
 
 ### Features

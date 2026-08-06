@@ -31,6 +31,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P0   | **Analytics Dashboard** | Event-log based content performance tracking — impressions, clicks, engagement, channel comparison, content scoring, A/B correlation, CSV/JSON export, trends + anomaly detection |
 | P1   | **Social Media Publishing** | Pluggable platform connectors (Twitter/X, LinkedIn) with rate limiting, retry, and status tracking |
 | P0   | **Platform Validation Engine** | Validate content against real platform constraints (Twitter/X, LinkedIn, Instagram, Facebook, TikTok) before publishing |
+| P0   | **Brand Kit** | Visual identity management — color palettes (hex/RGB/HSL), font pairings, logo storage, brand guidelines HTML generator, multi-brand support |
 | P1   | **AI Visibility Metrics** | Track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews) with per-content snapshots, Chart.js-ready trends, and optional background polling |
 
 ## Installation
@@ -205,6 +206,53 @@ See the per-feature guides in [docs/](docs/) for details:
 - [Prompt Templates](docs/prompt-templates.md)
 - [Translation Pipeline](docs/translation-pipeline.md)
 - [Multilingual Scheduling](docs/multilingual-scheduling.md)
+
+## 🎨 Brand Kit — Visual Identity Management
+
+ContentForge now manages both **brand voice** (what you say) and **brand kit**
+(how it looks) — color palettes, font pairings, logos, and downloadable brand
+guidelines in a single platform.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Color palette** | Create and store brand colors (primary, secondary, accent, background, text) with hex validation and computed RGB/HSL |
+| P0   | **Font library** | Heading + body + accent font pairing with custom font upload (TTF/OTF/WOFF/WOFF2) |
+| P0   | **Logo management** | Upload, store, and serve logos (primary, secondary, icon, watermark) with multi-format support |
+| P0   | **Guidelines generator** | Generate self-contained HTML brand guidelines combining visual identity and optional voice profile |
+| P1   | **Multi-brand** | Create multiple brand kits per user (personal, business, per-client) |
+| P0   | **REST API** | `POST /brand-kit`, `GET /brand-kit`, `GET /brand-kit/{id}`, `GET /brand-kit/guidelines`, `POST /brand-kit/upload` |
+
+### Usage
+
+```python
+import httpx
+
+base = "http://localhost:8000"
+
+# Create a brand kit
+kit = httpx.post(f"{base}/brand-kit", json={
+    "name": "Acme Corp",
+    "brand_type": "business",
+    "colors": {
+        "primary": "#0066cc",
+        "secondary": "#ffffff",
+        "accent": "#ff9900",
+        "background": "#f5f5f5",
+        "text": "#333333"
+    },
+    "fonts": {"heading": "Manrope", "body": "DM Sans", "accent": "Inter"},
+}).json()
+
+# Generate brand guidelines
+guidelines = httpx.get(f"{base}/brand-kit/guidelines",
+                       params={"brand_kit_id": kit["id"]}).text
+open("brand-guidelines.html", "w").write(guidelines)
+```
+
+See the [Brand Kit guide](docs/brand-kit.md) for the full API reference,
+data model, file upload constraints, and multi-brand usage.
 
 ## Authentication
 
@@ -554,6 +602,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 | [Voice Extraction](docs/extraction.md) | `VoiceExtractor` — infer profiles from sample text |
 | [API Overview](docs/api-overview.md) | Complete REST endpoint reference (base URL, all endpoints, response schemas) |
 | [Content Generation API](docs/content-generation.md) | `POST /content/generate` — template-driven content generation with voice injection |
+| [Brand Kit](docs/brand-kit.md) | `POST/GET /brand-kit`, `GET /brand-kit/guidelines`, `POST /brand-kit/upload` — visual identity CRUD, color/font/logo management, HTML guidelines generator |
 | [Brand Voice API](docs/brand-voice-api.md) | `GET/POST/PUT/DELETE /brand-voices` — brand voice CRUD endpoints |
 | [Scheduling API](docs/scheduling.md) | `GET/POST/PUT/DELETE /scheduling` — scheduled post management |
 || [Analytics Dashboard](docs/analytics-dashboard.md) | `POST /api/v1/analytics/track`, `GET /dashboard`, `/content/{id}`, `/channels`, `/ab-results`, `/score/{id}`, `/export`, `/trends`, `/anomalies` — event tracking, content scoring, channel comparison, A/B correlation |

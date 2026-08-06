@@ -8,6 +8,9 @@ src/ai_visibility/providers.py
 src/ai_visibility/router.py
 src/ai_visibility/schemas.py
 src/ai_visibility/service.py
+src/brand_kit/__init__.py
+src/brand_kit/guidelines.py
+src/brand_kit/storage.py
 src/brand_voice/__init__.py
 src/brand_voice/compliance.py
 src/brand_voice/extraction.py
@@ -35,6 +38,7 @@ src/contentforge.egg-info/top_level.txt
 src/models/__init__.py
 src/models/ab_test.py
 src/models/analytics.py
+src/models/brand_kit.py
 src/models/brand_voice.py
 src/models/generation.py
 src/models/platform_token.py
@@ -44,6 +48,7 @@ src/routers/__init__.py
 src/routers/ab_test.py
 src/routers/analytics.py
 src/routers/auth.py
+src/routers/brand_kit.py
 src/routers/brand_voice.py
 src/routers/constraints.py
 src/routers/content.py
@@ -57,6 +62,7 @@ src/schemas/__init__.py
 src/schemas/ab_test.py
 src/schemas/analytics.py
 src/schemas/auth.py
+src/schemas/brand_kit.py
 src/schemas/brand_voice.py
 src/schemas/constraints.py
 src/schemas/content.py
@@ -106,6 +112,7 @@ tests/test_approval_api_v012.py
 tests/test_approval_workflow_v012.py
 tests/test_auth.py
 tests/test_auto_detection.py
+tests/test_brand_kit.py
 tests/test_brand_voice.py
 tests/test_brand_voice_crud.py
 tests/test_campaign_cockpit_api_v011.py
@@ -142,6 +149,7 @@ tests/test_users.py
 tests/test_validation_api.py
 tests/test_validation_engine.py
 tests/test_validation_models.py
+tests/test_workspace_data_api_v013.py
 tests/test_workspace_experience.py
 tests/test_workspace_v012.py
 tests/test_workspace_v013.py

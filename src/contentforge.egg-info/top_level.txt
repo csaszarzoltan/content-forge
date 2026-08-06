@@ -1,4 +1,5 @@
 ai_visibility
+brand_kit
 brand_voice
 connectors
 constraints
