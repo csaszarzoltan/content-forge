@@ -8,13 +8,16 @@ POST   /brand-kit/upload       — upload font/logo file
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.brand_kit.guidelines import BrandGuidelinesGenerator
-from src.brand_kit.storage import FONT_EXTENSIONS, LOGO_EXTENSIONS
-from src.dependencies import get_db
+from src.brand_kit.storage import FONT_EXTENSIONS, LOGO_EXTENSIONS, BrandKitStorage
+from src.config import Settings
+from src.dependencies import get_db, get_settings_dep
 from src.models.brand_kit import BrandKit
 from src.schemas.brand_kit import (
     BrandKitCreate,
@@ -130,11 +133,20 @@ async def generate_guidelines(
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_brand_kit_file(
-    brand_kit_id: str,
-    file_type: str = "logo",
+    file: UploadFile = File(...),  # noqa: B008
+    brand_kit_id: str = Form(...),
+    file_type: str = Form("logo"),
     db: AsyncSession = Depends(get_db),  # noqa: B008
+    app_settings: Settings = Depends(get_settings_dep),  # noqa: B008
 ) -> dict:
-    """Upload a font or logo file."""
+    """Upload a font or logo file for a brand kit.
+
+    The file is validated (extension whitelist + sanitized filename),
+    stored under ``UPLOAD_ROOT/brand_kit/<kit_id>/<fonts|logos>/``, and
+    the brand kit's ``fonts``/``logos`` JSON field is updated with the
+    stored relative path.
+    """
+    storage = BrandKitStorage(app_settings.UPLOAD_ROOT)
     stmt = select(BrandKit).where(
         BrandKit.id == brand_kit_id,
         BrandKit.deleted_at.is_(None),
@@ -144,5 +156,47 @@ async def upload_brand_kit_file(
     if kit is None:
         raise HTTPException(status_code=404, detail="Brand kit not found")
 
+    if file_type not in ("font", "logo"):
+        raise HTTPException(
+            status_code=400,
+            detail="file_type must be 'font' or 'logo'",
+        )
     allowed = FONT_EXTENSIONS if file_type == "font" else LOGO_EXTENSIONS
-    return {"message": "Upload endpoint ready", "allowed_types": list(allowed)}
+
+    # Defense in depth: reject disallowed extensions, then sanitize the
+    # filename (strips directory components, rejects path traversal).
+    if not storage.validate_file_type(file.filename or "", allowed):
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed for {file_type}. Allowed: {sorted(allowed)}",
+        )
+    try:
+        filename = storage.validate_filename(file.filename or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    data = await file.read()
+    if file_type == "font":
+        stored_path = await storage.save_font(brand_kit_id, filename, data)
+        fonts = dict(kit.fonts or {})
+        fonts["heading_file"] = stored_path
+        kit.fonts = fonts
+    else:
+        stored_path = await storage.save_logo(brand_kit_id, filename, data)
+        logos = dict(kit.logos or {})
+        logos["primary"] = stored_path
+        logos["primary_format"] = Path(filename).suffix.lower().lstrip(".")
+        logos["primary_size"] = len(data)
+        kit.logos = logos
+
+    kit.increment_version()
+    await db.commit()
+    await db.refresh(kit)
+
+    return {
+        "path": stored_path,
+        "filename": filename,
+        "size": len(data),
+        "brand_kit_id": brand_kit_id,
+        "file_type": file_type,
+    }

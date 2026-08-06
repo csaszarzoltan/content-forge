@@ -19,3 +19,6 @@ frontend/dist/
 !.env.example
 coverage.xml
 htmlcov/
+
+# Brand kit asset uploads
+uploads/

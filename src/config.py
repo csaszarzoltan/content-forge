@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     SECRET_KEY: str = "change-me-in-production"
     HEALTH_CHECK_LLM: bool = False
+    # Brand kit asset storage root (fonts, logos)
+    UPLOAD_ROOT: str = "uploads"
 
     # JWT authentication settings
     JWT_SECRET: str = "change-me-in-production"
@@ -64,7 +66,7 @@ def get_settings() -> Settings:
 
     Uses a module-level cache so the .env file is only read once.
     """
-    global settings  # noqa: PLW0603
+    global settings
     if settings is None:
         settings = Settings()
     return settings
