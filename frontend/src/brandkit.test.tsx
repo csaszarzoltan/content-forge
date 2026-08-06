@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {describe, expect, it, vi, beforeEach} from "vitest";
-import {render, screen, fireEvent, waitFor} from "@testing-library/react";
+import {cleanup, render, screen, fireEvent, waitFor} from "@testing-library/react";
 import React from "react";
 import {
   BrandKitList,
@@ -47,18 +47,18 @@ const SECOND_KIT: BrandKit = {
 function mockFetch(responses: Record<string, unknown>) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string, opts?: RequestInit) => {
+    vi.fn(async (url: string, opts?: RequestInit): Promise<Response> => {
       const key = `${opts?.method ?? "GET"} ${url}`;
       const body = responses[key];
       if (body === undefined) {
-        return {ok: false, status: 404, text: async () => "Not found"};
+        return {ok: false, status: 404, text: async () => "Not found"} as Response;
       }
       return {
         ok: true,
         status: 200,
         json: async () => body,
         text: async () => JSON.stringify(body),
-      };
+      } as Response;
     }),
   );
 }
@@ -66,6 +66,7 @@ function mockFetch(responses: Record<string, unknown>) {
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  cleanup();
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -131,12 +132,14 @@ describe("BrandKitList", () => {
         "/api/v1/brand-kit",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify(
-            expect.objectContaining({
-              name: "New Brand",
-              description: "A fresh brand",
-            }),
-          ),
+        }),
+      );
+      const postCall = vi.mocked(fetch).mock.calls.find(([, o]) => o?.method === "POST");
+      expect(postCall?.[0]).toBe("/api/v1/brand-kit");
+      expect(JSON.parse(String(postCall?.[1]?.body))).toEqual(
+        expect.objectContaining({
+          name: "New Brand",
+          description: "A fresh brand",
         }),
       );
     });
@@ -155,7 +158,9 @@ describe("BrandKitList", () => {
     });
     fireEvent.click(screen.getByRole("button", {name: /create/i}));
 
-    expect(await screen.findByText(/created|success|brand kit/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/created|success|brand kit/i, {selector: ".bk-toast"}),
+    ).toBeInTheDocument();
   });
 
   it("shows a friendly error message on create failure", async () => {
@@ -326,7 +331,7 @@ describe("BrandGuidelinesView", () => {
     expect(downloadBtn).toBeInTheDocument();
 
     // Clicking download should create a blob URL and trigger download
-    const clickSpy = vi.spyOn(document.createElement("a"), "click");
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click");
     fireEvent.click(downloadBtn);
     expect(clickSpy).toHaveBeenCalled();
   });

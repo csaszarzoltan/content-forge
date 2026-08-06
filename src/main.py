@@ -11,14 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from src.config import get_settings
-from src.database import Base
 from src.ai_visibility.models import (  # noqa: F401  (register tables on Base.metadata)
     AIEngineMetrics,
     AIRawMention,
     AIReferralTraffic,
     AITrendAggregate,
 )
+from src.ai_visibility.router import router as ai_visibility_router
+from src.config import get_settings
+from src.database import Base
 from src.models import (  # noqa: F401
     ABEvent,
     ABTest,
@@ -31,11 +32,11 @@ from src.models import (  # noqa: F401
     User,
 )
 from src.routers.ab_test import router as ab_router
-from src.ai_visibility.router import router as ai_visibility_router
 from src.routers.analytics import router as analytics_router
 from src.routers.auth import router as auth_router
 from src.routers.brand_kit import router as brand_kit_router
 from src.routers.brand_voice import router as brand_voice_router
+from src.routers.constraints import router as constraints_router
 from src.routers.content import router as content_router
 from src.routers.languages import router as languages_router
 from src.routers.publish import router as publish_router
@@ -43,7 +44,6 @@ from src.routers.schedule import router as schedule_router
 from src.routers.seo import router as seo_router
 from src.routers.translate import router as translate_router
 from src.routers.workspaces import router as workspaces_router
-from src.routers.constraints import router as constraints_router  # noqa: F401
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 

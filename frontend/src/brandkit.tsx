@@ -1,6 +1,7 @@
 /* ── Brand Kit — types, API helpers, and components ────────── */
 
 import React, {FormEvent, useCallback, useEffect, useRef, useState} from "react";
+import {validationMessage} from "./flow";
 
 /* ── types ─────────────────────────────────────────────────── */
 
@@ -146,7 +147,7 @@ export function BrandKitList({onSelect}: {onSelect: (kit: BrandKit) => void}) {
     setError("");
     fetchBrandKits()
       .then((r) => setKits(r.items))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .catch((e) => setError(validationMessage(e)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -162,9 +163,8 @@ export function BrandKitList({onSelect}: {onSelect: (kit: BrandKit) => void}) {
       setDescription("");
       setBrandType("personal");
       setSuccess("Brand kit created");
-      setSuccess("Brand kit created");
     } catch {
-      setError("We kept your work. Check the API connection and try again.");
+      setError(validationMessage(new Error("create failed")));
     }
   };
 
@@ -206,27 +206,27 @@ export function BrandKitList({onSelect}: {onSelect: (kit: BrandKit) => void}) {
               ))}
             </section>
           )}
-
-          <form className="bk-create-form" onSubmit={handleCreate}>
-            <h2>Create brand kit</h2>
-            <label>Name
-              <input name="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="My brand" />
-            </label>
-            <label>Description
-              <input name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" />
-            </label>
-            <label>Type
-              <select name="brand_type" value={brandType} onChange={(e) => setBrandType(e.target.value)}>
-                <option value="personal">Personal</option>
-                <option value="business">Business</option>
-                <option value="corporate">Corporate</option>
-                <option value="startup">Startup</option>
-              </select>
-            </label>
-            <button type="submit">Create brand kit</button>
-          </form>
         </>
       )}
+
+      <form className="bk-create-form" onSubmit={handleCreate}>
+        <h2>Create brand kit</h2>
+        <label>Name
+          <input name="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="My brand" />
+        </label>
+        <label>Description
+          <input name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" />
+        </label>
+        <label>Type
+          <select name="brand_type" value={brandType} onChange={(e) => setBrandType(e.target.value)}>
+            <option value="personal">Personal</option>
+            <option value="business">Business</option>
+            <option value="corporate">Corporate</option>
+            <option value="startup">Startup</option>
+          </select>
+        </label>
+        <button type="submit">Create brand kit</button>
+      </form>
     </div>
   );
 }
@@ -235,7 +235,7 @@ export function BrandKitList({onSelect}: {onSelect: (kit: BrandKit) => void}) {
    BrandKitDashboard — per-brand editor
    ═════════════════════════════════════════════════════════════ */
 
-export function BrandKitDashboard({brandKitId, onBack}: {brandKitId: string; onBack: () => void}) {
+export function BrandKitDashboard({brandKitId, onBack, onGuidelines}: {brandKitId: string; onBack: () => void; onGuidelines?: () => void}) {
   const [kit, setKit] = useState<BrandKit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -253,7 +253,7 @@ export function BrandKitDashboard({brandKitId, onBack}: {brandKitId: string; onB
         setFonts(k.fonts);
         setLogos(k.logos);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load brand kit"))
+      .catch((e) => setError(validationMessage(e)))
       .finally(() => setLoading(false));
   }, [brandKitId]);
 
@@ -284,7 +284,7 @@ export function BrandKitDashboard({brandKitId, onBack}: {brandKitId: string; onB
       await updateBrandKit(brandKitId, {colors, fonts, logos});
       setSuccess("Brand kit saved");
     } catch {
-      setError("We kept your work. Check the API connection and try again.");
+      setError(validationMessage(new Error("save failed")));
     } finally {
       setSaving(false);
     }
@@ -408,6 +408,7 @@ export function BrandKitDashboard({brandKitId, onBack}: {brandKitId: string; onB
 
       <div className="bk-actions">
         <button className="back" onClick={onBack}>← Back</button>
+        {onGuidelines && <button className="ghost" onClick={onGuidelines}>View guidelines</button>}
         <button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save brand kit"}</button>
       </div>
     </div>
@@ -432,12 +433,15 @@ export function BrandGuidelinesView({brandKitId, onBack}: {brandKitId: string; o
 
   const handleDownload = () => {
     const blob = new Blob([html], {type: "text/html"});
-    const url = URL.createObjectURL(blob);
+    let url = "";
+    if (typeof URL.createObjectURL === "function") {
+      url = URL.createObjectURL(blob);
+    }
     const a = document.createElement("a");
     a.href = url;
     a.download = `brand-guidelines-${brandKitId}.html`;
     a.click();
-    URL.revokeObjectURL(url);
+    if (url) URL.revokeObjectURL(url);
   };
 
   if (loading) return <div className="loading" aria-live="polite">Loading guidelines…</div>;
@@ -452,4 +456,27 @@ export function BrandGuidelinesView({brandKitId, onBack}: {brandKitId: string; o
       <div data-testid="guidelines-container" className="bk-guidelines" dangerouslySetInnerHTML={{__html: html}} />
     </div>
   );
+}
+
+/* ═════════════════════════════════════════════════════════════
+   BrandKitWorkspace — top-level switcher (list / dashboard / guidelines)
+   ═════════════════════════════════════════════════════════════ */
+
+export function BrandKitWorkspace() {
+  const [selected, setSelected] = useState<BrandKit | null>(null);
+  const [guidelinesId, setGuidelinesId] = useState<string | null>(null);
+
+  if (guidelinesId) {
+    return <BrandGuidelinesView brandKitId={guidelinesId} onBack={() => setGuidelinesId(null)} />;
+  }
+  if (selected) {
+    return (
+      <BrandKitDashboard
+        brandKitId={selected.id}
+        onBack={() => setSelected(null)}
+        onGuidelines={() => setGuidelinesId(selected.id)}
+      />
+    );
+  }
+  return <BrandKitList onSelect={setSelected} />;
 }
