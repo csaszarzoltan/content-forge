@@ -48,7 +48,7 @@ def _to_response(kit: BrandKit) -> BrandKitResponse:
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_brand_kit(
     body: BrandKitCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> BrandKitResponse:
     """Create a new brand kit."""
     kit = BrandKit(
@@ -71,7 +71,7 @@ async def create_brand_kit(
 async def list_brand_kits(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> BrandKitListResponse:
     """List all brand kits (paginated)."""
     count_stmt = select(func.count()).select_from(BrandKit).where(
@@ -96,7 +96,7 @@ async def list_brand_kits(
 @router.get("/{brand_kit_id}")
 async def get_brand_kit(
     brand_kit_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> BrandKitResponse:
     """Get a single brand kit by ID."""
     stmt = select(BrandKit).where(
@@ -113,7 +113,7 @@ async def get_brand_kit(
 @router.get("/guidelines")
 async def generate_guidelines(
     brand_kit_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> str:
     """Generate brand guidelines HTML."""
     stmt = select(BrandKit).where(
@@ -132,7 +132,7 @@ async def generate_guidelines(
 async def upload_brand_kit_file(
     brand_kit_id: str,
     file_type: str = "logo",
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> dict:
     """Upload a font or logo file."""
     stmt = select(BrandKit).where(
