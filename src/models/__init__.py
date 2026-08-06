@@ -5,6 +5,7 @@ All models inherit from :class:`src.database.Base`.
 from src.models.ab_test import ABEvent, ABTest, ABVariant
 from src.models.analytics import AnalyticsEvent, ContentAnalytics
 from src.models.brand_voice import BrandVoice
+from src.models.brand_kit import BrandKit
 from src.models.generation import Generation
 from src.models.platform_token import PlatformToken
 from src.models.scheduled_post import ScheduledPost
@@ -16,6 +17,7 @@ __all__ = [
     "ABVariant",
     "AnalyticsEvent",
     "BrandVoice",
+    "BrandKit",
     "ContentAnalytics",
     "Generation",
     "PlatformToken",
