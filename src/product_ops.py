@@ -797,3 +797,23 @@ def render_publish_batch_detail(
         retry = f'<section class="panel recovery"><h2>Safe recovery</h2><p>Only failed or retryable channels will be queued. Successful deliveries will not be published again.</p><p><strong>Retry scope:</strong> {_esc(", ".join(retryable))}</p><form method="post" action="/workspace/publish/{_esc(batch_id)}/retry">{inputs}<button class="primary">Retry failed channels</button></form></section>'
     body = f'<p><a href="/workspace/publish">Back to publish center</a></p><section class="panel context"><p class="eyebrow">Delivery batch</p><h2>Asset {_esc(batch["asset_id"])}</h2><p><span class="status">{_esc(batch["state"].replace("_", " ").title())}</span></p></section><div class="cards">{"".join(cards)}</div>{retry}'
     return _layout("publish", body, notice, error)
+
+
+def workspace_overview(store: ContentOpsStore) -> dict[str, Any]:
+    """Return normalized collections for the complete React workspace shell."""
+    assets: list[dict[str, Any]] = []
+    with store._db() as db:
+        assets = [dict(row) for row in db.execute("SELECT * FROM assets ORDER BY rowid DESC")]
+    return {
+        "campaigns": store.rows("campaigns"),
+        "assets": assets,
+        "approvals": store.rows("approvals"),
+        "publish_batches": store.rows("publish_batches"),
+        "deliveries": store.rows("deliveries"),
+        "localization_jobs": store.rows("localization_jobs"),
+        "locale_variants": store.rows("locale_variants"),
+        "voice_profiles": store.rows("voice_profiles"),
+        "voice_rules": store.rows("voice_rules"),
+        "provenance": store.rows("provenance"),
+        "summary": store.attention_summary(),
+    }

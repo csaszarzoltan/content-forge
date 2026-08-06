@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contentforge"
-version = "0.12.0"
+version = "0.13.0"
 description = "AI-powered content platform with brand voice customization"
 requires-python = ">=3.11"
 dependencies = [
@@ -18,7 +18,8 @@ dependencies = [
     "passlib[bcrypt]==1.7.4",
     "fast-langdetect==1.0.1",
     "sacrebleu==2.6.0",
-    "scipy==1.18.0",
+    "scipy==1.17.1; python_version < \"3.12\"",
+    "scipy==1.18.0; python_version >= \"3.12\"",
     "textstat==0.7.12",
     "httpx==0.28.1",
     "cryptography==50.0.0",

@@ -15,6 +15,7 @@ from src.product_ops import (
     render_campaign_detail,
     render_publish_batch_detail,
     render_workspace,
+    workspace_overview,
 )
 
 router = APIRouter()
@@ -330,3 +331,9 @@ def get_asset_audit(asset_id: str) -> dict[str, object]:
     """Return the chronological approval audit trail for an asset."""
     items = _store().audit_events(asset_id)
     return {"items": items, "count": len(items)}
+
+
+@router.get("/api/v1/workspace-overview")
+def get_workspace_overview() -> dict[str, object]:
+    """Return all collections required by the routed React workspaces."""
+    return workspace_overview(_store())

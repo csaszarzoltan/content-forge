@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.13.0] - 2026-08-05
+
+### Features
+- Added working hash-based navigation for all ten sidebar workspaces.
+- Added routed My Work, Campaigns, Content, Calendar, Approvals, Localization, Analytics, Brand Governance, Connections, and Admin pages.
+- Added a consolidated workspace overview API backed by real SQLite collections.
+- Preserved campaign cockpit, versioned editor, and request-review flows inside the routed shell.
+
+### Fixes
+- Replaced all inert `href="#"` sidebar placeholders with real routes and active states.
+- Added Python 3.11 and 3.12 SciPy dependency markers.
+- Added a Windows-friendly backend runner that watches only `src`, preventing node_modules reload loops.
+
+### Tests
+- Added React navigation contracts and backend workspace integration coverage.
+
+
 ## [0.12.0] - 2026-08-05
 
 ### Features

@@ -1,6 +1,9 @@
+ai_visibility
 brand_voice
 connectors
+constraints
 models
 routers
 schemas
 services
+static

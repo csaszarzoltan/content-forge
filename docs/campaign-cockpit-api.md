@@ -55,3 +55,9 @@ Accepts `reviewer`, `decision`, and mandatory `reason`. A changed asset returns 
 `GET /api/v1/assets/{asset_id}/audit`
 
 Returns approval requests and decisions in chronological order.
+
+## Complete workspace overview
+
+`GET /api/v1/workspace-overview`
+
+Returns campaigns, assets, approvals, publish batches, delivery attempts, localization jobs, locale variants, brand profiles, voice rules, provenance records, and actionable summary counts for the routed React workspaces.

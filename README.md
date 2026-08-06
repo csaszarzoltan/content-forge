@@ -700,3 +700,28 @@ New endpoints:
 - `POST /api/v1/assets/{asset_id}/approval`
 - `POST /api/v1/approvals/{request_id}/decision`
 - `GET /api/v1/assets/{asset_id}/audit`
+
+## v0.13 complete workspace navigation
+
+Every sidebar item now opens a real React workspace with a stable URL hash, active navigation state, browser Back/Forward support, and meaningful loading, empty, data, and error states.
+
+Available routes:
+
+- `#my-work`
+- `#campaigns`
+- `#content`
+- `#calendar`
+- `#approvals`
+- `#localization`
+- `#analytics`
+- `#brand`
+- `#connections`
+- `#admin`
+
+On Windows, start the backend with:
+
+```powershell
+python scripts/run_backend.py
+```
+
+This watches only `src/`, so installing frontend dependencies no longer restarts the API server. Python 3.11 installs SciPy 1.17.1, while Python 3.12 and later install SciPy 1.18.0.
