@@ -48,7 +48,7 @@ class BrandKitStorage:
     @staticmethod
     def validate_filename(filename: str) -> str:
         """Sanitize a filename: strip directory components, reject path traversal."""
-        if ".." in filename or "/" in filename or "\\" in filename:
+        if ".." in filename or "\\" in filename:
             raise ValueError(f"Path traversal not allowed: {filename}")
         name = Path(filename).name
         if not name:

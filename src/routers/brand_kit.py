@@ -8,19 +8,18 @@ POST   /brand-kit/upload       — upload font/logo file
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.brand_kit.guidelines import BrandGuidelinesGenerator
-from src.brand_kit.storage import FONT_EXTENSIONS, LOGO_EXTENSIONS, BrandKitStorage
+from src.brand_kit.storage import FONT_EXTENSIONS, LOGO_EXTENSIONS
 from src.dependencies import get_db
 from src.models.brand_kit import BrandKit
 from src.schemas.brand_kit import (
     BrandKitCreate,
     BrandKitListResponse,
     BrandKitResponse,
-    BrandKitUpdate,
 )
 
 router = APIRouter(prefix="/brand-kit", tags=["brand-kit"])
@@ -145,6 +144,5 @@ async def upload_brand_kit_file(
     if kit is None:
         raise HTTPException(status_code=404, detail="Brand kit not found")
 
-    storage = BrandKitStorage("/tmp/brand_kit_uploads")
     allowed = FONT_EXTENSIONS if file_type == "font" else LOGO_EXTENSIONS
     return {"message": "Upload endpoint ready", "allowed_types": list(allowed)}
