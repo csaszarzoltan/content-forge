@@ -22,3 +22,7 @@ htmlcov/
 
 # Brand kit asset uploads
 uploads/
+
+# Playwright artifacts
+frontend/test-results/
+frontend/playwright-report/

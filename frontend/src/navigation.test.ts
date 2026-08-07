@@ -5,13 +5,14 @@ describe("workspace navigation", () => {
   it("gives every visible workspace a real route", () => {
     expect(NAV_ITEMS.map(item => item.route)).toEqual([
       "my-work", "campaigns", "content", "calendar", "approvals",
-      "localization", "analytics", "brand", "brand-kit", "connections", "admin"
+      "localization", "transcreation", "analytics", "brand", "brand-kit", "connections", "admin"
     ]);
   });
   it("normalizes hashes and falls back safely", () => {
     expect(normalizeRoute("")).toBe("my-work");
     expect(normalizeRoute("#missing")).toBe("my-work");
     expect(normalizeRoute("#brand-kit")).toBe("brand-kit");
+    expect(normalizeRoute("#transcreation")).toBe("transcreation");
   });
   it("places brand-kit after brand with the correct icon", () => {
     const brandIdx = NAV_ITEMS.findIndex(i => i.route === "brand");
@@ -19,5 +20,12 @@ describe("workspace navigation", () => {
     expect(kitIdx).toBe(brandIdx + 1);
     expect(NAV_ITEMS[kitIdx].label).toBe("Brand Kit");
     expect(NAV_ITEMS[kitIdx].icon).toBe("◆");
+  });
+  it("places transcreation after localization with the correct icon", () => {
+    const locIdx = NAV_ITEMS.findIndex(i => i.route === "localization");
+    const tcIdx = NAV_ITEMS.findIndex(i => i.route === "transcreation");
+    expect(tcIdx).toBe(locIdx + 1);
+    expect(NAV_ITEMS[tcIdx].label).toBe("Transcreate");
+    expect(NAV_ITEMS[tcIdx].icon).toBe("⇄");
   });
 });
