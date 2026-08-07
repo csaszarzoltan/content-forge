@@ -75,6 +75,9 @@ class RiskItem(BaseModel):
 class LocaleFormatItem(BaseModel):
     """A locale-formatting conversion detected and applied."""
 
+    id: str | None = Field(
+        None, description="Stable identifier (e.g. 'fmt-date-1') used to accept/reject conversions"
+    )
     original: str = Field(..., description="Original value before conversion")
     converted: str = Field(..., description="Converted value for target locale")
     format_type: FormatType = Field(..., description="Type of formatting applied")

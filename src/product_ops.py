@@ -13,7 +13,10 @@ import sqlite3
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.schemas.transcreation import TranscreationResult
 
 PAGES = {
     "campaigns": ("Campaign workspace", "Plan, generate, review, and schedule channel assets."),
@@ -62,6 +65,8 @@ class ContentOpsStore:
                 CREATE TABLE IF NOT EXISTS provenance(id TEXT PRIMARY KEY,asset_id TEXT,model TEXT,prompt TEXT,voice_version TEXT,state TEXT,created_at REAL);
                 CREATE TABLE IF NOT EXISTS provenance_events(id TEXT PRIMARY KEY,record_id TEXT,kind TEXT,payload TEXT,created_at REAL);
                 CREATE TABLE IF NOT EXISTS asset_revisions(id TEXT PRIMARY KEY,asset_id TEXT,version INTEGER,content TEXT,author TEXT,created_at REAL,UNIQUE(asset_id,version));
+                CREATE TABLE IF NOT EXISTS transcreation_results(id TEXT PRIMARY KEY,asset_id TEXT,locale TEXT,analysis TEXT,adaptation TEXT,preflight TEXT,decisions TEXT,created_at REAL,updated_at REAL);
+                CREATE TABLE IF NOT EXISTS transcreation_flags(id TEXT PRIMARY KEY,asset_id TEXT,segment_id TEXT,resolved INTEGER DEFAULT 0,override INTEGER DEFAULT 0,created_at REAL,UNIQUE(asset_id,segment_id));
                 """
             )
             campaign_columns = {row[1] for row in db.execute("PRAGMA table_info(campaigns)")}
@@ -584,6 +589,252 @@ class ContentOpsStore:
             raise ValueError("TABLE_INVALID")
         with self._db() as db:
             return [dict(x) for x in db.execute(query)]
+
+
+class TranscreationStore:
+    """Persist transcreation analysis/adaptation/preflight results per asset.
+
+    Follows the ContentOpsStore pattern: SQLite with JSON columns and an
+    audit log. Results are keyed by asset + locale; every write upserts the
+    latest snapshot and appends a provenance event so downstream workers
+    (review UI, publish gate) can read them back deterministically.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = str(path)
+        with self._db() as db:
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS transcreation_results(
+                    id TEXT PRIMARY KEY,
+                    asset_id TEXT,
+                    locale TEXT,
+                    analysis TEXT,
+                    adaptation TEXT,
+                    preflight TEXT,
+                    decisions TEXT,
+                    created_at REAL,
+                    updated_at REAL,
+                    UNIQUE(asset_id, locale)
+                );
+                CREATE TABLE IF NOT EXISTS transcreation_flags(
+                    id TEXT PRIMARY KEY,
+                    asset_id TEXT,
+                    segment_id TEXT,
+                    resolved INTEGER DEFAULT 0,
+                    override INTEGER DEFAULT 0,
+                    created_at REAL,
+                    UNIQUE(asset_id, segment_id)
+                );
+                CREATE TABLE IF NOT EXISTS audit_events(
+                    id TEXT PRIMARY KEY,
+                    entity_id TEXT,
+                    kind TEXT,
+                    payload TEXT,
+                    created_at REAL
+                );
+                """
+            )
+
+    def _db(self) -> sqlite3.Connection:
+        db = sqlite3.connect(self.path, timeout=10)
+        db.row_factory = sqlite3.Row
+        return db
+
+    @staticmethod
+    def _id() -> str:
+        return uuid.uuid4().hex
+
+    def save_result(self, result: TranscreationResult) -> None:
+        """Upsert one analysis/adaptation/preflight snapshot for an asset."""
+        data = result.model_dump(mode="json")
+        locale = "unknown"
+        for snapshot in (result.analysis, result.adaptation, result.preflight):
+            if snapshot is not None:
+                locale = getattr(snapshot, "locale", locale) or locale
+                break
+        with self._db() as db:
+            db.execute(
+                """
+                INSERT INTO transcreation_results(
+                    id, asset_id, locale, analysis, adaptation, preflight,
+                    decisions, created_at, updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(asset_id, locale) DO UPDATE SET
+                    analysis=excluded.analysis,
+                    adaptation=excluded.adaptation,
+                    preflight=excluded.preflight,
+                    decisions=excluded.decisions,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    result.id,
+                    result.asset_id,
+                    locale,
+                    json.dumps(data.get("analysis")),
+                    json.dumps(data.get("adaptation")),
+                    json.dumps(data.get("preflight")),
+                    json.dumps(data.get("decisions")),
+                    result.created_at.timestamp(),
+                    time.time(),
+                ),
+            )
+            self._audit(db, result.asset_id, "TRANSCREATION_SAVED", {"result_id": result.id})
+
+    def result(self, asset_id: str) -> TranscreationResult:
+        """Return the latest stored result for an asset (any locale)."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM transcreation_results WHERE asset_id=? "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+                (asset_id,),
+            ).fetchone()
+            if not row:
+                raise KeyError(asset_id)
+            return self._row_to_result(row)
+
+    def result_for_locale(self, asset_id: str, locale: str) -> TranscreationResult:
+        """Return the stored result for an exact asset + locale pair."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM transcreation_results WHERE asset_id=? AND locale=?",
+                (asset_id, locale),
+            ).fetchone()
+            if not row:
+                raise KeyError((asset_id, locale))
+            return self._row_to_result(row)
+
+    def results(self, asset_id: str) -> list[TranscreationResult]:
+        """Return all stored results for an asset, newest first."""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT * FROM transcreation_results WHERE asset_id=? "
+                "ORDER BY updated_at DESC, rowid DESC",
+                (asset_id,),
+            ).fetchall()
+        return [self._row_to_result(row) for row in rows]
+
+    @staticmethod
+    def _row_to_result(row: sqlite3.Row) -> TranscreationResult:
+        from src.schemas.transcreation import TranscreationResult
+
+        data: dict[str, Any] = {
+            "id": row["id"],
+            "asset_id": row["asset_id"],
+            "analysis": _json_or_none(row["analysis"]),
+            "adaptation": _json_or_none(row["adaptation"]),
+            "preflight": _json_or_none(row["preflight"]),
+            "decisions": json.loads(row["decisions"]) if row["decisions"] else [],
+        }
+        return TranscreationResult.model_validate(data)
+
+    def add_decision(self, asset_id: str, decision: dict[str, Any]) -> None:
+        """Append one reviewer decision to the asset's latest result."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM transcreation_results WHERE asset_id=? "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+                (asset_id,),
+            ).fetchone()
+            if not row:
+                raise KeyError(asset_id)
+            decisions = json.loads(row["decisions"]) if row["decisions"] else []
+            decisions.append(decision)
+            db.execute(
+                "UPDATE transcreation_results SET decisions=?,updated_at=? WHERE id=?",
+                (json.dumps(decisions, sort_keys=True), time.time(), row["id"]),
+            )
+            self._audit(
+                db,
+                asset_id,
+                "TRANSCREATION_DECISION",
+                {"segment_id": decision.get("segment_id"), "decision": decision.get("decision")},
+            )
+
+    def flags(self, asset_id: str) -> list[dict[str, Any]]:
+        """Return the unresolved/low-confidence flag rows for an asset."""
+        with self._db() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    "SELECT * FROM transcreation_flags WHERE asset_id=? AND resolved=0 "
+                    "ORDER BY rowid",
+                    (asset_id,),
+                )
+            ]
+
+    def resolve_flags(self, asset_id: str, segment_ids: list[str]) -> int:
+        """Mark flagged segments resolved (review decisions taken). Returns count."""
+        if not segment_ids:
+            return 0
+        with self._db() as db:
+            db.executemany(
+                "INSERT OR IGNORE INTO transcreation_flags(id,asset_id,segment_id,resolved,created_at) "
+                "VALUES (?,?,?,1,?)",
+                [(self._id(), asset_id, seg, time.time()) for seg in segment_ids],
+            )
+            placeholders = ",".join("?" * len(segment_ids))
+            db.execute(
+                f"UPDATE transcreation_flags SET resolved=1 WHERE asset_id=? AND "
+                f"segment_id IN ({placeholders})",
+                (asset_id, *segment_ids),
+            )
+            self._audit(db, asset_id, "TRANSCREATION_FLAGS_RESOLVED", {"count": len(segment_ids)})
+            return len(segment_ids)
+
+    def set_override(self, asset_id: str, override: bool = True) -> None:
+        """Explicitly override the preflight block for an asset (US-005).
+
+        Unblocks publishing by clearing the ``blocked`` flag on the stored
+        preflight snapshot while keeping the risk items for the audit trail.
+        """
+        with self._db() as db:
+            row = db.execute(
+                "SELECT id, preflight FROM transcreation_results WHERE asset_id=? "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+                (asset_id,),
+            ).fetchone()
+            if not row or not row["preflight"]:
+                raise KeyError(asset_id)
+            payload = json.loads(row["preflight"])
+            payload["blocked"] = False
+            payload["override_available"] = bool(override)
+            payload["audit_status"] = "review_needed"
+            db.execute(
+                "UPDATE transcreation_results SET preflight=?,updated_at=? WHERE id=?",
+                (json.dumps(payload), time.time(), row["id"]),
+            )
+            self._audit(db, asset_id, "TRANSCREATION_OVERRIDE", {"override": override})
+
+    def publish_blocked(self, asset_id: str) -> bool:
+        """True when the latest preflight blocks publishing (US-005 gate)."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT preflight FROM transcreation_results WHERE asset_id=? "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+                (asset_id,),
+            ).fetchone()
+            if not row or not row["preflight"]:
+                return False
+            payload = json.loads(row["preflight"])
+            return bool(payload.get("blocked"))
+
+    def _audit(
+        self, db: sqlite3.Connection, entity_id: str, kind: str, payload: dict[str, Any]
+    ) -> None:
+        db.execute(
+            "INSERT INTO audit_events VALUES (?,?,?,?,?)",
+            (self._id(), entity_id, kind, json.dumps(payload, sort_keys=True), time.time()),
+        )
+
+
+def _json_or_none(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _esc(v: Any) -> str:
