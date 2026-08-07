@@ -774,11 +774,11 @@ class TranscreationStore:
                 [(self._id(), asset_id, seg, time.time()) for seg in segment_ids],
             )
             placeholders = ",".join("?" * len(segment_ids))
-            db.execute(
-                f"UPDATE transcreation_flags SET resolved=1 WHERE asset_id=? AND "
-                f"segment_id IN ({placeholders})",
-                (asset_id, *segment_ids),
+            sql = (
+                "UPDATE transcreation_flags SET resolved=1 WHERE asset_id=? AND "
+                "segment_id IN (" + placeholders + ")"
             )
+            db.execute(sql, (asset_id, *segment_ids))
             self._audit(db, asset_id, "TRANSCREATION_FLAGS_RESOLVED", {"count": len(segment_ids)})
             return len(segment_ids)
 
