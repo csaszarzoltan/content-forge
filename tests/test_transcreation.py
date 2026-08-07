@@ -21,21 +21,21 @@ Test policy (pre-dev contract):
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.quick
 
 # ── Schemas ─────────────────────────────────────────────────────────────────
+# ── Router ──────────────────────────────────────────────────────────────────
+from src.routers.transcreation import router as transcreation_router
 from src.schemas.transcreation import (
+    AdaptedSegment,
     AdaptRequest,
     AdaptResponse,
-    AdaptedSegment,
     AnalyzeRequest,
     AnalyzeResponse,
     ConfidenceFlag,
-    DecisionLog,
     FlaggedSegment,
     FormatType,
     LocaleFormatItem,
@@ -55,9 +55,6 @@ from src.services.transcreation import (
     LocaleFormatter,
     TranscreationService,
 )
-
-# ── Router ──────────────────────────────────────────────────────────────────
-from src.routers.transcreation import router as transcreation_router
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
