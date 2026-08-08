@@ -725,14 +725,22 @@ class TranscreationService:
             self._store.save_result(snapshot)
         return result
 
-    async def export(self, asset_id: str) -> str:
+    async def export(
+        self,
+        asset_id: str,
+        accepted_ids: list[str] | None = None,
+        rejected_ids: list[str] | None = None,
+    ) -> str:
         """Export accepted adaptations (blocked if unresolved flags exist).
 
         US-003 AC2: export raises when the asset has unresolved low-confidence
-        segments (no analysis recorded, or flagged items never decided).
+        segments.  Decisions passed via *accepted_ids* / *rejected_ids* resolve
+        the corresponding flags so export can proceed.
 
         Args:
             asset_id: Asset identifier.
+            accepted_ids: Segment ids whose adaptation is accepted.
+            rejected_ids: Segment ids whose adaptation is rejected.
 
         Returns:
             JSON string of accepted adaptations.
@@ -752,8 +760,12 @@ class TranscreationService:
             raise TranscreationBlockedError(
                 "transcreation_export_unavailable: no analysis for asset"
             )
+        # Determine which flagged segment IDs have been decided by the reviewer.
+        decided_ids = set(accepted_ids or []) | set(rejected_ids or [])
         unresolved = [
-            item for item in result.analysis.risk_items if item.confidence < CONFIDENCE_THRESHOLD
+            item
+            for item in result.analysis.risk_items
+            if item.confidence < CONFIDENCE_THRESHOLD and item.id not in decided_ids
         ]
         if unresolved:
             raise TranscreationBlockedError(
@@ -846,12 +858,13 @@ class TranscreationService:
     def _analyze_via_rules(self, text: str, locale: str) -> list[RiskItem]:
         """Rule-based risk detection over the cached pattern table."""
         items: list[RiskItem] = []
+        spans = self._build_span_map(text)  # O(n) once
         for pattern in _RISK_PATTERNS:
             for match in pattern["pattern"].finditer(text):
                 items.append(
                     RiskItem(
                         id=f"risk-{len(items) + 1}",
-                        segment=self._surrounding_sentence(text, match.start()),
+                        segment=self._span_for_position(spans, match.start()) or text,
                         category=pattern["category"],
                         original_text=match.group(0),
                         issue_description=pattern["description"],
@@ -998,13 +1011,35 @@ class TranscreationService:
         parts = re.split(r"(?<=[.!?])\s+", text.strip())
         return [part for part in parts if part]
 
-    def _surrounding_sentence(self, text: str, position: int) -> str:
-        """Return the sentence containing ``position`` in ``text``."""
-        for sentence in self._sentences(text):
-            start = text.find(sentence)
-            if start <= position < start + len(sentence):
+    @staticmethod
+    def _build_span_map(text: str) -> list[tuple[int, int, str]]:
+        """Build a list of (start, end, sentence) spans in a single O(n) pass.
+
+        Used by ``_analyze_via_rules`` to resolve match positions to sentences
+        without the O(n²) ``text.find(sentence)`` call per match.
+        """
+        spans: list[tuple[int, int, str]] = []
+        idx = 0
+        for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+            if not sentence:
+                continue
+            start = text.find(sentence, idx)
+            if start == -1:
+                start = text.find(sentence)
+            end = start + len(sentence)
+            spans.append((start, end, sentence))
+            idx = end
+        return spans
+
+    @staticmethod
+    def _span_for_position(spans: list[tuple[int, int, str]], position: int) -> str:
+        """Return the sentence whose span contains *position*. O(n) scan over
+        pre-sorted spans; total cost is O(n) across all calls in one rule pass.
+        """
+        for start, end, sentence in spans:
+            if start <= position < end:
                 return sentence
-        return text
+        return ""
 
     def _literal(self, sentence: str, locale: str) -> str:
         """Literal (word-for-word) translation of a sentence."""

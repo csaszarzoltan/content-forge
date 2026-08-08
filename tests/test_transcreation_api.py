@@ -318,3 +318,104 @@ class TestExternalFailureHandling:
         )
         assert response.status_code in (502, 503)
         assert "detail" in response.json()
+
+
+# ── Export positive path + resolution (BLOCKER-1 fix verification) ─────────
+
+
+class TestExportPositivePath:
+    """US-003 AC2 — export succeeds for clean assets and after flag resolution."""
+
+    def test_export_clean_asset_returns_200(self, tmp_path: Path) -> None:
+        """Clean asset (no flags) -> export 200 with accepted_adaptations."""
+        import json as _json
+
+        api = client(tmp_path)
+        # Preflight a clean asset — analysis stored with no risk items.
+        preflight = api.post(
+            "/api/v1/transcreation/preflight",
+            json={
+                "asset_id": "asset-clean-1",
+                "content": "The quarterly report is available for download.",
+                "target_locale": "de-DE",
+            },
+        )
+        assert preflight.status_code == 200
+        # Export should succeed — no unresolved flags.
+        response = api.post("/api/v1/transcreation/assets/asset-clean-1/export", json={})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["asset_id"] == "asset-clean-1"
+        # The adapted_text field contains the JSON string from service.export().
+        payload = _json.loads(body["adapted_text"])
+        assert "accepted_adaptations" in payload
+        assert isinstance(payload["accepted_adaptations"], list)
+
+    def test_export_after_resolution_returns_200(self, tmp_path: Path) -> None:
+        """Flagged asset -> accept decisions -> export 200."""
+        import json as _json
+
+        api = client(tmp_path)
+        # Preflight an asset with low-confidence risk items (idiom: confidence 0.65).
+        preflight = api.post(
+            "/api/v1/transcreation/preflight",
+            json={
+                "asset_id": "asset-flagged-1",
+                "content": "It's raining cats and dogs.",
+                "target_locale": "de-DE",
+            },
+        )
+        assert preflight.status_code == 200
+        pf_body = preflight.json()
+        # Verify there are low-confidence flagged items.
+        low_conf = [item for item in pf_body["risk_items"] if item["confidence"] < 0.7]
+        assert low_conf, "Expected low-confidence risk items for this text"
+        flagged_ids = [item["id"] for item in low_conf]
+        # Export without resolving should be blocked.
+        blocked = api.post("/api/v1/transcreation/assets/asset-flagged-1/export", json={})
+        assert blocked.status_code == 409
+        # Export with accepted_ids for all flagged segments should succeed.
+        resolved = api.post(
+            "/api/v1/transcreation/assets/asset-flagged-1/export",
+            json={"accepted_ids": flagged_ids},
+        )
+        assert resolved.status_code == 200
+        body = resolved.json()
+        assert body["asset_id"] == "asset-flagged-1"
+        payload = _json.loads(body["adapted_text"])
+        assert "accepted_adaptations" in payload
+
+
+# ── BLOCKER-2: Large-input timing sanity ────────────────────────────────────
+
+
+class TestLargeInputTiming:
+    """BLOCKER-2 — _surrounding_sentence O(n) rewrite must stay fast."""
+
+    def test_50kb_input_under_1s(self, tmp_path: Path) -> None:
+        """50KB of sentences through the rule engine must complete in < 1s."""
+        import time
+
+        # Build a 50KB text by repeating sentences with slight variation.
+        base_sentences = [
+            "The quarterly report is available for download.",
+            "Please review the attached documents before the meeting.",
+            "Our team is working on the new feature release.",
+            "The deadline for the project has been extended.",
+            "Thank you for your prompt response to this matter.",
+        ]
+        # Each sentence is ~51 chars. 50KB / 51 ≈ 980 sentences; use 1200 for margin.
+        text = ". ".join(
+            base_sentences[i % len(base_sentences)] for i in range(1200)
+        )
+        assert len(text) >= 50_000, f"Text too short: {len(text)} bytes"
+
+        api = client(tmp_path)
+        start = time.perf_counter()
+        response = api.post(
+            "/api/v1/transcreation/analyze",
+            json={"text": text, "target_locale": "de-DE"},
+        )
+        elapsed = time.perf_counter() - start
+        assert response.status_code == 200
+        assert elapsed < 1.0, f"50KB analyze took {elapsed:.2f}s — expected < 1s"

@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.product_ops import TranscreationStore
@@ -27,6 +27,7 @@ from src.schemas.transcreation import (
     AdaptResponse,
     AnalyzeRequest,
     AnalyzeResponse,
+    ExportRequest,
     PreflightRequest,
     PreflightResult,
     TranscreationResult,
@@ -124,13 +125,6 @@ async def preflight_transcreation(body: PreflightRequest) -> PreflightResult:
     except Exception as exc:
         raise HTTPException(status_code=503, detail="transcreation_preflight_unavailable") from exc
 
-    store.save_result(
-        TranscreationResult(
-            id=store._id(),
-            asset_id=body.asset_id,
-            preflight=result,
-        )
-    )
     return result
 
 
@@ -171,14 +165,15 @@ async def get_asset_result(asset_id: str) -> TranscreationResult:
         raise HTTPException(status_code=404, detail="transcreation_result_not_found") from exc
 
 
-@router.post("/assets/{asset_id}/export")
-async def export_asset(asset_id: str, request: Request) -> dict[str, str]:
+@router.post("/assets/{asset_id}/export", response_model=dict[str, str])
+async def export_asset(asset_id: str, body: ExportRequest | None = None) -> dict[str, str]:
     """Export accepted adaptations; blocked while unresolved flags exist (US-003 AC2)."""
-    await request.body()  # accept (and ignore) an empty JSON body
+    if body is None:
+        body = ExportRequest()
     store = _store()
     service = _service(store)
     try:
-        adapted = await service.export(asset_id)
+        adapted = await service.export(asset_id, accepted_ids=body.accepted_ids, rejected_ids=body.rejected_ids)
     except TranscreationBlockedError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except KeyError as exc:

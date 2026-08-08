@@ -92,7 +92,7 @@ class LocaleFormatItem(BaseModel):
 class AnalyzeRequest(BaseModel):
     """Request body for POST /api/v1/transcreation/analyze."""
 
-    text: str = Field(..., min_length=1, description="Text to analyze for cultural risks")
+    text: str = Field(..., min_length=1, max_length=100000, description="Text to analyze for cultural risks")
     target_locale: str = Field(..., min_length=2, description="Target locale (e.g. 'de-DE')")
     source_locale: str = Field("auto", description="Source locale or 'auto'")
 
@@ -122,9 +122,10 @@ class AdaptedSegment(BaseModel):
 class AdaptRequest(BaseModel):
     """Request body for POST /api/v1/transcreation/adapt."""
 
-    text: str = Field(..., min_length=1, description="Text to culturally adapt")
+    text: str = Field(..., min_length=1, max_length=100000, description="Text to culturally adapt")
     target_locale: str = Field(..., min_length=2, description="Target locale")
     source_locale: str = Field("auto", description="Source locale or 'auto'")
+    asset_id: str | None = Field(None, description="Asset identifier for persistence")
     accepted_ids: list[str] = Field(default_factory=list)
     rejected_ids: list[str] = Field(default_factory=list)
     edits: dict[str, str] = Field(default_factory=dict)
@@ -166,7 +167,7 @@ class PreflightRequest(BaseModel):
     """Request body for POST /api/v1/transcreation/preflight."""
 
     asset_id: str = Field(..., min_length=1, description="Asset identifier")
-    content: str = Field(..., min_length=1, description="Content to preflight-check")
+    content: str = Field(..., min_length=1, max_length=100000, description="Content to preflight-check")
     target_locale: str = Field(..., min_length=2, description="Target locale")
 
 
@@ -181,6 +182,25 @@ class PreflightResult(BaseModel):
     audit_status: Literal["pass", "fail", "review_needed"] = Field("pass")
     override_available: bool = Field(
         True, description="Whether the user may override and publish anyway"
+    )
+
+
+# ── US-003 AC2 / US-004 — Export ────────────────────────────────────────────
+
+class ExportRequest(BaseModel):
+    """Request body for POST /api/v1/transcreation/assets/{asset_id}/export.
+
+    Carries per-segment review decisions so the export can verify that all
+    low-confidence flags have been resolved before allowing export (US-003 AC2).
+    """
+
+    accepted_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of segments whose adaptation is accepted (resolves low-confidence flags)",
+    )
+    rejected_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of segments whose adaptation is rejected (resolves low-confidence flags)",
     )
 
 
