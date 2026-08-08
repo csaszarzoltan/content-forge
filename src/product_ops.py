@@ -1090,40 +1090,318 @@ def workspace_overview(store: ContentOpsStore) -> dict[str, Any]:
 # ============================================================================
 
 
+# Video job state machine: queued → outline → scenes → render → ready | failed.
+# ``failed`` is reachable from any state; backwards jumps (e.g. ready → scenes)
+# are rejected. Scene sub-states: pending → generating → done | failed.
+_JOB_STATE_ORDER: tuple[str, ...] = ("queued", "outline", "scenes", "render", "ready")
+
+# Live VideoJobStore instances keyed by DB path (see VideoJobStore.__init__).
+_LIVE_VIDEO_STORES: dict[str, VideoJobStore] = {}
+
+_SCENE_FIELDS: tuple[str, ...] = (
+    "state",
+    "attempts",
+    "error",
+    "image_path",
+    "audio_path",
+    "heading",
+    "narration",
+    "tts_text",
+)
+
+
+def _image_for_section(heading: str | None, images: dict) -> str | None:
+    """Return the reused blog image for a section, or None when broken/missing.
+
+    Matches the section heading against the blog post's image map (headings →
+    image paths). Only images that exist on disk are reused; broken or missing
+    images are skipped so the scene falls back to a styled title card
+    (P0-3 acceptance: broken images never fail the job).
+    """
+    if not heading or not images:
+        return None
+    path = images.get(heading)
+    if not path:
+        return None
+    candidate = Path(str(path))
+    if candidate.is_file():
+        return str(path)
+    return None
+
+
 class VideoJobStore:
     """Persist video jobs with a per-scene state machine (P0-1).
 
-    PROVISIONAL STUB — methods raise NotImplementedError until the
-    developer implements them (see class docstring above).
+    Follows the TranscreationStore pattern: raw sqlite3 with JSON columns and
+    an audit log. Jobs persist a source snapshot, brand voice / style / voice /
+    resolution selection and per-scene rows (pending → generating → done |
+    failed) with attempts, error and cached asset paths, so retries never
+    re-synthesize/re-render completed scenes (US-003).
     """
 
     def __init__(self, path: str | Path) -> None:
         self.path = str(path)
+        # Keep a module-level registry of live stores so direct-call helpers
+        # (e.g. ``retry_video_job`` in the router) can resolve the store that
+        # actually holds a job even when it was created on a different path
+        # (the test seam points the module at a temp DB per fixture).
+        _LIVE_VIDEO_STORES[self.path] = self
+        with self._db() as db:
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS video_jobs(
+                    id TEXT PRIMARY KEY,
+                    source_type TEXT,
+                    source_ref TEXT,
+                    state TEXT,
+                    brand_voice_id TEXT,
+                    voice_profile_name TEXT,
+                    style_preset TEXT,
+                    voice TEXT,
+                    resolution TEXT,
+                    auto_segment INTEGER DEFAULT 1,
+                    segment_order INTEGER,
+                    parent_job_id TEXT,
+                    error TEXT,
+                    created_at REAL,
+                    updated_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS video_scenes(
+                    id TEXT PRIMARY KEY,
+                    job_id TEXT,
+                    order_index INTEGER,
+                    heading TEXT,
+                    narration TEXT,
+                    tts_text TEXT,
+                    state TEXT,
+                    attempts INTEGER DEFAULT 0,
+                    error TEXT,
+                    image_path TEXT,
+                    audio_path TEXT,
+                    created_at REAL,
+                    updated_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS video_audit(
+                    id TEXT PRIMARY KEY,
+                    job_id TEXT,
+                    kind TEXT,
+                    payload TEXT,
+                    created_at REAL
+                );
+                """
+            )
+
+    def _db(self) -> sqlite3.Connection:
+        db = sqlite3.connect(self.path, timeout=10)
+        db.row_factory = sqlite3.Row
+        return db
+
+    @staticmethod
+    def _id() -> str:
+        return uuid.uuid4().hex
 
     def create_job(self, source: dict) -> str:
-        """Create a video job from a source dict; return the job id."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        """Create a video job from a source dict; return the job id.
+
+        Scenes are created from the source sections via split_sections so the
+        job starts with an ordered scene list (P0-3 contract).
+        """
+        job_id = self._id()
+        now = time.time()
+        from src.services.video_scenes import split_sections
+
+        with self._db() as db:
+            db.execute(
+                "INSERT INTO video_jobs("
+                "id,source_type,source_ref,state,brand_voice_id,voice_profile_name,"
+                "style_preset,voice,resolution,auto_segment,segment_order,parent_job_id,"
+                "error,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    job_id,
+                    str(source.get("source_type") or "script"),
+                    str(source.get("source_ref") or ""),
+                    "queued",
+                    source.get("brand_voice_id"),
+                    source.get("voice_profile_name"),
+                    source.get("style_preset") or "explainer",
+                    source.get("voice"),
+                    source.get("resolution") or "720p",
+                    1 if source.get("auto_segment", True) else 0,
+                    source.get("segment_order"),
+                    source.get("parent_job_id"),
+                    None,
+                    now,
+                    now,
+                ),
+            )
+            sections = split_sections(str(source.get("source_ref") or ""))
+            images: dict = source.get("images") or {}
+            for idx, section_text in enumerate(sections, start=1):
+                heading = None
+                lines = [ln.strip() for ln in section_text.splitlines() if ln.strip()]
+                if lines and lines[0].startswith("#"):
+                    heading = lines[0].lstrip("#").strip()
+                scene_id = self._id()
+                db.execute(
+                    "INSERT INTO video_scenes("
+                    "id,job_id,order_index,heading,narration,tts_text,state,attempts,"
+                    "error,image_path,audio_path,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        scene_id,
+                        job_id,
+                        idx,
+                        heading,
+                        section_text,
+                        section_text,
+                        "pending",
+                        0,
+                        None,
+                        _image_for_section(heading, images),
+                        None,
+                        now,
+                        now,
+                    ),
+                )
+            self._audit(db, job_id, "JOB_CREATED", {"source_type": source.get("source_type")})
+        return job_id
 
     def get_job(self, job_id: str) -> dict:
-        """Return the full job record including its scenes."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        """Return the full job record including its scenes and audit events."""
+        with self._db() as db:
+            row = db.execute("SELECT * FROM video_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row:
+                raise KeyError(job_id)
+            scenes = []
+            for s in db.execute(
+                "SELECT * FROM video_scenes WHERE job_id=? ORDER BY order_index", (job_id,)
+            ):
+                scene = dict(s)
+                scene["order"] = scene.pop("order_index", 0)
+                scenes.append(scene)
+            events = []
+            for e in db.execute(
+                "SELECT * FROM video_audit WHERE job_id=? ORDER BY created_at, rowid", (job_id,)
+            ):
+                event = dict(e)
+                try:
+                    event["payload"] = json.loads(event["payload"]) if event.get("payload") else {}
+                except (TypeError, json.JSONDecodeError):
+                    event["payload"] = {}
+                events.append(event)
+        record = dict(row)
+        record["scenes"] = scenes
+        record["audit_events"] = events
+        return record
 
     def update_state(self, job_id: str, state: str) -> None:
-        """Transition the job to a valid next state."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        """Transition the job to a valid next state (state machine guard)."""
+        if state not in {"queued", "outline", "scenes", "render", "ready", "failed"}:
+            raise ValueError(f"invalid video job state: {state}")
+        with self._db() as db:
+            row = db.execute("SELECT state FROM video_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row:
+                raise KeyError(job_id)
+            current = row["state"]
+            if state == "failed":
+                pass  # any state can fail
+            elif state in _JOB_STATE_ORDER and current in _JOB_STATE_ORDER:
+                if _JOB_STATE_ORDER.index(state) < _JOB_STATE_ORDER.index(current):
+                    raise ValueError(
+                        f"invalid video job state transition: {current} -> {state}"
+                    )
+            else:
+                raise ValueError(f"invalid video job state transition: {current} -> {state}")
+            db.execute(
+                "UPDATE video_jobs SET state=?, updated_at=? WHERE id=?",
+                (state, time.time(), job_id),
+            )
+            self._audit(db, job_id, "JOB_STATE", {"state": state})
 
     def list_scenes(self, job_id: str) -> list[dict]:
-        """Return all scene rows for a job, ordered."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        """Return all scene rows for a job, ordered by their section order."""
+        with self._db() as db:
+            row = db.execute("SELECT id FROM video_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row:
+                raise KeyError(job_id)
+            scenes = []
+            for s in db.execute(
+                "SELECT * FROM video_scenes WHERE job_id=? ORDER BY order_index", (job_id,)
+            ):
+                scene = dict(s)
+                scene["order"] = scene.pop("order_index", 0)
+                scenes.append(scene)
+            return scenes
+
+    def segment_job_ids(self, parent_id: str) -> list[str]:
+        """Return child segment job ids whose ``parent_job_id`` matches parent_id."""
+        with self._db() as db:
+            return [
+                str(row[0])
+                for row in db.execute(
+                    "SELECT id FROM video_jobs WHERE parent_job_id=? ORDER BY segment_order, rowid",
+                    (parent_id,),
+                )
+            ]
 
     def update_scene(self, job_id: str, scene_id: str, **fields: Any) -> None:
-        """Update scene fields (state, attempts, error, asset paths, ...)."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        """Update scene fields (state, attempts, error, asset paths, ...).
+
+        Only known columns are accepted (allowlist) so callers can never
+        inject arbitrary SQL or write junk columns. The UPDATE statement is
+        fully static — every column is a literal in the query text and all
+        values are bound parameters (no string-built SQL).
+        """
+        updates: dict[str, Any] = {k: v for k, v in fields.items() if k in _SCENE_FIELDS}
+        if not updates:
+            return
+        now = time.time()
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM video_scenes WHERE id=? AND job_id=?", (scene_id, job_id)
+            ).fetchone()
+            if not row:
+                raise KeyError(scene_id)
+            merged: dict[str, Any] = dict(row)
+            merged.update(updates)
+            merged["updated_at"] = now
+            db.execute(
+                "UPDATE video_scenes SET state=?, attempts=?, error=?, image_path=?,"
+                " audio_path=?, heading=?, narration=?, tts_text=?, updated_at=?"
+                " WHERE id=? AND job_id=?",
+                (
+                    merged.get("state"),
+                    merged.get("attempts") or 0,
+                    merged.get("error"),
+                    merged.get("image_path"),
+                    merged.get("audio_path"),
+                    merged.get("heading"),
+                    merged.get("narration"),
+                    merged.get("tts_text"),
+                    now,
+                    scene_id,
+                    job_id,
+                ),
+            )
+            if "state" in updates:
+                self._audit(db, job_id, "SCENE_STATE", {"scene_id": scene_id, "state": updates["state"]})
 
     def scene(self, job_id: str, scene_id: str) -> dict:
         """Return one scene row."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM video_scenes WHERE id=? AND job_id=?", (scene_id, job_id)
+            ).fetchone()
+            if not row:
+                raise KeyError(scene_id)
+            return dict(row)
 
     def audit(self, job_id: str, kind: str, payload: dict | None = None) -> None:
         """Append an audit event for the job."""
-        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+        with self._db() as db:
+            self._audit(db, job_id, kind, payload or {})
+
+    def _audit(self, db: sqlite3.Connection, job_id: str, kind: str, payload: dict) -> None:
+        db.execute(
+            "INSERT INTO video_audit VALUES (?,?,?,?,?)",
+            (self._id(), job_id, kind, json.dumps(payload, sort_keys=True), time.time()),
+        )

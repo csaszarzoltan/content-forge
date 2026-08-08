@@ -71,6 +71,7 @@ print(engine.render("launch", profile))
 | Compliance | [docs/compliance.md](compliance.md) | `ComplianceScorer`, `ComplianceResult` |
 | Extraction | [docs/extraction.md](extraction.md) | `VoiceExtractor` |
 | Transcreation | [docs/transcreation.md](transcreation.md) | `TranscreationService`, `LocaleData`, `LocaleFormatter` |
+| Video Pipeline | [docs/video-pipeline.md](video-pipeline.md) | `VideoJobStore`, `TTSProvider`, `OpenAITTSProvider`, `split_sections`, `assemble_scenes`, `split_at_section_boundaries` |
 
 ## Additional Resources
 
@@ -79,6 +80,7 @@ print(engine.render("launch", profile))
 - [Analytics Dashboard](analytics-dashboard.md) — Content performance tracking, scoring, export, trends
 - [AI Visibility](ai-visibility.md) — AI assistant mentions/citations, share of voice, referral traffic, Chart.js dashboard
 - [Transcreation](transcreation.md) — Cultural risk detection, locale formatting, side-by-side review, preflight gate, export
+- [Video Pipeline](video-pipeline.md) — Blog/script → scenes → voiceover → MP4, job state machine, per-scene retry, partial export
 - [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples
 

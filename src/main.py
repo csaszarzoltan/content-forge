@@ -44,6 +44,7 @@ from src.routers.schedule import router as schedule_router
 from src.routers.seo import router as seo_router
 from src.routers.transcreation import router as transcreation_router
 from src.routers.translate import router as translate_router
+from src.routers.video import router as video_router
 from src.routers.workspaces import router as workspaces_router
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
@@ -130,6 +131,7 @@ app.include_router(content_router)
 app.include_router(languages_router)
 app.include_router(translate_router)
 app.include_router(transcreation_router)
+app.include_router(video_router)
 app.include_router(publish_router)
 app.include_router(schedule_router)
 app.include_router(ab_router)

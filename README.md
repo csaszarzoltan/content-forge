@@ -34,6 +34,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P0   | **Brand Kit** | Visual identity management — color palettes (hex/RGB/HSL), font pairings, logo storage, brand guidelines HTML generator, multi-brand support |
 | P1   | **AI Visibility Metrics** | Track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews) with per-content snapshots, Chart.js-ready trends, and optional background polling |
 | P0   | **Transcreation** | Cultural risk detection (idioms, references, register, taboo), locale formatting (dates, currency, units, honorifics for 9 locales), side-by-side review, preflight publish gate, and export with flag resolution |
+| P0   | **AI Video Generation** | Blog/script → scenes → voiceover → MP4 pipeline with job state machine, per-scene progress and retry, TTS providers (OpenAI/ElevenLabs/Coqui), style presets, brand voice inheritance, MP4 export, 5-step wizard UI |
 
 ## Installation
 
@@ -671,6 +672,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 || [Translation Pipeline](docs/translation-pipeline.md) | BLEU/chrF quality scoring, cross-language consistency, post-processing |
 || [Multilingual Scheduling](docs/multilingual-scheduling.md) | Timezone-aware publishing, language calendars, auto-translate, dependency chains |
 | [Transcreation](docs/transcreation.md) | `POST /api/v1/transcreation/analyze`, `/adapt`, `/preflight`, `GET /preflight/{id}`, `POST /override`, `GET /assets/{id}/result`, `POST /assets/{id}/export` — cultural risk detection, locale formatting, side-by-side review, preflight gate, export |
+| [Video Generation](docs/video-pipeline.md) | `POST/GET /api/v1/video/jobs`, `POST /jobs/{id}/retry`, `GET /jobs/{id}/export`, `POST /jobs/{parent}/combine`, `GET /voices` — blog/script → scenes → voiceover → MP4, job state machine, per-scene retry, partial export, style presets, brand voice inheritance |
 
 ## Examples
 
