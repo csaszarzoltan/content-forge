@@ -157,10 +157,17 @@ export async function transcreateOverride(assetId: string): Promise<PreflightRes
   });
 }
 
-export async function transcreateExport(assetId: string): Promise<{asset_id: string; adapted_text: string}> {
+export async function transcreateExport(
+  assetId: string,
+  acceptedIds: string[] = [],
+  rejectedIds: string[] = [],
+): Promise<{asset_id: string; adapted_text: string}> {
   return apiRequest<{asset_id: string; adapted_text: string}>(
     `/api/v1/transcreation/assets/${assetId}/export`,
-    {method: "POST", body: "{}"},
+    {
+      method: "POST",
+      body: JSON.stringify({accepted_ids: acceptedIds, rejected_ids: rejectedIds}),
+    },
   );
 }
 
@@ -294,7 +301,7 @@ export function TranscreationWorkspace({
     setError("");
     setSuccess("");
     try {
-      const result = await transcreateExport(assetId);
+      const result = await transcreateExport(assetId, [...accepted], [...rejected]);
       setSuccess(`Exported accepted adaptations for asset ${result.asset_id}`);
     } catch (x) {
       setError(apiMessage(x));
