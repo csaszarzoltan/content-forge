@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.14.0] - 2026-08-06
+## [0.14.0] - 2026-08-07
 
 ### Features
 - Added Brand Kit visual identity management system.
@@ -13,8 +13,12 @@
 - Added multi-brand support — users can create multiple brand kits (personal, business, per-client).
 - Added Brand Kit dashboard frontend (React + TypeScript).
 
+### Fixes
+- Fixed transcreation export endpoint — `transcreateExport()` now sends `accepted_ids` and `rejected_ids` instead of empty body `{}` ([a6a9c40](https://github.com/csaszarzoltan/content-forge/commit/a6a9c40)).
+
 ### Tests
 - Added 97 brand kit tests covering ORM model, Pydantic schemas, storage, guidelines generation, CRUD endpoints, and integration flow.
+- 2266 passing tests total (27 skipped) — full suite green.
 
 ## [0.13.0] - 2026-08-05
 
