@@ -1068,3 +1068,62 @@ def workspace_overview(store: ContentOpsStore) -> dict[str, Any]:
         "provenance": store.rows("provenance"),
         "summary": store.attention_summary(),
     }
+
+
+# ============================================================================
+# VideoJobStore — PROVISIONAL STUB (pre-tester scaffold, t_ba5cfcec)
+# ----------------------------------------------------------------------------
+# Persistence for the video pipeline (P0-1, analysis-brief.md §6). Follows the
+# TranscreationStore pattern: raw sqlite3, JSON columns, audit log, uuid hex
+# ids. Runtime behavior is implemented by the developer:
+#
+#   create_job(source) -> str              # VideoJobSource dict/dataclass
+#   get_job(job_id) -> VideoJobRecord      # dict incl. scenes[]
+#   update_state(job_id, state)            # state machine guard
+#   list_scenes(job_id) -> list[dict]
+#   update_scene(job_id, scene_id, **fields)
+#   scene(job_id, scene_id) -> dict
+#   audit(job_id, kind, payload)           # append audit event
+#
+# Job state machine: queued → outline → scenes → render → ready | failed
+# Scene sub-states:  pending → generating → done | failed (attempts ≤ 3)
+# ============================================================================
+
+
+class VideoJobStore:
+    """Persist video jobs with a per-scene state machine (P0-1).
+
+    PROVISIONAL STUB — methods raise NotImplementedError until the
+    developer implements them (see class docstring above).
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = str(path)
+
+    def create_job(self, source: dict) -> str:
+        """Create a video job from a source dict; return the job id."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def get_job(self, job_id: str) -> dict:
+        """Return the full job record including its scenes."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def update_state(self, job_id: str, state: str) -> None:
+        """Transition the job to a valid next state."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def list_scenes(self, job_id: str) -> list[dict]:
+        """Return all scene rows for a job, ordered."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def update_scene(self, job_id: str, scene_id: str, **fields: Any) -> None:
+        """Update scene fields (state, attempts, error, asset paths, ...)."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def scene(self, job_id: str, scene_id: str) -> dict:
+        """Return one scene row."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
+
+    def audit(self, job_id: str, kind: str, payload: dict | None = None) -> None:
+        """Append an audit event for the job."""
+        raise NotImplementedError("VideoJobStore stub — not implemented yet")
