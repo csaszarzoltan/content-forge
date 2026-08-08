@@ -20,7 +20,7 @@
 - Video pipeline review fixes (t_db9e57ad): worker executor (jobs now leave `queued`), partial export skips failed scenes (`X-Partial-Skipped`), combine concatenates rendered MP4 clips instead of MP3 audio (409 until clips exist), `/voices` never hardcodes voice ids and maps provider-unavailable paths to 503, combine 404s on unknown parents.
 
 ### Tests
-- 2433 passing tests (27 skipped) — full suite green except one pre-tester interface/behavior contradiction (`test_handlers_async` requires async `retry_video_job` while `TestRetryNoRerenderBehavior` calls it synchronously; sync implementation kept so 185/186 video behavioral tests pass, including the new BLOCKER-1 worker regression: real API create → real worker → `ready` + playable MP4 export).
+- 2443 passing tests (27 skipped) — full suite green except one pre-tester interface/behavior contradiction (`test_handlers_async` requires async `retry_video_job` while `TestRetryNoRerenderBehavior` calls it synchronously; sync implementation kept so 177/178 video behavioral tests pass, including the new BLOCKER-1 worker regression: real API create → real worker → `ready` + playable MP4 export).
 - 13 frontend video wizard tests passing (was 9 skipped in RED).
 
 ## [0.14.0] - 2026-08-07

@@ -586,6 +586,93 @@ Export accepted adaptations. **Body (optional):** `{"accepted_ids": [...], "reje
 
 ---
 
+## Video Generation API — `/api/v1/video/*`
+
+Turn a blog Generation row, a URL, or raw script text into a narrated MP4
+video. Jobs run through a background worker (`VideoJobWorker`, lifespan task)
+that drives `queued → outline → scenes → render → ready | failed`, so the
+public API stays responsive while TTS + render happen off the request path.
+
+#### `POST /api/v1/video/jobs`
+
+Create a video job. **Request body:**
+
+```json
+{
+  "source_type": "generation_id | url | script",
+  "source_ref": "gen-123 | https://example.com/blog/post | ## Intro\nHello.",
+  "brand_voice_id": "bv-1",
+  "style_preset": "explainer | documentary",
+  "voice": "alloy",
+  "resolution": "720p",
+  "auto_segment": true
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `source_type` | enum | yes | — | `generation_id`, `url`, or `script` |
+| `source_ref` | string | yes | — | Generation id, URL, or script text (≤ 200k chars) |
+| `brand_voice_id` | string | no | `null` | Brand voice profile id (resolved → `voice_profile_name`) |
+| `style_preset` | enum | no | `null` | `explainer` (default) or `documentary` |
+| `voice` | string | no | `null` | TTS voice id (e.g. `alloy`) |
+| `resolution` | enum | no | `"720p"` | `480p`, `720p`, or `1080p` |
+| `auto_segment` | bool | no | `true` | Split long posts into sequential segment jobs |
+
+**Response** (201): `{"job_id": "…", "state": "queued", "segments": null | ["…"]}`.
+- `400` malformed/oversize source · `404` unknown `generation_id` · `422` invalid enum/field validation.
+
+#### `GET /api/v1/video/jobs/{job_id}`
+
+Fetch a job with per-scene status and overall progress.
+
+**Response** (200): `VideoJobResponse` — `id`, `source_type`, `source_ref`,
+`state`, `brand_voice_id`, `voice_profile_name`, `style_preset`, `voice`,
+`resolution`, `segment_order`, `error`, `overall_progress`, `scenes[]`
+(each: `id`, `order`, `heading`, `state`, `attempts`, `error`,
+`image_path`, `audio_path`), `created_at`, `updated_at`.
+- `404` unknown job id (`{"detail": "video job not found"}`).
+
+#### `POST /api/v1/video/jobs/{job_id}/retry`
+
+Re-queue **only** failed scenes; completed scenes are never re-rendered.
+Attempts increment per retry; scenes at max retries (3) stay failed.
+
+**Response** (200): `{"retried": ["scene-id", …]}`.
+- `404` unknown job · `409` job state not retryable (e.g. `ready`).
+
+#### `GET /api/v1/video/jobs/{job_id}/export?resolution=720p&partial=true`
+
+Stream the rendered MP4 (`Content-Type: video/mp4`). `partial=true` skips
+scenes that exhausted retries (failed at max attempts) and adds
+`x-partial: true` plus an `X-Partial-Skipped` header listing the skipped
+scene ids; without `partial`, a job with any failed scene is `409` (a
+partial export must be explicit). Jobs with a pre-rendered `output_path`
+(combine results) stream that file directly.
+
+- `409` nothing renderable (no done scenes / job not ready and no partial allowed) · `404` unknown job · `422` invalid resolution.
+
+#### `POST /api/v1/video/jobs/{parent_id}/combine`
+
+Concatenate a segment family's rendered per-scene MP4 clips into one combined
+MP4. Uses the rendered **clip** files cached on the scenes by the background
+worker (`clip_path`) — never the MP3 audio assets.
+
+**Response** (200): `{"combined_job_id": "…", "url": "/api/v1/video/jobs/…/export"}`.
+- `404` unknown or implausible parent id · `409` the parent's segments have no rendered clips yet.
+
+#### `GET /api/v1/video/voices?provider=openai|elevenlabs|coqui`
+
+List selectable TTS voices.
+
+**Response** (200): `{"provider": "openai", "voices": [{"id": "alloy", "name": "Alloy"}, …]}`.
+- `422` unknown provider · `503` provider unavailable (missing API key / optional extra not installed).
+
+See the [Video Generation guide](video-pipeline.md) for the state machine,
+TTS provider configuration, and a runnable example.
+
+---
+
 ## Error handling
 
 All endpoints return standard HTTP status codes:

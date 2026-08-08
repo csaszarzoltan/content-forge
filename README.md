@@ -2,7 +2,7 @@
 
 **AI-powered content platform with brand voice customization.**
 
-[![Tests](https://img.shields.io/badge/tests-1966%20passing-green)](https://github.com/csaszarzoltan/contentforge)
+[![Tests](https://img.shields.io/badge/tests-2443%20passing-green)](https://github.com/csaszarzoltan/contentforge)
 [![Deployed](https://img.shields.io/badge/deployed-Railway-%230B4B5A)](https://contentforge-production-7e96.up.railway.app)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -50,7 +50,7 @@ Requires Python 3.11+ and Pydantic >= 2.0.
 git clone https://github.com/csaszarzoltan/contentforge.git
 cd contentforge
 pip install -e ".[dev]"
-pytest          # 1966 tests pass
+pytest          # 2443 tests pass
 ruff check src/ # zero violations
 ```
 
@@ -643,6 +643,64 @@ See the [Transcreation guide](docs/transcreation.md) for the full API
 reference, locale table, architecture, and runnable
 [transcreation example](examples/api_transcreation.py).
 
+## 🎬 Video Generation — Blog/Script → Scenes → Voiceover → MP4
+
+ContentForge v0.15.0 adds an **AI video generation pipeline**: turn a blog
+Generation row, a URL, or raw script text into a narrated MP4 video with a
+per-scene job state machine, progress tracking, retry, partial export, and a
+5-step wizard UI. The pipeline is brand-voice aware, self-hosted, and renders
+with MoviePy 2 + the `imageio-ffmpeg` bundled FFmpeg binary — no system
+FFmpeg install required.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Video job API** | `POST/GET /api/v1/video/jobs`, `POST /jobs/{id}/retry`, `GET /jobs/{id}/export`, `POST /jobs/{parent}/combine`, `GET /voices` |
+| P0   | **Background worker** | `VideoJobWorker` (lifespan task) drives `queued → ready`: per-scene TTS → `done`, render → `ready`; failures mark scenes `failed` (attempts ≤ 3) so retry/partial-export work in production |
+| P0   | **Scene assembly** | Blog sections → ordered scenes with narration; blog images reused per section; broken/missing images fall back to styled title cards |
+| P0   | **TTS providers** | OpenAI TTS (default), ElevenLabs (HTTP), Coqui (`video-coqui` optional extra) — `GET /voices` lists selectable voices |
+| P0   | **Retry without re-render** | Only failed scenes are re-queued; completed scenes keep cached `audio_path`/`image_path` and attempt counts (US-003) |
+| P0   | **Partial export** | After max retries, `GET /export?partial=true` streams the completed scenes with `x-partial: true` + `X-Partial-Skipped` |
+| P0   | **MP4 export** | H.264 + AAC, `yuv420p`, resolution selection (`480p`/`720p`/`1080p`, default `720p`) |
+| P0   | **5-step wizard UI** | React + TypeScript `#video` workspace: source → outline → style/voice → generate → export, selections preserved across steps (US-004) |
+| P1   | **Long-post segmentation** | 10k-char cap; posts split at section boundaries into sequential segment jobs, combined via `POST /jobs/{parent}/combine` (US-002) |
+
+### Usage
+
+```python
+import httpx
+
+base = "http://localhost:8000/api/v1/video"
+
+# Create a video job from a script (no API keys needed to run the cycle —
+# without a TTS key the worker writes silent placeholder audio per scene)
+created = httpx.post(f"{base}/jobs", json={
+    "source_type": "script",
+    "source_ref": "## Intro\nHello! This is a short test video.",
+    "style_preset": "explainer",
+    "voice": "alloy",
+    "resolution": "480p",
+}).json()
+job_id = created["job_id"]
+print(f"Job {job_id} → {created['state']}")
+
+# Poll until the background worker finishes (state == 'ready')
+job = httpx.get(f"{base}/jobs/{job_id}").json()
+while job["state"] not in ("ready", "failed"):
+    job = httpx.get(f"{base}/jobs/{job_id}").json()
+print(f"State: {job['state']} — progress {job['overall_progress']}%")
+
+# Stream the MP4 export to a file
+mp4 = httpx.get(f"{base}/jobs/{job_id}/export", params={"resolution": "480p"})
+open(f"video_{job_id}.mp4", "wb").write(mp4.content)
+print(f"Exported {len(mp4.content)} bytes, content-type {mp4.headers['content-type']}")
+```
+
+See the [Video Generation guide](docs/video-pipeline.md) for the full API
+reference, state machine, TTS provider configuration, and the runnable
+[video example](examples/api_video.py).
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -689,6 +747,7 @@ Ready-to-run examples in [examples/](examples/):
 - [api_ai_visibility.py](examples/api_ai_visibility.py) — AI visibility walkthrough: ingest referrals for all four engines, on-demand refresh, per-content snapshot, trends feed
 - [multilingual_generation.py](examples/multilingual_generation.py) — End-to-end multi-language pipeline (detection → templates → scoring → scheduling)
 - [api_transcreation.py](examples/api_transcreation.py) — Transcreation walkthrough: analyze cultural risks, adapt with reviewer decisions, preflight check, override, export
+- [api_video.py](examples/api_video.py) — Video generation walkthrough: create job from script, poll progress, retry, partial export, MP4 export, voices
 
 ## Changelog
 
@@ -697,7 +756,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ## Tests
 
 ```bash
-pytest              # 1966 tests (interface + behavioral)
+pytest              # 2443 tests (interface + behavioral)
 pytest -v           # verbose mode
 python -m pytest    # same runner
 ```
