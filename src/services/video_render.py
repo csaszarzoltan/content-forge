@@ -81,6 +81,9 @@ def render_scene(scene: object) -> Path:
 
     Scenes are dicts with ``id``, ``heading``, ``audio_path``/``narration``
     and optional ``image_path``/``style_preset``. Returns the MP4 clip path.
+    Idempotent: a clip already rendered for this scene id + resolution is
+    returned as-is (the worker caches per-scene clips so combine can reuse
+    them — see ``clip_path_for``).
     """
     scene_dict = scene if isinstance(scene, dict) else getattr(scene, "model_dump", lambda: dict(scene))()
     resolution = str(scene_dict.get("resolution") or "720p")
@@ -89,9 +92,11 @@ def render_scene(scene: object) -> Path:
     size = RESOLUTIONS[resolution]
     scene_id = str(scene_dict.get("id") or "scene")
     render_dir = _RENDER_ROOT / "scenes" / scene_id
-    render_dir.mkdir(parents=True, exist_ok=True)
     out = render_dir / f"{scene_id}_{resolution}.mp4"
+    if out.is_file() and out.stat().st_size > 0:
+        return out  # already rendered — reuse the cached clip
 
+    render_dir.mkdir(parents=True, exist_ok=True)
     image_clip = _scene_image(scene_dict, size)
     audio_path = scene_dict.get("audio_path")
     audio = AudioFileClip(str(audio_path)) if audio_path and Path(str(audio_path)).is_file() else None
@@ -104,6 +109,21 @@ def render_scene(scene: object) -> Path:
         audio.close()
     image_clip.close()
     return out
+
+
+def clip_path_for(scene: object, resolution: str = "720p") -> Path:
+    """Return the deterministic clip path for a scene (may not exist yet).
+
+    Mirrors ``render_scene``'s output layout so callers (the worker cache,
+    the combine endpoint) can resolve a scene's rendered MP4 without
+    re-rendering or guessing paths.
+    """
+    scene_dict = scene if isinstance(scene, dict) else getattr(scene, "model_dump", lambda: dict(scene))()
+    res = str(scene_dict.get("resolution") or resolution or "720p")
+    if res not in RESOLUTIONS:
+        res = "720p"
+    scene_id = str(scene_dict.get("id") or "scene")
+    return _RENDER_ROOT / "scenes" / scene_id / f"{scene_id}_{res}.mp4"
 
 
 def render_job(job_id: str, scenes: list[object], resolution: str = "720p") -> Path:
@@ -145,13 +165,21 @@ def combine_scenes(paths: list[str | Path], resolution: str = "720p", out: str |
 
 
 def _write_clip(clip, out: Path) -> None:
-    """Write one clip to MP4 (H.264 + AAC, yuv420p for player compat)."""
+    """Write one clip to MP4 (H.264 + AAC, yuv420p for player compat).
+
+    ``temp_audiofile_path`` is pinned to the output's own directory: moviepy
+    otherwise writes its ``<name>TEMP_MPY_wvf_snd.<ext>`` temp audio into the
+    process CWD, which collides when concurrent workers render different
+    jobs (shared repo root → broken pipe / invalid data). Per-output temp
+    files keep concurrent renders isolated (BLOCKER-1 review t_db9e57ad).
+    """
     clip.write_videofile(
         str(out),
         fps=24,
         codec="libx264",
         audio_codec="aac",
         ffmpeg_params=["-pix_fmt", "yuv420p"],
+        temp_audiofile_path=str(out.parent),
         logger=None,
     )
 
@@ -218,4 +246,4 @@ def _probe_duration(path: Path) -> float:
     return 0.0
 
 
-__all__ = ["RESOLUTIONS", "VIDEO_COQUI_EXTRA", "combine_scenes", "render_job", "render_scene"]
+__all__ = ["RESOLUTIONS", "VIDEO_COQUI_EXTRA", "clip_path_for", "combine_scenes", "render_job", "render_scene"]

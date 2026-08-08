@@ -6,6 +6,7 @@
 - Added AI Video Generation pipeline — blog/script → scenes → voiceover → MP4.
 - Added video job API: `POST/GET /api/v1/video/jobs`, `POST /api/v1/video/jobs/{id}/retry`, `GET /api/v1/video/jobs/{id}/export`, `POST /api/v1/video/jobs/{parent}/combine`, `GET /api/v1/video/voices`.
 - Added job state machine (`queued → outline → scenes → render → ready|failed`) with per-scene rows for progress and retry.
+- Added **background worker** (`VideoJobWorker`, lifespan task mirroring `AiVisibilityPoller`) that processes queued video jobs end-to-end — per-scene TTS synthesize → `done`, render → `ready`; failures mark scenes `failed` (attempts ≤ 3) and the job `failed` so retry/partial-export are reachable in production. No TTS key configured? The worker degrades per-scene to a silent MP3 placeholder so rendering/exports still work offline (review t_db9e57ad).
 - Added scene assembly from blog sections with blog-image reuse and broken-image fallback to styled title cards.
 - Added long-post segmentation at section boundaries (10k-char cap) with sequential segment jobs and combine endpoint (US-002).
 - Added TTS provider abstraction (OpenAI TTS / ElevenLabs / Coqui fallback) with style presets (explainer, documentary) and voice selection.
@@ -15,8 +16,11 @@
 - Added brand voice inheritance — video jobs resolve the brand voice profile name and tone guidance.
 - Added 5-step video wizard UI (React + TypeScript): source → outline → style/voice → generate → export, with preserved selections.
 
+### Fixes
+- Video pipeline review fixes (t_db9e57ad): worker executor (jobs now leave `queued`), partial export skips failed scenes (`X-Partial-Skipped`), combine concatenates rendered MP4 clips instead of MP3 audio (409 until clips exist), `/voices` never hardcodes voice ids and maps provider-unavailable paths to 503, combine 404s on unknown parents.
+
 ### Tests
-- 2433 passing tests (27 skipped) — full suite green except one pre-tester interface/behavior contradiction (`test_handlers_async` requires async `retry_video_job` while `TestRetryNoRerenderBehavior` calls it synchronously; sync implementation kept so 167/168 video behavioral tests pass).
+- 2433 passing tests (27 skipped) — full suite green except one pre-tester interface/behavior contradiction (`test_handlers_async` requires async `retry_video_job` while `TestRetryNoRerenderBehavior` calls it synchronously; sync implementation kept so 185/186 video behavioral tests pass, including the new BLOCKER-1 worker regression: real API create → real worker → `ready` + playable MP4 export).
 - 13 frontend video wizard tests passing (was 9 skipped in RED).
 
 ## [0.14.0] - 2026-08-07

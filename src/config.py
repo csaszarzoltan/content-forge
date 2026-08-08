@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     # to build the canonical target URL for citation detection; empty falls
     # back to the reserved .example placeholder (tests/dev).
     AI_VISIBILITY_CONTENT_BASE_URL: str = ""
+    # Video pipeline background worker (BLOCKER-1 fix, review t_db9e57ad):
+    # enabled by default — jobs must leave `queued` without any test seam.
+    VIDEO_WORKER_ENABLED: bool = True
+    VIDEO_WORKER_INTERVAL_SECONDS: int = 2
+    # Max jobs processed per worker pass (safety bound for slow TTS/render).
+    VIDEO_WORKER_MAX_JOBS: int = 5
+    # Where rendered clips/audio are written (mirrors video_render's default).
+    VIDEO_RENDER_DIR: str = "/tmp/contentforge_video"
     PERPLEXITY_API_KEY: str = ""  # empty => Perplexity provider unconfigured
     GEMINI_API_KEY: str = ""  # empty => Gemini provider unconfigured
     CHATGPT_SEARCH_API_KEY: str = ""  # empty => ChatGPT provider unconfigured

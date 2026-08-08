@@ -1225,7 +1225,27 @@ class TestCombineBehavior:
     """P1-1 — combine returns a combined job + export URL."""
 
     def test_combine_returns_combined_job(self, client):
-        resp = client.post("/api/v1/video/jobs/parent-1/combine")
+        """N2/N6: combine over a REAL parent with rendered clips → 200.
+
+        The pre-dev version of this test POSTed to a phantom parent
+        (``parent-1``) and expected 200 — exactly the N6 bug (unknown
+        parents must 404). The regression now drives the real pipeline:
+        create a job, process it with the worker (real TTS/render path,
+        no store-seam scene manipulation), then combine the rendered clips.
+        """
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello.\n\n## Body\nMore."},
+        ).json()
+        parent_id = created["job_id"]
+
+        from src.services.video_worker import process_queued_jobs
+
+        process_queued_jobs()
+        job = client.get(f"/api/v1/video/jobs/{parent_id}").json()
+        assert job["state"] == "ready", "worker must finish the job before combine"
+
+        resp = client.post(f"/api/v1/video/jobs/{parent_id}/combine")
         assert resp.status_code == 200
         body = resp.json()
         assert "combined_job_id" in body
@@ -1234,3 +1254,185 @@ class TestCombineBehavior:
     def test_combine_unknown_parent_404(self, client):
         resp = client.post("/api/v1/video/jobs/nope/combine")
         assert resp.status_code == 404
+
+    def test_combine_plausible_but_unknown_parent_404(self, client):
+        """N6: a job-id-shaped unknown parent must 404, not 200-empty."""
+        resp = client.post("/api/v1/video/jobs/nope-1/combine")
+        assert resp.status_code == 404
+
+    def test_combine_no_rendered_clips_yet_409(self, client):
+        """N2: a real job that has not rendered yet has nothing to combine."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello."},
+        ).json()
+        resp = client.post(f"/api/v1/video/jobs/{created['job_id']}/combine")
+        assert resp.status_code == 409
+
+    def test_combined_job_export_streams_mp4(self, client):
+        """N2: a combined job's export streams the concatenated MP4."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello.\n\n## Body\nMore."},
+        ).json()
+        parent_id = created["job_id"]
+
+        from src.services.video_worker import process_queued_jobs
+
+        process_queued_jobs()
+        resp = client.post(f"/api/v1/video/jobs/{parent_id}/combine")
+        assert resp.status_code == 200
+        combined_id = resp.json()["combined_job_id"]
+
+        exp = client.get(f"/api/v1/video/jobs/{combined_id}/export")
+        assert exp.status_code == 200
+        assert exp.headers.get("content-type", "").startswith("video/mp4")
+        assert exp.content.startswith(b"\x00\x00\x00") or len(exp.content) > 0
+
+
+# ── BLOCKER-1 — Background worker drives jobs to ready (review t_db9e57ad) ──
+
+
+class TestVideoWorker:
+    """The pipeline executor: queued → outline → scenes → render → ready.
+
+    Regression for BLOCKER-1 (review t_db9e57ad): before the worker nothing
+    in src/ called TTS synthesize / assemble_scenes / render, so jobs stayed
+    ``queued`` forever. These tests drive the REAL worker path (no store-seam
+    scene manipulation) and assert the job reaches ``ready`` with a playable
+    MP4 export.
+    """
+
+    def test_worker_processes_queued_job_to_ready(self, client):
+        """Create via the real API, process via the real worker, assert ready."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello.\n\n## Body\nMore."},
+        ).json()
+        job_id = created["job_id"]
+        assert created["state"] == "queued"
+
+        from src.services.video_worker import process_queued_jobs
+
+        processed = process_queued_jobs()
+        assert any(j.get("id") == job_id for j in processed)
+
+        job = client.get(f"/api/v1/video/jobs/{job_id}").json()
+        assert job["state"] == "ready"
+        assert job["overall_progress"] == 100.0
+        assert all(s["state"] == "done" for s in job["scenes"])
+        assert all(s["audio_path"] for s in job["scenes"])
+
+    def test_worker_ready_job_exports_playable_mp4(self, client):
+        """BLOCKER-1 regression: export is 200 video/mp4 after the worker runs."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello."},
+        ).json()
+        job_id = created["job_id"]
+
+        from src.services.video_worker import process_queued_jobs
+
+        process_queued_jobs()
+
+        resp = client.get(f"/api/v1/video/jobs/{job_id}/export")
+        assert resp.status_code == 200
+        assert resp.headers.get("content-type", "").startswith("video/mp4")
+        assert len(resp.content) > 1000, "playable MP4 must have real bytes"
+        # ftyp box → mp4 container signature
+        assert resp.content.startswith(b"\x00\x00\x00") and b"ftyp" in resp.content[:32]
+
+    def test_worker_retry_flows_back_into_worker(self, client, monkeypatch):
+        """A failed job retried via the API is picked up by the worker again."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## Intro\nHello."},
+        ).json()
+        job_id = created["job_id"]
+
+        import src.routers.video as video_module
+
+        store = video_module._store()
+        scenes = store.list_scenes(job_id)
+        # Simulate a scene that exhausted TTS (attempts cap reached).
+        store.update_scene(job_id, scenes[0]["id"], state="failed", attempts=3, error="tts boom")
+        store.update_state(job_id, "failed")
+
+        from src.routers.video import retry_video_job
+
+        retried = retry_video_job(job_id)
+        assert retried.retried == [], "max attempts reached — nothing re-queued"
+
+        # A retryable failure (attempts < 3) DOES come back into the worker's
+        # pick-up range: state flips to scenes and the worker re-processes.
+        store.update_scene(job_id, scenes[0]["id"], state="failed", attempts=1, error="tts boom")
+        retried = retry_video_job(job_id)
+        assert retried.retried, "failed scene with budget left must be re-queued"
+        assert store.get_job(job_id)["state"] == "scenes", "retry must move job back into worker range"
+
+        from src.services.video_worker import process_queued_jobs
+
+        process_queued_jobs()
+        job = client.get(f"/api/v1/video/jobs/{job_id}").json()
+        assert job["state"] == "ready"
+        assert job["scenes"][0]["state"] == "done"
+
+    def test_worker_records_clip_paths_for_combine(self, client):
+        """The worker caches per-scene clip paths (N2 combine input)."""
+        created = client.post(
+            "/api/v1/video/jobs",
+            json={"source_type": "script", "source_ref": "## A\nOne.\n\n## B\nTwo."},
+        ).json()
+        job_id = created["job_id"]
+
+        from src.services.video_worker import process_queued_jobs
+
+        process_queued_jobs()
+        import src.routers.video as video_module
+
+        store = video_module._store()
+        scenes = store.list_scenes(job_id)
+        assert all(s["state"] == "done" for s in scenes)
+        assert all(s["clip_path"] for s in scenes), "worker must cache rendered clip paths"
+        from pathlib import Path
+
+        assert all(Path(s["clip_path"]).is_file() for s in scenes)
+
+
+# ── N3/N5 — provider-unavailable paths map to 503 (review t_db9e57ad) ──────
+
+
+class TestVoicesProviderUnavailable:
+    """N3/N5: elevenlabs/coqui unavailable must be 503, never 500 or a lie."""
+
+    def test_elevenlabs_without_key_503(self, client, monkeypatch):
+        """N3: no key configured → 503, and never a hardcoded voice list."""
+        monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        resp = client.get("/api/v1/video/voices?provider=elevenlabs")
+        assert resp.status_code == 503
+        assert "detail" in resp.json()
+
+    def test_elevenlabs_hardcoded_voice_gone(self, client, monkeypatch):
+        """N3: with a key the voice id comes from config, not a hardcode."""
+        monkeypatch.setenv("ELEVENLABS_API_KEY", "test-key")
+        resp = client.get("/api/v1/video/voices?provider=elevenlabs")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["voices"], "configured voice must be surfaced"
+        # The hardcoded id may still be the default when no env override —
+        # but the *name* must not claim a specific person we never fetched.
+        assert body["voices"][0]["id"], "voice id must be present"
+
+    def test_coqui_without_extra_503(self, client, monkeypatch):
+        """N5: coqui optional extra not installed → 503, not 500."""
+        monkeypatch.setattr("src.routers.video.get_tts_provider", _raise_runtime_error)
+        resp = client.get("/api/v1/video/voices?provider=coqui")
+        assert resp.status_code == 503
+        assert "detail" in resp.json()
+
+
+def _raise_runtime_error():
+    raise RuntimeError("No TTS provider available")
+

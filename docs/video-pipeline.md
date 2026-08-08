@@ -17,6 +17,7 @@ ContentForge v0.15.0 adds an **AI video generation pipeline**: it turns a blog p
 | P0 | **MP4 export** | H.264 + AAC, `yuv420p`, resolution selection (`480p`/`720p`/`1080p`, default `720p`) |
 | P0 | **Brand voice inheritance** | Video jobs resolve the brand voice profile name (explicit → project → user scope) and surface `voice_profile_name` |
 | P0 | **5-step wizard UI** | React + TypeScript hash-routed `#video` workspace: source → outline → style/voice → generate → export, selections preserved across steps (US-004) |
+| P0 | **Background worker** | `VideoJobWorker` (lifespan task, mirrors `AiVisibilityPoller`) processes queued jobs end-to-end — per-scene TTS → `done`, render → `ready`; failures mark scenes `failed` (attempts ≤ 3) and the job `failed` so retry/partial-export work in production |
 | P1 | **Long-post segmentation** | 10k-char cap; posts split at section boundaries into sequential segment jobs (`segment_order`), combined via `POST /jobs/{parent}/combine` (US-002) |
 
 ## Job State Machine
@@ -29,9 +30,9 @@ queued ────► outline ────► scenes ────► render ─
                                           partial (max retries, some scenes done)
 ```
 
-- `failed` is reachable from any state; backwards jumps (e.g. `ready → scenes`) are rejected with `ValueError` at the store level.
-- Scene sub-states: `pending → generating → done | failed`, each row carrying `attempts`, `error`, and cached `image_path`/`audio_path`.
-- `partial` state: jobs whose scenes exceeded max retries can still export the completed scenes (`x-partial: true`).
+- `failed` is reachable from any state; backwards jumps (e.g. `ready → scenes`) are rejected with `ValueError` at the store level. The one exception: a failed job can re-enter the pipeline via the retry endpoint (`failed → scenes`), which is how retried scenes flow back to the worker.
+- Scene sub-states: `pending → generating → done | failed`, each row carrying `attempts`, `error`, and cached `image_path`/`audio_path` (plus `clip_path` once rendered).
+- Partial export: jobs whose scenes exceeded max retries can still export the completed scenes via `GET /export?partial=true` (`x-partial: true`, `X-Partial-Skipped` lists the skipped scene ids).
 
 ## API Endpoints
 
@@ -97,17 +98,29 @@ Re-queue **only** failed scenes; completed scenes are never re-rendered (US-003)
 
 ### `GET /api/v1/video/jobs/{job_id}/export?resolution=720p&partial=true`
 
-Stream the rendered MP4 (`Content-Type: video/mp4`). `partial=true` skips scenes that exhausted retries and adds `x-partial: true`.
+Stream the rendered MP4 (`Content-Type: video/mp4`). `partial=true` skips
+scenes that exhausted retries (failed at max attempts) and adds
+`x-partial: true` plus an `X-Partial-Skipped` header listing the skipped
+scene ids; without `partial`, a job with any failed scene is `409` (a
+partial export must be explicit). Jobs with a pre-rendered `output_path`
+(combine results) stream that file directly.
 
 - `409` — nothing renderable (no done scenes / job not ready and no partial allowed)
 - `404` — unknown job; `422` — invalid resolution.
 
 ### `POST /api/v1/video/jobs/{parent_id}/combine`
 
-Concatenate a segment family's rendered clips into one combined MP4 (US-002).
+Concatenate a segment family's rendered per-scene MP4 clips into one combined
+MP4 (US-002). Combine uses the rendered **clip** files cached on the scenes
+by the background worker (`clip_path`) — never the MP3 audio assets (N2).
+The combined job is created with a pre-rendered `output_path`, so its export
+streams immediately.
 
 **Response** (`200`): `{"combined_job_id": "…", "url": "/api/v1/video/jobs/…"}`
-- `404` — unknown/implausible parent id.
+- `404` — unknown or implausible parent id (the 404 contract holds for
+  job-id-shaped unknowns too, N6).
+- `409` — the parent's segments have no rendered clips yet (nothing to
+  concatenate).
 
 ### `GET /api/v1/video/voices?provider=openai|elevenlabs|coqui`
 
@@ -127,7 +140,11 @@ Every error is a JSON body `{"detail": "…"}`:
 | ElevenLabs | `ELEVENLABS_API_KEY` | HTTP, voice list via API |
 | Coqui | `coqui-tts` optional extra | Local fallback; voice names known once installed |
 
-`get_tts_provider()` factory returns the first available provider. When no key is configured the pipeline writes a short silent MP3 placeholder so scene rendering and exports still work offline.
+`get_tts_provider()` factory returns the first available provider. When no
+TTS key is configured the **background worker** degrades per-scene: it writes
+a short silent MP3 placeholder (via the bundled ffmpeg binary) so scene
+rendering and exports still work offline. Real synthesis requires a key —
+the placeholder keeps the pipeline playable end-to-end without one.
 
 ## Architecture
 
@@ -139,7 +156,9 @@ Every error is a JSON body `{"detail": "…"}`:
 | `src/services/video_scenes.py` | `split_sections` + `assemble_scenes` (blog image reuse) |
 | `src/services/video_segments.py` | `split_at_section_boundaries` (10k cap, US-002) |
 | `src/services/tts.py` | `TTSProvider` ABC + OpenAI/ElevenLabs/Coqui + factory |
-| `src/services/video_render.py` | MoviePy 2 + imageio-ffmpeg: per-scene clips → H.264 MP4 |
+| `src/services/video_render.py` | MoviePy 2 + imageio-ffmpeg: per-scene clips → H.264 MP4 (idempotent per-scene clip cache) |
+| `src/services/video_worker.py` | Background executor (`VideoJobWorker` + `process_job`/`process_queued_jobs`): drives `queued → ready|failed` |
+| `src/main.py` | Wires `VideoJobWorker` into the app lifespan (opt-in via `VIDEO_WORKER_ENABLED`) |
 | `frontend/src/video.tsx` | 5-step wizard (`#video` hash route) |
 
 ## Frontend

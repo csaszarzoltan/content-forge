@@ -26,6 +26,7 @@ provider failures — every error body is JSON {"detail": ...}.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from datetime import UTC
 from pathlib import Path
@@ -66,9 +67,11 @@ _RETRYABLE_JOB_STATES = {"queued", "outline", "scenes", "failed"}
 
 _MAX_RETRIES = 3
 
-# Segment-family parent ids look like "<job>-<n>" (e.g. "abc123-1"). A plain
-# word (e.g. "nope") is not a plausible parent reference → 404 on combine.
-_PLAUSIBLE_PARENT_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}-[0-9]+$")
+# Segment-family parent ids are job ids (uuid hex) optionally suffixed with a
+# segment index (e.g. "abc123-1"). A plain word (e.g. "nope") is not a
+# plausible parent reference → 404 on combine; unknown ids are 404 via the
+# store lookup (N6).
+_PLAUSIBLE_PARENT_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}(-[0-9]+)?$")
 
 
 def _segment_job_ids(store: VideoJobStore, parent_id: str) -> list[str]:
@@ -307,6 +310,9 @@ def retry_video_job(job_id: str) -> VideoRetryResponse:
         retried.append(scene["id"])
 
     if retried:
+        # Move the job back into the worker's pick-up range so the retried
+        # scenes are actually processed (worker processes queued/outline/scenes).
+        store.update_state(job_id, "scenes")
         store.audit(job_id, "JOB_RETRY", {"retried": retried})
     return VideoRetryResponse(retried=retried)
 
@@ -319,7 +325,15 @@ async def retry_video_job_endpoint(job_id: str) -> VideoRetryResponse:
 
 @router.get("/jobs/{job_id}/export")
 async def export_video_job(job_id: str, resolution: str = "720p", partial: bool = False):
-    """Stream the rendered MP4 (FileResponse); partial export when allowed."""
+    """Stream the rendered MP4 (FileResponse); partial export when allowed.
+
+    ``partial=true`` skips scenes that exhausted retries (failed at max
+    attempts) and renders only the completed scenes, surfacing the skipped
+    ids via the ``X-Partial`` header (P1-2, US-003). Without ``partial`` a
+    job with any failed scene is 409 (a partial export must be explicit).
+    Jobs with a pre-rendered ``output_path`` (combine results) stream that
+    file directly.
+    """
     if resolution not in RESOLUTIONS:
         raise HTTPException(
             status_code=422,
@@ -331,12 +345,29 @@ async def export_video_job(job_id: str, resolution: str = "720p", partial: bool 
     except KeyError:
         raise HTTPException(status_code=404, detail="video job not found") from None
 
+    # Pre-rendered combined output (N2): stream it directly.
+    output_path = record.get("output_path")
+    if output_path and Path(str(output_path)).is_file():
+        return FileResponse(
+            path=str(output_path),
+            media_type="video/mp4",
+            filename=f"video_{job_id}_{resolution}.mp4",
+        )
+
     scenes = record.get("scenes") or []
     done_scenes = [s for s in scenes if s.get("state") == "done"]
     failed_scenes = [s for s in scenes if s.get("state") == "failed"]
 
     if not done_scenes:
         raise HTTPException(status_code=409, detail="nothing renderable: no completed scenes")
+
+    # Without partial=true, a job with failed scenes is not fully rendered →
+    # 409 unless the caller explicitly opts into a partial export (N1).
+    if failed_scenes and not partial:
+        raise HTTPException(
+            status_code=409,
+            detail="job has failed scenes; pass partial=true to export the completed scenes only",
+        )
 
     # Partial export renders only the completed scenes; the skipped (failed)
     # scene ids are surfaced via the X-Partial header (P1-2, US-003).
@@ -353,7 +384,9 @@ async def export_video_job(job_id: str, resolution: str = "720p", partial: bool 
 
     headers: dict[str, str] = {}
     if partial and failed_scenes:
+        skipped = ",".join(str(s.get("id")) for s in failed_scenes)
         headers["X-Partial"] = "true"
+        headers["X-Partial-Skipped"] = skipped
     return FileResponse(
         path=str(out),
         media_type="video/mp4",
@@ -368,10 +401,11 @@ async def combine_video_jobs(parent_id: str) -> VideoCombineResponse:
 
     The parent id identifies a segment family (e.g. ``job-abc-123-1``); its
     child segment jobs (``parent_job_id == parent_id``) are concatenated in
-    order. When the parent has no completed segments yet the combined job is
-    still created (state ``ready`` placeholder, export streams once scenes
-    render) so the wizard can offer the combine action early. Ids that are
-    not plausible segment-family references are rejected with 404.
+    order using their rendered per-scene MP4 clips (``clip_path`` — NOT the
+    MP3 audio files, which would be a type mismatch, N2). Unknown or
+    implausible parent ids are rejected with 404 (N6). When no rendered
+    clips exist yet the request is refused with 409 — a combined job is only
+    created once there is something renderable to concatenate.
     """
     store = _store()
     if not _PLAUSIBLE_PARENT_RE.match(parent_id):
@@ -380,42 +414,69 @@ async def combine_video_jobs(parent_id: str) -> VideoCombineResponse:
     try:
         parent = store.get_job(parent_id)
     except KeyError:
-        parent = None
+        raise HTTPException(status_code=404, detail="parent video job not found") from None
 
-    segments: list[dict] = []
-    if parent is not None:
-        segments = [
-            s
-            for s in (parent.get("scenes") or [])
-            if s.get("state") == "done" and s.get("audio_path")
-        ]
-    if not segments:
-        # Fall back to segment child jobs referenced by parent_job_id.
-        segment_jobs = [
-            store.get_job(job_id)
-            for job_id in _segment_job_ids(store, parent_id)
-        ]
-        segment_jobs = [j for j in segment_jobs if j is not None]
-        if segment_jobs:
-            segments = []
-            for seg_job in segment_jobs:
-                for scene in seg_job.get("scenes") or []:
-                    if scene.get("state") == "done" and scene.get("audio_path"):
-                        segments.append(scene)
+    # Collect rendered clips: prefer the segment child jobs' clips (the
+    # actual per-segment content); when no segments exist, fall back to the
+    # parent's own rendered clips. Never mixes MP3 audio with MP4 clips (N2).
+    clips: list[Path] = []
+    segment_jobs = [
+        store.get_job(job_id)
+        for job_id in _segment_job_ids(store, parent_id)
+    ]
+    segment_jobs = [j for j in segment_jobs if j is not None]
+    if segment_jobs:
+        for seg_job in segment_jobs:
+            for scene in seg_job.get("scenes") or []:
+                if scene.get("state") == "done" and scene.get("clip_path"):
+                    clip = Path(str(scene["clip_path"]))
+                    if clip.is_file():
+                        clips.append(clip)
+    else:
+        for scene in parent.get("scenes") or []:
+            if scene.get("state") == "done" and scene.get("clip_path"):
+                clip = Path(str(scene["clip_path"]))
+                if clip.is_file():
+                    clips.append(clip)
+
+    if not clips:
+        raise HTTPException(
+            status_code=409,
+            detail="nothing to combine: no rendered clips exist for the parent's segments",
+        )
+
+    resolution = (parent.get("resolution") or "720p") if parent else "720p"
+    if resolution not in RESOLUTIONS:
+        resolution = "720p"
 
     combined_job_id = store.create_job(
         {
             "source_type": "script",
-            "source_ref": parent.get("source_ref") if parent else parent_id,
-            "brand_voice_id": parent.get("brand_voice_id") if parent else None,
-            "style_preset": parent.get("style_preset") if parent else None,
-            "voice": parent.get("voice") if parent else None,
-            "resolution": (parent.get("resolution") or "720p") if parent else "720p",
+            "source_ref": parent.get("source_ref") or parent_id,
+            "brand_voice_id": parent.get("brand_voice_id"),
+            "style_preset": parent.get("style_preset"),
+            "voice": parent.get("voice"),
+            "resolution": resolution,
             "auto_segment": False,
         }
     )
+
+    # Render the concatenated MP4 now (synchronously in the worker's thread
+    # pattern via to_thread — never blocking the event loop).
+    def _combine() -> Path:
+        from src.services.video_render import combine_scenes
+
+        return combine_scenes([str(p) for p in clips], resolution=resolution)
+
+    try:
+        out = await asyncio.to_thread(_combine)
+    except Exception as exc:
+        status, detail = _provider_error_status(exc)
+        raise HTTPException(status_code=status, detail=detail) from exc
+
+    store.set_output_path(combined_job_id, out)
     store.update_state(combined_job_id, "ready")
-    store.audit(combined_job_id, "JOB_COMBINED", {"parent_id": parent_id})
+    store.audit(combined_job_id, "JOB_COMBINED", {"parent_id": parent_id, "clips": len(clips)})
     return VideoCombineResponse(
         combined_job_id=combined_job_id,
         url=f"/api/v1/video/jobs/{combined_job_id}/export",
@@ -440,12 +501,21 @@ async def list_voices(provider: str = "openai") -> VoiceListResponse:
         )
 
     if voice_provider is VoiceProvider.elevenlabs:
-        tts = get_tts_provider()
+        try:
+            tts = get_tts_provider()
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="elevenlabs provider unavailable (no API key)",
+            ) from exc
         if tts.name != "elevenlabs":
             raise HTTPException(status_code=503, detail="elevenlabs provider unavailable (no API key)")
+        # N3: never hardcode a voice id — surface the configured one (env
+        # default "Rachel") so the client gets a real, usable voice.
+        voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
         return VoiceListResponse(
             provider=voice_provider,
-            voices=[VoiceItem(id="21m00Tcm4TlvDq8ikWAM", name="Rachel")],
+            voices=[VoiceItem(id=voice_id, name="Configured voice")],
         )
 
     # coqui — local model names are only known once the optional extra is installed.
@@ -456,4 +526,17 @@ async def list_voices(provider: str = "openai") -> VoiceListResponse:
             status_code=503,
             detail="coqui provider unavailable (install the video-coqui extra)",
         ) from None
+    # N5: a configured-but-broken coqui install must also map to 503, not 500.
+    try:
+        tts = get_tts_provider()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="coqui provider unavailable (no TTS provider configured)",
+        ) from exc
+    if tts.name != "coqui":
+        raise HTTPException(
+            status_code=503,
+            detail="coqui provider unavailable (install the video-coqui extra)",
+        )
     return VoiceListResponse(provider=voice_provider, voices=[])

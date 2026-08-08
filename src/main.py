@@ -98,8 +98,20 @@ async def lifespan(app: FastAPI):
         await ai_poller.start()
     app.state.ai_poller = ai_poller
 
+    # Video pipeline worker (BLOCKER-1, review t_db9e57ad): processes queued
+    # video jobs end-to-end (TTS → scene done → render → ready|failed).
+    video_worker = None
+    if settings.VIDEO_WORKER_ENABLED:
+        from src.services.video_worker import VideoJobWorker
+
+        video_worker = VideoJobWorker(settings=settings)
+        await video_worker.start()
+    app.state.video_worker = video_worker
+
     yield
     # Shutdown
+    if video_worker is not None:
+        await video_worker.shutdown()
     if ai_poller is not None:
         await ai_poller.shutdown()
     await app.state.scheduler.shutdown()

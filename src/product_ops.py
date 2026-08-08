@@ -1104,6 +1104,7 @@ _SCENE_FIELDS: tuple[str, ...] = (
     "error",
     "image_path",
     "audio_path",
+    "clip_path",
     "heading",
     "narration",
     "tts_text",
@@ -1164,7 +1165,8 @@ class VideoJobStore:
                     parent_job_id TEXT,
                     error TEXT,
                     created_at REAL,
-                    updated_at REAL
+                    updated_at REAL,
+                    output_path TEXT
                 );
                 CREATE TABLE IF NOT EXISTS video_scenes(
                     id TEXT PRIMARY KEY,
@@ -1178,6 +1180,7 @@ class VideoJobStore:
                     error TEXT,
                     image_path TEXT,
                     audio_path TEXT,
+                    clip_path TEXT,
                     created_at REAL,
                     updated_at REAL
                 );
@@ -1190,6 +1193,17 @@ class VideoJobStore:
                 );
                 """
             )
+            # Lightweight migration: pre-existing DBs (created before the
+            # worker/combine pass) lack the new columns. CREATE TABLE IF NOT
+            # EXISTS never alters an existing table, so add the columns here
+            # (idempotent — sqlite ignores duplicate ADD COLUMN only via the
+            # pragma guard below).
+            _existing_job_cols = {r[1] for r in db.execute("PRAGMA table_info(video_jobs)")}
+            if "output_path" not in _existing_job_cols:
+                db.execute("ALTER TABLE video_jobs ADD COLUMN output_path TEXT")
+            _existing_scene_cols = {r[1] for r in db.execute("PRAGMA table_info(video_scenes)")}
+            if "clip_path" not in _existing_scene_cols:
+                db.execute("ALTER TABLE video_scenes ADD COLUMN clip_path TEXT")
 
     def _db(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
@@ -1215,7 +1229,7 @@ class VideoJobStore:
                 "INSERT INTO video_jobs("
                 "id,source_type,source_ref,state,brand_voice_id,voice_profile_name,"
                 "style_preset,voice,resolution,auto_segment,segment_order,parent_job_id,"
-                "error,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "error,created_at,updated_at,output_path) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     job_id,
                     str(source.get("source_type") or "script"),
@@ -1232,6 +1246,7 @@ class VideoJobStore:
                     None,
                     now,
                     now,
+                    None,
                 ),
             )
             sections = split_sections(str(source.get("source_ref") or ""))
@@ -1304,6 +1319,8 @@ class VideoJobStore:
             current = row["state"]
             if state == "failed":
                 pass  # any state can fail
+            elif current == "failed" and state in _JOB_STATE_ORDER:
+                pass  # retry recovery: a failed job can re-enter the pipeline
             elif state in _JOB_STATE_ORDER and current in _JOB_STATE_ORDER:
                 if _JOB_STATE_ORDER.index(state) < _JOB_STATE_ORDER.index(current):
                     raise ValueError(
@@ -1343,6 +1360,31 @@ class VideoJobStore:
                 )
             ]
 
+    def queued_job_ids(self) -> list[str]:
+        """Return processable job ids in FIFO order (worker pick-up list).
+
+        The worker processes jobs whose state is queued/outline/scenes —
+        newly created jobs plus jobs whose failed scenes were re-queued via
+        the retry endpoint (which moves the job back to ``scenes``).
+        """
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT id FROM video_jobs WHERE state IN ('queued','outline','scenes')"
+                " ORDER BY created_at, rowid"
+            ).fetchall()
+            return [str(r[0]) for r in rows]
+
+    def set_output_path(self, job_id: str, path: str | Path) -> None:
+        """Persist a pre-rendered output file for a job (combine results)."""
+        with self._db() as db:
+            row = db.execute("SELECT id FROM video_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row:
+                raise KeyError(job_id)
+            db.execute(
+                "UPDATE video_jobs SET output_path=?, updated_at=? WHERE id=?",
+                (str(path), time.time(), job_id),
+            )
+
     def update_scene(self, job_id: str, scene_id: str, **fields: Any) -> None:
         """Update scene fields (state, attempts, error, asset paths, ...).
 
@@ -1366,7 +1408,7 @@ class VideoJobStore:
             merged["updated_at"] = now
             db.execute(
                 "UPDATE video_scenes SET state=?, attempts=?, error=?, image_path=?,"
-                " audio_path=?, heading=?, narration=?, tts_text=?, updated_at=?"
+                " audio_path=?, clip_path=?, heading=?, narration=?, tts_text=?, updated_at=?"
                 " WHERE id=? AND job_id=?",
                 (
                     merged.get("state"),
@@ -1374,6 +1416,7 @@ class VideoJobStore:
                     merged.get("error"),
                     merged.get("image_path"),
                     merged.get("audio_path"),
+                    merged.get("clip_path"),
                     merged.get("heading"),
                     merged.get("narration"),
                     merged.get("tts_text"),
