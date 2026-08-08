@@ -517,6 +517,75 @@ curl "http://localhost:8000/api/v1/publish/status?status_filter=published"
 
 ---
 
+### Transcreation — Cultural Adaptation
+
+All endpoints are under `/api/v1/transcreation` and require no authentication.
+
+#### `POST /api/v1/transcreation/analyze`
+
+Detect cultural risks and locale formatting issues.
+
+**Request body:**
+```json
+{
+  "text": "It's raining cats and dogs. The upgrade costs $1,000.",
+  "target_locale": "de-DE",
+  "source_locale": "auto"
+}
+```
+
+**Response** (200 OK): `AnalyzeResponse` — `risk_items`, `format_items`, `overall_risk`, `locale`. See [Transcreation guide](transcreation.md) for full schema.
+
+#### `POST /api/v1/transcreation/adapt`
+
+Culturally adapt content with per-segment reviewer decisions.
+
+**Request body:**
+```json
+{
+  "text": "It's raining cats and dogs.",
+  "target_locale": "de-DE",
+  "accepted_ids": ["seg-1"],
+  "rejected_ids": [],
+  "edits": {}
+}
+```
+
+**Response** (200 OK): `AdaptResponse` — `adapted_text`, `segments`, `changes_log`, `flagged_segments`.
+
+#### `POST /api/v1/transcreation/preflight`
+
+Pre-flight publish check — blocks on high-risk items.
+
+**Request body:**
+```json
+{
+  "asset_id": "asset-123",
+  "content": "That's a load of crap.",
+  "target_locale": "de-DE"
+}
+```
+
+**Response** (200 OK): `PreflightResult` — `blocked`, `blocked_reasons`, `audit_status`, `override_available`.
+
+#### `GET /api/v1/transcreation/preflight/{asset_id}`
+
+Retrieve the latest stored preflight result for an asset.
+
+#### `POST /api/v1/transcreation/preflight/{asset_id}/override`
+
+Override a preflight block. **Body:** `{"override": true}`. Returns updated `PreflightResult`.
+
+#### `GET /api/v1/transcreation/assets/{asset_id}/result`
+
+Return the full persisted transcreation result (analysis + adaptation + preflight + decisions).
+
+#### `POST /api/v1/transcreation/assets/{asset_id}/export`
+
+Export accepted adaptations. **Body (optional):** `{"accepted_ids": [...], "rejected_ids": [...]}`. Blocked with `409` while low-confidence flags remain unresolved.
+
+---
+
 ## Error handling
 
 All endpoints return standard HTTP status codes:

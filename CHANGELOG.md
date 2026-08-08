@@ -20,6 +20,12 @@
 - Added 97 brand kit tests covering ORM model, Pydantic schemas, storage, guidelines generation, CRUD endpoints, and integration flow.
 - 2266 passing tests total (27 skipped) — full suite green.
 
+### Docs
+- New [Transcreation guide](docs/transcreation.md) — cultural risk detection, locale formatting (9 locales), side-by-side review, preflight publish gate, export with flag resolution, API reference, architecture, error mapping
+- README updated: Transcreation feature row in feature table, Transcreation section with usage examples, module reference entry, examples list, ruff verification command
+- New [transcreation example](examples/api_transcreation.py) — full pipeline walkthrough: analyze → adapt → preflight → override → export
+- docs/index.md updated with Transcreation module guide row and additional resources entry
+
 ## [0.13.0] - 2026-08-05
 
 ### Features

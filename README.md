@@ -33,6 +33,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P0   | **Platform Validation Engine** | Validate content against real platform constraints (Twitter/X, LinkedIn, Instagram, Facebook, TikTok) before publishing |
 | P0   | **Brand Kit** | Visual identity management — color palettes (hex/RGB/HSL), font pairings, logo storage, brand guidelines HTML generator, multi-brand support |
 | P1   | **AI Visibility Metrics** | Track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews) with per-content snapshots, Chart.js-ready trends, and optional background polling |
+| P0   | **Transcreation** | Cultural risk detection (idioms, references, register, taboo), locale formatting (dates, currency, units, honorifics for 9 locales), side-by-side review, preflight publish gate, and export with flag resolution |
 
 ## Installation
 
@@ -585,6 +586,62 @@ definitions, the four-table data model, provider configuration, and a Chart.js
 dashboard example — plus the runnable
 [ai-visibility example](examples/api_ai_visibility.py).
 
+## 🌍 Transcreation — Cultural Adaptation
+
+ContentForge v0.14.0 adds a **transcreation** pipeline that goes beyond
+translation: it detects cultural risks (idioms, cultural references, register
+mismatches, taboo terms), converts locale-specific formatting (dates, currency,
+units, honorifics), flags low-confidence segments for human review, and blocks
+publishing until risks are resolved or explicitly overridden.
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P0   | **Cultural risk detection** | Scan text for idioms, cultural references, register mismatches, and taboo terms — with LLM-powered and rule-based analysis |
+| P0   | **Locale formatting** | Convert dates, currency ($→€), imperial→metric units, and honorific titles (Mr.→Herr) for 9 target locales |
+| P0   | **Side-by-side review** | Per-segment accept/edit/reject workflow with literal vs. adapted text comparison |
+| P0   | **Preflight publish gate** | Block publishing when high-risk items are detected; override available for explicit human approval |
+| P0   | **Export with flag resolution** | Export accepted adaptations only after all low-confidence flags are resolved |
+| P1   | **LLM + rule dual path** | LLM provider when configured; deterministic rule-based fallback on any LLM failure |
+
+### Usage
+
+```python
+import httpx
+
+base = "http://localhost:8000/api/v1/transcreation"
+
+# Analyze for cultural risks and locale formatting
+analysis = httpx.post(f"{base}/analyze", json={
+    "text": "It's raining cats and dogs. The upgrade costs $1,000.",
+    "target_locale": "de-DE",
+}).json()
+print(f"Risk items: {len(analysis['risk_items'])}")
+print(f"Overall risk: {analysis['overall_risk']}")
+
+# Culturally adapt with reviewer decisions
+adaptation = httpx.post(f"{base}/adapt", json={
+    "text": "It's raining cats and dogs. The report is ready.",
+    "target_locale": "de-DE",
+    "accepted_ids": ["seg-1"],
+}).json()
+print(adaptation["adapted_text"])
+
+# Preflight check before publishing
+preflight = httpx.post(f"{base}/preflight", json={
+    "asset_id": "asset-1",
+    "content": "That's a load of crap.",
+    "target_locale": "de-DE",
+}).json()
+if preflight["blocked"]:
+    print(f"Blocked: {preflight['blocked_reasons']}")
+```
+
+See the [Transcreation guide](docs/transcreation.md) for the full API
+reference, locale table, architecture, and runnable
+[transcreation example](examples/api_transcreation.py).
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -613,6 +670,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 || [Prompt Templates (per-language)](docs/prompt-templates.md) | Language-adaptive prompt templates, brand voice localization, fallback chain |
 || [Translation Pipeline](docs/translation-pipeline.md) | BLEU/chrF quality scoring, cross-language consistency, post-processing |
 || [Multilingual Scheduling](docs/multilingual-scheduling.md) | Timezone-aware publishing, language calendars, auto-translate, dependency chains |
+| [Transcreation](docs/transcreation.md) | `POST /api/v1/transcreation/analyze`, `/adapt`, `/preflight`, `GET /preflight/{id}`, `POST /override`, `GET /assets/{id}/result`, `POST /assets/{id}/export` — cultural risk detection, locale formatting, side-by-side review, preflight gate, export |
 
 ## Examples
 
@@ -628,6 +686,7 @@ Ready-to-run examples in [examples/](examples/):
 - [api_analytics.py](examples/api_analytics.py) — Analytics dashboard walkthrough: track events, dashboard, channel comparison, scoring, trends, export
 - [api_ai_visibility.py](examples/api_ai_visibility.py) — AI visibility walkthrough: ingest referrals for all four engines, on-demand refresh, per-content snapshot, trends feed
 - [multilingual_generation.py](examples/multilingual_generation.py) — End-to-end multi-language pipeline (detection → templates → scoring → scheduling)
+- [api_transcreation.py](examples/api_transcreation.py) — Transcreation walkthrough: analyze cultural risks, adapt with reviewer decisions, preflight check, override, export
 
 ## Changelog
 
@@ -685,6 +744,8 @@ uv run ruff check src/product_ops.py src/routers/workspaces.py \
 uv run ruff format --check src/product_ops.py src/routers/workspaces.py \
   src/services/readability.py src/services/language_detection.py \
   tests/test_product_workspaces.py src/main.py
+uv run ruff check src/services/transcreation.py src/schemas/transcreation.py \
+  src/routers/transcreation.py examples/api_transcreation.py
 uv build
 ```
 

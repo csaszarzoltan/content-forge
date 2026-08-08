@@ -70,6 +70,7 @@ print(engine.render("launch", profile))
 | Scoping | [docs/scoping.md](scoping.md) | `VoiceScope` |
 | Compliance | [docs/compliance.md](compliance.md) | `ComplianceScorer`, `ComplianceResult` |
 | Extraction | [docs/extraction.md](extraction.md) | `VoiceExtractor` |
+| Transcreation | [docs/transcreation.md](transcreation.md) | `TranscreationService`, `LocaleData`, `LocaleFormatter` |
 
 ## Additional Resources
 
@@ -77,6 +78,7 @@ print(engine.render("launch", profile))
 - [CHANGELOG.md](../CHANGELOG.md) — Version history
 - [Analytics Dashboard](analytics-dashboard.md) — Content performance tracking, scoring, export, trends
 - [AI Visibility](ai-visibility.md) — AI assistant mentions/citations, share of voice, referral traffic, Chart.js dashboard
+- [Transcreation](transcreation.md) — Cultural risk detection, locale formatting, side-by-side review, preflight gate, export
 - [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples
 
