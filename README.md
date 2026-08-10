@@ -35,6 +35,7 @@ Parse, manage, and inject brand voice profiles into LLM prompts for consistent, 
 | P1   | **AI Visibility Metrics** | Track mentions, citations, share of voice, and referral traffic from AI assistants (ChatGPT, Perplexity, Gemini, Google AI Overviews) with per-content snapshots, Chart.js-ready trends, and optional background polling |
 | P0   | **Transcreation** | Cultural risk detection (idioms, references, register, taboo), locale formatting (dates, currency, units, honorifics for 9 locales), side-by-side review, preflight publish gate, and export with flag resolution |
 | P0   | **AI Video Generation** | Blog/script → scenes → voiceover → MP4 pipeline with job state machine, per-scene progress and retry, background worker (queued → ready, TTS → render), TTS providers (OpenAI/ElevenLabs/Coqui), style presets, brand voice inheritance, MP4 export, 5-step wizard UI |
+| P1   | **Video Platform Analytics** | Unified performance tracking across YouTube, TikTok, and Instagram — aggregated metrics, daily trend charts, optimal posting-time heatmaps, per-video drill-down with best-platform detection; partial data on platform failures (no API keys needed to start the server) |
 
 ## Installation
 
@@ -701,6 +702,57 @@ See the [Video Generation guide](docs/video-pipeline.md) for the full API
 reference, state machine, TTS provider configuration, and the runnable
 [video example](examples/api_video.py).
 
+## 📈 Video Platform Analytics — YouTube · TikTok · Instagram
+
+ContentForge v0.15.0 adds **video platform analytics**: unified performance
+tracking across YouTube, TikTok, and Instagram. Each platform is an
+independent client, so a missing key, expired token, or quota error only
+affects that platform — it is reported in `platforms_unavailable` and the
+rest of the response is served normally (partial data, never a hard
+failure).
+
+### Features
+
+| Tier | Module | Description |
+|------|--------|-------------|
+| P1   | **Performance tracking** | `GET /api/v1/analytics/video-performance` — views, likes, comments, shares (plus platform-specific fields: plays, saves, completion rate, watch time) aggregated per platform, with `video_id` / `platform` / date-range filters |
+| P1   | **Trend charts** | `GET /api/v1/analytics/video-performance/timeseries` — daily points per platform, Chart.js-ready |
+| P1   | **Optimal posting times** | `GET /api/v1/analytics/video-performance/optimal-times` — day × hour engagement heatmap (0 = Monday, 0–23 h) |
+| P1   | **Per-video drill-down** | `GET /api/v1/analytics/video-performance/{video_id}` — one video across all platforms plus `best_platform` detection |
+| P1   | **CLI** | `python -m src.cli analytics video-performance [--platform ...] [--days N]` — terminal table of the same aggregation |
+| P1   | **Partial-failure resilience** | Platform outages degrade to `platforms_unavailable` entries; all-unconfigured servers still start and serve `200` with empty data |
+
+### Usage
+
+```python
+import httpx
+
+base = "http://localhost:8000/api/v1/analytics/video-performance"
+
+# Aggregated metrics across all configured platforms (no keys → 200 with
+# empty platforms + platforms_unavailable listing all three)
+perf = httpx.get(base, params={"video_id": "abc123"}).json()
+print(perf["platforms"])                    # per-platform metric dicts
+print(perf["platforms_unavailable"])        # ['youtube', 'tiktok', 'instagram']
+
+# Daily trend points (Chart.js-ready)
+trend = httpx.get(f"{base}/timeseries", params={"platform": "youtube"}).json()
+print(trend["points"])
+
+# Per-video drill-down with best-platform detection (502 when no platforms
+# are configured — see error mapping below)
+detail = httpx.get(f"{base}/abc123").json()
+print(detail.get("best_platform", detail))
+```
+
+Error mapping: inverted date range → **400**; malformed datetime / unknown
+platform → **422**; drill-down with all platforms down → **502**; video not
+found on any responding platform → **404**.
+
+See the [Video Platform Analytics guide](docs/video-analytics.md) for setup
+(API keys, YouTube OAuth2, TikTok Research API access, Instagram Business
+account), the full endpoint reference, CLI usage, and error behavior.
+
 ## Module Reference
 
 See the [docs/](docs/) directory for detailed per-feature guides:
@@ -731,6 +783,7 @@ See the [docs/](docs/) directory for detailed per-feature guides:
 || [Multilingual Scheduling](docs/multilingual-scheduling.md) | Timezone-aware publishing, language calendars, auto-translate, dependency chains |
 | [Transcreation](docs/transcreation.md) | `POST /api/v1/transcreation/analyze`, `/adapt`, `/preflight`, `GET /preflight/{id}`, `POST /override`, `GET /assets/{id}/result`, `POST /assets/{id}/export` — cultural risk detection, locale formatting, side-by-side review, preflight gate, export |
 | [Video Generation](docs/video-pipeline.md) | `POST/GET /api/v1/video/jobs`, `POST /jobs/{id}/retry`, `GET /jobs/{id}/export`, `POST /jobs/{parent}/combine`, `GET /voices` — blog/script → scenes → voiceover → MP4, background worker drives jobs to ready, job state machine, per-scene retry, partial export, style presets, brand voice inheritance |
+| [Video Platform Analytics](docs/video-analytics.md) | `GET /api/v1/analytics/video-performance`, `/timeseries`, `/optimal-times`, `/{video_id}` — YouTube/TikTok/Instagram performance tracking, trend charts, optimal posting-time heatmaps, per-video drill-down, partial data on platform failures, CLI (`analytics video-performance`) |
 
 ## Examples
 

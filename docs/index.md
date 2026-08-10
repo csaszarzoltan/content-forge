@@ -72,6 +72,7 @@ print(engine.render("launch", profile))
 | Extraction | [docs/extraction.md](extraction.md) | `VoiceExtractor` |
 | Transcreation | [docs/transcreation.md](transcreation.md) | `TranscreationService`, `LocaleData`, `LocaleFormatter` |
 | Video Pipeline | [docs/video-pipeline.md](video-pipeline.md) | `VideoJobStore`, `TTSProvider`, `OpenAITTSProvider`, `split_sections`, `assemble_scenes`, `split_at_section_boundaries` |
+| Video Platform Analytics | [docs/video-analytics.md](video-analytics.md) | `VideoAnalyticsService`, `YouTubeClient`, `TikTokClient`, `InstagramClient`, `VideoAPIClient` |
 
 ## Additional Resources
 
@@ -81,6 +82,7 @@ print(engine.render("launch", profile))
 - [AI Visibility](ai-visibility.md) — AI assistant mentions/citations, share of voice, referral traffic, Chart.js dashboard
 - [Transcreation](transcreation.md) — Cultural risk detection, locale formatting, side-by-side review, preflight gate, export
 - [Video Pipeline](video-pipeline.md) — Blog/script → scenes → voiceover → MP4, job state machine, per-scene retry, partial export
+- [Video Platform Analytics](video-analytics.md) — YouTube/TikTok/Instagram performance tracking, trend charts, optimal posting-time heatmaps, per-video drill-down, CLI
 - [Social Media Publishing](social-publishing.md) — Platform connectors, publish API, rate limiting
 - [examples/](../examples/) — Runnable code examples
 

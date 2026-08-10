@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+- Added **Video Platform Analytics** — unified performance tracking across YouTube, TikTok, and Instagram under `/api/v1/analytics/video-performance`:
+  - `GET /api/v1/analytics/video-performance` — aggregated views/likes/comments/shares per platform (plus platform-specific fields: plays, saves, completion rate, watch time) with `video_id`, `platform`, and date-range filters.
+  - `GET /api/v1/analytics/video-performance/timeseries` — daily trend points per platform, Chart.js-ready.
+  - `GET /api/v1/analytics/video-performance/optimal-times` — day × hour optimal posting-time heatmap (0 = Monday, 0–23 h; structure contract-stable, scores placeholder in this release).
+  - `GET /api/v1/analytics/video-performance/{video_id}` — per-video drill-down across all platforms with best-platform detection by views.
+  - Platform clients fail independently: unconfigured keys, quota exhaustion, and API errors degrade to `platforms_unavailable` entries with partial data instead of hard failures; no API keys needed to start the server.
+  - Config via `YOUTUBE_API_KEY`, `YOUTUBE_OAUTH_TOKEN`, `TIKTOK_API_KEY`, `INSTAGRAM_ACCESS_TOKEN` (empty = platform skipped).
+  - Typer CLI: `python -m src.cli analytics video-performance [--platform ...] [--days N]`.
+- New [Video Platform Analytics guide](docs/video-analytics.md) — setup (YouTube OAuth2, TikTok Research API access, Instagram Business account), endpoint reference with example requests/responses, CLI usage, error-handling contract.
+
+### Fixes
+- None.
+
 ## [0.15.0] - 2026-08-08
 
 ### Features
