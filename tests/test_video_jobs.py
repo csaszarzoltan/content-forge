@@ -574,10 +574,18 @@ class TestVideoRouterInterface:
             get_video_job,
             list_voices,
             retry_video_job,
+            retry_video_job_endpoint,
         )
 
-        for handler in (create_video_job, get_video_job, retry_video_job, export_video_job, combine_video_jobs, list_voices):
+        # All six HTTP route handlers must be async (Starlette requires it).
+        # The /retry route is served by retry_video_job_endpoint, which wraps
+        # the synchronous core retry_video_job via asyncio.to_thread.
+        for handler in (create_video_job, get_video_job, retry_video_job_endpoint, export_video_job, combine_video_jobs, list_voices):
             assert inspect.iscoroutinefunction(handler), f"{handler.__name__} must be async"
+
+        # retry_video_job is the documented synchronous core — scripts and
+        # tests call it directly (see its docstring), so it must stay sync.
+        assert not inspect.iscoroutinefunction(retry_video_job), "retry_video_job must stay sync (scripts/tests call it directly)"
 
     def test_create_handler_accepts_body(self):
         from src.routers.video import create_video_job
