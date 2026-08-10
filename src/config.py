@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     CHATGPT_SEARCH_API_KEY: str = ""  # empty => ChatGPT provider unconfigured
     GOOGLE_AI_SEARCH_API_KEY: str = ""  # empty => Google AIO provider unconfigured
 
+    # Video platform analytics API keys
+    YOUTUBE_API_KEY: str = ""  # empty => YouTube client unconfigured
+    YOUTUBE_OAUTH_TOKEN: str = ""  # optional OAuth2 token for YouTube
+    TIKTOK_API_KEY: str = ""  # empty => TikTok client unconfigured
+    INSTAGRAM_ACCESS_TOKEN: str = ""  # empty => Instagram client unconfigured
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
