@@ -73,3 +73,7 @@ def video_performance(
         typer.echo(f"\nUnavailable platforms: {', '.join(unavailable)}")
 
     typer.echo(f"\nDate range: {days} days")
+
+
+if __name__ == "__main__":
+    app()

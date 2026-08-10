@@ -690,6 +690,41 @@ class TestVideoAnalyticsCLI:
             pytest.skip("CLI not implemented yet — RED phase")
         assert result.exit_code == 0
 
+    def test_cli_module_runs_via_python_m(self):
+        """Regression (reviewer N2): `python -m src.cli` must execute the app.
+
+        The module previously only imported (exit 0, no output) because it
+        lacked an ``if __name__ == "__main__":`` guard. This test asserts the
+        guard exists AND that running the module as __main__ exits 0 with
+        rendered output.
+        """
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent
+        cli_source = (repo_root / "src" / "cli.py").read_text(encoding="utf-8")
+        assert 'if __name__ == "__main__":' in cli_source, (
+            "src/cli.py missing __main__ guard — `python -m src.cli` only imports"
+        )
+
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(repo_root / "src")
+        result = subprocess.run(
+            [sys.executable, "-m", "src.cli", "--help"],
+            cwd=repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"`python -m src.cli --help` exited {result.returncode}: {result.stderr}"
+        )
+        assert "ContentForge" in result.stdout
+
 
 # ============================================================================
 # SECTION 6 — DATABASE TESTS (GREEN: post-implementation)

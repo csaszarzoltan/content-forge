@@ -33,6 +33,9 @@ dependencies = [
     "pillow>=11.0,<13",
 ]
 
+[project.scripts]
+contentforge = "src.cli:app"
+
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",

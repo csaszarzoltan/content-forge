@@ -6,7 +6,6 @@ Pre-development stub — field contracts per task spec t_6ffc403c.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
