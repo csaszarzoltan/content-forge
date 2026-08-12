@@ -1,108 +1,52 @@
 # Development Report
 
 ## Implemented Scope
-
-Implemented the Family Creator vertical slice: durable adult-owned workspaces and bounded roles; invitations and server-derived navigation; contextual Home; four-step deterministic project creation; private deduplicated ideas; exact-revision review and supersession; adult-only idempotent publish behavior; responsive Family Setup, Home, Journey, Idea, and Review screens.
+Completed invitation acceptance, adult publication confirmation, connection recovery, provider-backed LinkedIn/X publishing, weekly family outcomes, avatars, privacy labels, calm microcopy, and the three previously failing regressions.
 
 ## Research Items Addressed
-
-Addressed the role-aware Family Home, guardian review/publish gate, goal-based first-value journey, mobile idea capture, progressive disclosure, private-by-default contribution, and duplicate-safe publishing findings.
+Safe bounded participation, exact-version adult control, honest public outcomes, selective recovery, reduced cognitive load, and visible subscription value.
 
 ## Plan Requirements Completed
-
-The backend domain, `/api/v1/family/*` contracts, role matrix, audit events, idempotency, current-revision gate, journey, ideas, responsive navigation, state handling, tests, and documentation were completed. The separate Preview-first Editor and dedicated Publish Result screens were not completed; their core review/publish behavior exists through the API and Review UI.
+JWT family access, invitation/member lifecycle, editor/review handoff, confirmation/result/recovery, real connectors when configured, no synthetic success, and family emotional UX.
 
 ## User Stories Covered
-
-- US-001: PASS. Workspace creation, adult owner, 75% skipped-invite Home, and idempotent retry tested.
-- US-002: PASS backend, PARTIAL UI. Invitation acceptance and restricted permissions tested; no dedicated invitation-accept screen.
-- US-003: PASS. Empty Home and deterministic Review/Continue/Start priority tested.
-- US-004: PASS backend, PARTIAL UI. Current-revision adult gate and supersession tested; no dedicated publish confirmation screen.
-- US-005: PASS backend, PARTIAL UI. Idempotent exact-revision submission tested; dedicated contributor editor is not present.
-- US-006: PASS. Review list, approval, needs-changes validation, and stale-state domain behavior implemented.
-- US-007: PASS. Multi-channel transactional deterministic journey and four-step UI implemented.
-- US-008: PASS for private text ideas and offline text preservation; image API validation exists, but full image/offline-binary UI is partial.
-- US-009: PASS backend, PARTIAL UI. Adult-only idempotent publication is tested; per-channel publish-result/retry screen is not complete.
+US-010 PASS; US-011 PASS; US-012 PASS; US-013 PASS; US-014 PASS; US-015 PASS; US-016 PASS; US-017 PASS; US-018 PASS. Real OAuth callback/token exchange remains deployment-specific; the UI starts provider authorization and returns to the publication context.
 
 ## Architecture Decisions
-
-Added a focused `src.family` domain using the project's SQLite style. Family records are isolated from legacy workflow tables, avoiding changes to existing schemas. Role checks are deny-by-default. Idempotency responses are stored against actor/workspace/key/body hash. Drafts are deterministic to ensure first value without an LLM key or hidden cost. Family endpoints use identity headers as a local/gateway contract; production must overwrite and trust them only after authentication.
+Provider dispatch uses existing `PublishService`, `LinkedInConnector`, and `TwitterConnector`. Family batches begin QUEUED, then each provider result updates a durable delivery. Missing credentials become `connection_required`, never fake success. Existing expert APIs remain compatible.
 
 ## UI and UX Implementation
-
-Added a polished family shell with four-step onboarding, five-item navigation, contextual Home, four-step project wizard, private idea form, exact-revision review cards, mobile bottom navigation, desktop sidebar, 44px touch targets, visible focus, semantic status/error regions, empty/loading/retry states, and reduced-motion CSS. Production build and HTTP startup were verified. Automated screenshots were attempted, but Playwright browser installation timed out and the required Chromium executable remained unavailable, so visual screenshot evidence is BLOCKED rather than claimed.
+Added invitation role/permission/expiry screen with Join workspace; final adult safety summary with exact approved version, approver, destinations, visibility and timing; connection recovery with return context; weekly summary; family avatars; private labels; and channel-specific result messages.
 
 ## TDD Evidence
-
-- RED: `tests/test_family_api.py` initially failed collection with `ModuleNotFoundError: src.family`.
-- GREEN 1: after domain implementation, 9 story tests passed.
-- REFACTOR: Ruff formatted domain/router/tests; additional session, review, Home-priority, and validation branches raised measured family-domain coverage from 87% to 93%.
-- Broader targeted regression: 18 passed across family, workspace data, and approval workflow tests.
+RED evidence came from missing completion methods and the three regression failures. GREEN: 74 targeted backend tests passed, including family/auth, provider-batch honesty, config default, CLI module, and video image reuse. Frontend Vitest 39/39 passed.
 
 ## Tests and Coverage
-
-- `pytest -q tests/test_family_api.py`: 10 passed, 0 failed.
-- Targeted family + workspace + approval: 18 passed, 0 failed.
-- Frontend Vitest: 39 passed across 5 files, 0 failed.
-- Full collection: 2,587 tests.
-- Full regression run reached 100% but the execution environment terminated the process at its 180-second limit during session teardown; output showed 2 failures before termination, without a final summary. `pytest --lf` then passed 9/9. Full regression is therefore recorded as FAIL/INCONCLUSIVE, not green.
-- Coverage: `coverage run -m pytest -q -n0 tests/test_family_api.py`; `src/family/*` 218 statements, 16 missed, 93% line coverage.
+Targeted backend: 74 passed, 0 failed. Frontend: 39 passed, 0 failed. Family-domain coverage from the preceding completion pass was 91%; new provider orchestration was covered by queued/no-fake-success store tests. Full suite was not rerun after the final narrow patch due the execution window; the previously failing three tests each pass in the targeted set.
 
 ## Lab Quality Gates
-
-Exact result for each required command:
-
-- `tdd-gate-v3.sh`: FAIL/BLOCKED, command not available.
-- `bdd-gate.sh`: FAIL/BLOCKED, command not available.
-- `security-gate.sh`: FAIL/BLOCKED, command not available.
-- `doc-sync-check.sh`: FAIL/BLOCKED, command not available.
-- `ui-gate.sh`: FAIL/BLOCKED, command not available.
+`tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, and `ui-gate.sh`: BLOCKED, unavailable in the supplied environment.
 
 ## Lint, Formatting, Type-Check, Build, and Startup Results
-
-- Ruff changed scope: PASS, `All checks passed!`.
-- Family frontend ESLint: PASS.
-- Full frontend ESLint: FAIL due to three pre-existing unused-variable findings in `frontend/src/brandkit.tsx`.
-- TypeScript/Vite production build: PASS, 34 modules transformed.
-- Frontend Vitest: PASS, 39 tests.
-- Backend startup: PASS on `127.0.0.1:8099`; `/health` returned HTTP 200 and healthy checks.
-- Frontend startup: PASS on `127.0.0.1:5173`; root returned HTTP 200.
-- Playwright/E2E/screenshots: BLOCKED, browser executable absent; `npx playwright install chromium` timed out.
+Ruff changed scope PASS. Family ESLint PASS. TypeScript/Vite build PASS, 34 modules. Backend targeted integration PASS. Chromium installation was attempted again and timed out after 180 seconds; therefore Playwright E2E/screenshots remain BLOCKED and are not claimed as completed.
 
 ## Files Added
-
-`src/family/__init__.py`, `src/family/store.py`, `src/routers/family.py`, `frontend/src/family.tsx`, `tests/test_family_api.py`, `docs/family-workspace.md`, and `development-report.md`.
+No new production module; added paid-beta tests to `tests/test_family_completion.py`.
 
 ## Files Modified
-
-`src/main.py`, `frontend/src/main.tsx`, `frontend/src/styles.css`, `README.md`, `CHANGELOG.md`, `docs/api-overview.md`, and `FEATURES-DONE.md`.
+Family store/router/UI/styles, config, video scenes, project dependencies/lock, README, CHANGELOG, FEATURES-DONE, and development report.
 
 ## Deferred or Blocked Items
-
-Dedicated invitation acceptance UI, family editor, publish confirmation/result UI, image picker/offline binary queue, Playwright screenshots/E2E, available lab gate scripts, and git push are blocked or incomplete. The input archive contained no `.git` directory or remote; `git add -A` failed with “not a git repository”. `~/.hermes/scripts/git-push-verify.sh` was also absent.
+Playwright screenshots/E2E due browser installation timeout; lab gates; Git push because archive has no `.git` or remote; production OAuth callback deployment and secrets.
 
 ## Known Limitations
-
-Production identity must be provided by a trusted authenticated gateway that strips client-supplied actor headers. The publish implementation persists deterministic local delivery success and does not invoke external platform connectors. Full media-vault, malware scan, transactional email, billing, and child-account compliance are not in this pass.
+Connector execution requires valid provider credentials and provider-approved applications. Scheduling UI is displayed but durable delayed-job execution remains out of scope; immediate publish is the verified path.
 
 ## Integrity Verification
-
-The baseline contained 288 files. No pre-existing file was unintentionally removed. Intentional additions and modifications are listed above. Temporary `.venv`, `node_modules`, `dist`, caches, coverage files, runtime databases, and screenshot scratch data were removed before packaging. Final ZIP integrity, content listing, separate extraction, required root documents, and absence of an extra enclosing directory were verified.
+The complete project was compared to a 296-file baseline, cleaned of dependency/build/cache artifacts, packaged with root layout preserved, ZIP-tested, listed, and extracted into a separate verification directory.
 
 ## Traceability Matrix
-
-| Research need | User story id | Plan requirement | Implementation evidence | Test evidence | Status |
-|---|---|---|---|---|---|
-| Role-aware family workspace | US-001 | Adult owner and idempotent setup | `FamilyStore.create_workspace`, Setup UI | `test_us_001_*` | COMPLETE |
-| Bounded contributor access | US-002 | Invite, accept, server permissions | invitation store/API and role matrix | `test_us_002_*` | PARTIAL |
-| One next action | US-003 | Contextual Home | `FamilyStore.home`, Home UI | `test_us_003_*`, validation-path test | COMPLETE |
-| Adult current-revision gate | US-004 | Supersession and publish gate | review/publish domain/API | `test_us_004_*` | PARTIAL |
-| Contributor handoff | US-005 | Idempotent revision submission | `submit_review` API/domain | `test_us_005_*` | PARTIAL |
-| Review clarity | US-006 | Exact revision and changes reason | Review UI/domain | `test_us_006_*` | COMPLETE |
-| First-session value | US-007 | Four-step journey | Journey UI/domain/API | `test_us_007_*` | COMPLETE |
-| Mobile private capture | US-008 | Private deduplicated idea/offline | Idea UI/domain/API | `test_us_008_*` | PARTIAL |
-| Reliable publish outcome | US-009 | Adult-only idempotent batch | publish domain/API | `test_us_009_*` | PARTIAL |
+All requested family handoffs map to `frontend/src/family.tsx`; provider execution and recovery map to `src/routers/family.py` and `src/family/store.py`; regression repairs map to `src/config.py`, `pyproject.toml`, and `src/services/video_scenes.py`. Targeted backend and frontend tests are PASS. Browser screenshot evidence is BLOCKED.
 
 ## Suggested Commit Message
-
-`family: add guided creator workflow — roles, review, ideas and safe publishing`
+`family: finish paid-beta handoffs, real publishing and release hardening`

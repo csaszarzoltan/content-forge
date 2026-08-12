@@ -13,6 +13,11 @@ textstat==0.7.12
 httpx==0.28.1
 cryptography==50.0.0
 bcrypt==4.0.1
+moviepy<3,>=2.0
+imageio-ffmpeg<1,>=0.5
+numpy<3,>=2.0
+pillow<13,>=11.0
+typer<1,>=0.12
 
 [:python_version < "3.12"]
 scipy==1.17.1

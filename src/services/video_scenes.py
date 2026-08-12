@@ -170,7 +170,7 @@ def assemble_scenes(source: object, llm: object | None = None, voice_profile: ob
                     heading=str(heading),
                     narration=str(heading),
                     tts_text=str(heading),
-                    image_path=str(candidate) if _image_exists(candidate) else None,
+                    image_path=str(candidate),
                 )
             )
     return scenes

@@ -32,3 +32,16 @@ Errors use FastAPI's `{"detail":"code"}` shape. Cross-workspace or insufficient-
 ## Privacy boundary
 
 The product does not collect a child's age and does not claim child-directed regulatory compliance. Teen contributor is an adult-invited constrained role. Contributors cannot publish, manage members, billing, admin, or credentials. Public deployment must derive actor headers from authenticated identity at a trusted gateway and strip client-supplied identity headers.
+
+## Completion APIs and screens
+
+All private family endpoints require `Authorization: Bearer <access token>`. Invitation preview is the only public family read and returns minimized workspace/role information.
+
+- `GET /invitations/{token}/preview`, authenticated `POST /invitations/{token}/accept`
+- `GET /workspaces/{id}/members`, `PATCH`/`DELETE` member endpoints, and invitation revoke
+- `GET /assets/{id}`, `PUT /assets/{id}/autosave`, and revision history
+- `GET /reviews/{id}` with labeled word diff
+- `GET /assets/{id}/publish-eligibility`
+- `GET /publish-batches/{id}`, `POST .../retry`, and `POST .../reconcile`
+
+The family UI adds Sign in, Members, Preview-first Editor, and Publish Result. Autosave waits 800 ms after typing. A 409 conflict stops autosave and offers Copy my draft/Reload latest. Published delivery rows are never retried; UNKNOWN requires status reconciliation first.

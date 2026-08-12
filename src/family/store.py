@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import secrets
@@ -48,6 +49,19 @@ CREATE TABLE IF NOT EXISTS family_deliveries(id TEXT PRIMARY KEY,batch_id TEXT,c
 CREATE TABLE IF NOT EXISTS family_idempotency(workspace_id TEXT,actor_id TEXT,key TEXT,request_hash TEXT,response TEXT,PRIMARY KEY(workspace_id,actor_id,key));
 CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,actor_id TEXT,kind TEXT,entity_id TEXT,payload TEXT,created_at REAL);
 """)
+            for table, column, ddl in [
+                ("family_invitations", "revoked_at", "REAL"),
+                ("family_memberships", "updated_at", "REAL"),
+                ("family_assets", "updated_at", "REAL"),
+                ("family_reviews", "updated_at", "REAL"),
+                ("family_deliveries", "attempt_count", "INTEGER NOT NULL DEFAULT 1"),
+                ("family_deliveries", "last_attempt_at", "REAL"),
+                ("family_deliveries", "error_code", "TEXT"),
+            ]:
+                cols = {row[1] for row in d.execute(f"PRAGMA table_info({table})")}
+                if column not in cols:
+                    d.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+            d.execute("UPDATE family_invitations SET token_once=NULL WHERE state='PENDING'")
 
     def db(self):
         d = sqlite3.connect(self.path)
@@ -114,7 +128,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
                 "INSERT INTO family_workspaces VALUES(?,?,?,?,?)", (w, name.strip(), mode, u, now)
             )
             d.execute(
-                "INSERT INTO family_memberships VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT INTO family_memberships(id,workspace_id,user_id,display_name,email,role,state,joined_at) VALUES(?,?,?,?,?,?,?,?)",
                 (m, w, u, name_display, "", "ADULT_OWNER", "ACTIVE", now),
             )
             out = {
@@ -135,7 +149,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
         iid = _id()
         with self.db() as d:
             d.execute(
-                "INSERT INTO family_invitations VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO family_invitations(id,workspace_id,email,role,token_hash,token_once,state,expires_at,created_by,accepted_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     iid,
                     w,
@@ -173,13 +187,15 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
             ).fetchone()
             if existing:
                 return dict(existing)
+            if inv["state"] == "REVOKED":
+                raise ValueError("invitation_revoked")
             if inv["state"] != "PENDING" or inv["expires_at"] < time.time():
                 raise ValueError("invitation_expired")
             if inv["email"] != email.strip().lower():
                 raise PermissionDenied("invitation_email_mismatch")
             mid = _id()
             d.execute(
-                "INSERT INTO family_memberships VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT INTO family_memberships(id,workspace_id,user_id,display_name,email,role,state,joined_at) VALUES(?,?,?,?,?,?,?,?)",
                 (
                     mid,
                     inv["workspace_id"],
@@ -309,7 +325,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
                 )
                 title = f"{b['project_name']} - {c.title()}"
                 d.execute(
-                    "INSERT INTO family_assets VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO family_assets(id,workspace_id,project_id,channel,title,content,state,version,author_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (aid, w, pid, c, title, content, "DRAFT", 1, u, now),
                 )
                 d.execute(
@@ -378,7 +394,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
             rid = _id()
             now = time.time()
             d.execute(
-                "INSERT INTO family_reviews VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO family_reviews(id,workspace_id,asset_id,revision_version,note,state,requester_id,reviewer_id,reason,created_at,decided_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (rid, w, aid, a["version"], note[:500], "PENDING", u, None, None, now, None),
             )
             d.execute("UPDATE family_assets SET state='WAITING_APPROVAL' WHERE id=?", (aid,))
@@ -466,7 +482,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
             for c in channels:
                 did = _id()
                 d.execute(
-                    "INSERT INTO family_deliveries VALUES(?,?,?,?,?,?)",
+                    "INSERT INTO family_deliveries(id,batch_id,channel,state,remote_id,error) VALUES(?,?,?,?,?,?)",
                     (did, bid, c, "PUBLISHED", f"demo-{did[:8]}", None),
                 )
                 deliveries.append({"id": did, "channel": c, "state": "PUBLISHED"})
@@ -474,3 +490,358 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
             self._save_idem(d, w, u, key, payload, out)
             self._audit(d, w, u, "PUBLISHED", bid, {"version": version, "channels": channels})
             return out
+
+    def invitation_preview(self, token: str) -> dict:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self.db() as d:
+            row = d.execute(
+                "SELECT i.id,i.role,i.state,i.expires_at,i.revoked_at,w.name workspace_name,m.display_name inviter_name FROM family_invitations i JOIN family_workspaces w ON w.id=i.workspace_id LEFT JOIN family_memberships m ON m.workspace_id=i.workspace_id AND m.user_id=i.created_by WHERE i.token_hash=?",
+                (token_hash,),
+            ).fetchone()
+        if not row:
+            raise KeyError("invitation_not_found")
+        out = dict(row)
+        if out["revoked_at"] is not None or out["state"] == "REVOKED":
+            raise ValueError("invitation_revoked")
+        if out["expires_at"] < time.time():
+            raise ValueError("invitation_expired")
+        return out
+
+    def revoke_invitation(self, w, u, iid):
+        self.require(w, u, "manage_members")
+        with self.db() as d:
+            cur = d.execute(
+                "UPDATE family_invitations SET state='REVOKED',revoked_at=? WHERE id=? AND workspace_id=? AND state='PENDING'",
+                (time.time(), iid, w),
+            )
+            if not cur.rowcount:
+                raise KeyError("invitation_not_found")
+            self._audit(d, w, u, "INVITATION_REVOKED", iid, {})
+
+    def members(self, w, u):
+        self.require(w, u, "manage_members")
+        with self.db() as d:
+            return {
+                "members": [
+                    dict(x)
+                    for x in d.execute(
+                        "SELECT * FROM family_memberships WHERE workspace_id=? AND state='ACTIVE' ORDER BY joined_at",
+                        (w,),
+                    )
+                ],
+                "invitations": [
+                    dict(x)
+                    for x in d.execute(
+                        "SELECT id,role,state,expires_at,created_at FROM family_invitations WHERE workspace_id=? AND state='PENDING' ORDER BY created_at",
+                        (w,),
+                    )
+                ],
+            }
+
+    def update_member(self, w, u, mid, role):
+        self.require(w, u, "manage_members")
+        if role not in ROLES:
+            raise ValueError("invalid_role")
+        with self.db() as d:
+            t = d.execute(
+                "SELECT * FROM family_memberships WHERE id=? AND workspace_id=?", (mid, w)
+            ).fetchone()
+            if not t:
+                raise KeyError("membership_not_found")
+            if (
+                t["role"] == "ADULT_OWNER"
+                and role != "ADULT_OWNER"
+                and d.execute(
+                    "SELECT count(*) FROM family_memberships WHERE workspace_id=? AND state='ACTIVE' AND role='ADULT_OWNER'",
+                    (w,),
+                ).fetchone()[0]
+                <= 1
+            ):
+                raise ValueError("last_owner_required")
+            d.execute(
+                "UPDATE family_memberships SET role=?,updated_at=? WHERE id=?",
+                (role, time.time(), mid),
+            )
+            self._audit(d, w, u, "MEMBER_ROLE_CHANGED", mid, {"from": t["role"], "to": role})
+            return dict(d.execute("SELECT * FROM family_memberships WHERE id=?", (mid,)).fetchone())
+
+    def remove_member(self, w, u, mid):
+        self.require(w, u, "manage_members")
+        with self.db() as d:
+            t = d.execute(
+                "SELECT * FROM family_memberships WHERE id=? AND workspace_id=?", (mid, w)
+            ).fetchone()
+            if not t:
+                raise KeyError("membership_not_found")
+            if (
+                t["role"] == "ADULT_OWNER"
+                and d.execute(
+                    "SELECT count(*) FROM family_memberships WHERE workspace_id=? AND state='ACTIVE' AND role='ADULT_OWNER'",
+                    (w,),
+                ).fetchone()[0]
+                <= 1
+            ):
+                raise ValueError("last_owner_required")
+            d.execute(
+                "UPDATE family_memberships SET state='REMOVED',updated_at=? WHERE id=?",
+                (time.time(), mid),
+            )
+            self._audit(d, w, u, "MEMBER_REMOVED", mid, {})
+
+    def asset_detail(self, w, u, aid):
+        self.membership(w, u)
+        with self.db() as d:
+            r = d.execute(
+                "SELECT a.*,p.name project_name FROM family_assets a JOIN family_projects p ON p.id=a.project_id WHERE a.id=? AND a.workspace_id=?",
+                (aid, w),
+            ).fetchone()
+            if not r:
+                raise KeyError("asset_not_found")
+            out = dict(r)
+            out["revisions"] = [
+                dict(x)
+                for x in d.execute(
+                    "SELECT * FROM family_revisions WHERE asset_id=? ORDER BY version DESC", (aid,)
+                )
+            ]
+            return out
+
+    def review_detail(self, w, u, rid):
+        self.membership(w, u)
+        with self.db() as d:
+            r = d.execute(
+                "SELECT r.*,a.title,a.channel,a.content,a.version,p.name project_name FROM family_reviews r JOIN family_assets a ON a.id=r.asset_id JOIN family_projects p ON p.id=a.project_id WHERE r.id=? AND r.workspace_id=?",
+                (rid, w),
+            ).fetchone()
+            if not r:
+                raise KeyError("review_not_found")
+            out = dict(r)
+            revs = list(
+                d.execute(
+                    "SELECT version,content FROM family_revisions WHERE asset_id=? AND version<=? ORDER BY version DESC LIMIT 2",
+                    (r["asset_id"], r["revision_version"]),
+                )
+            )
+        old = revs[1]["content"] if len(revs) > 1 else ""
+        new = revs[0]["content"] if revs else out["content"]
+        out["diff"] = [
+            {
+                "kind": "added"
+                if p.startswith("+ ")
+                else "removed"
+                if p.startswith("- ")
+                else "unchanged",
+                "text": p[2:],
+            }
+            for p in difflib.ndiff(old.split(), new.split())
+        ]
+        return out
+
+    def publish_eligibility(self, w, u, aid):
+        self.require(w, u, "publish")
+        asset = self.asset_detail(w, u, aid)
+        with self.db() as d:
+            a = d.execute(
+                "SELECT * FROM family_reviews WHERE asset_id=? AND revision_version=? AND state='APPROVED'",
+                (aid, asset["version"]),
+            ).fetchone()
+        return {
+            "eligible": bool(a),
+            "asset": asset,
+            "approval": dict(a) if a else None,
+            "blockers": [] if a else ["approval_required_for_current_revision"],
+        }
+
+    def set_delivery_state(self, bid, channel, state, error=None):
+        with self.db() as d:
+            d.execute(
+                "UPDATE family_deliveries SET state=?,error=?,error_code=? WHERE batch_id=? AND channel=?",
+                (state, error, error, bid, channel),
+            )
+
+    def publish_result(self, w, u, bid):
+        self.require(w, u, "publish")
+        with self.db() as d:
+            b = d.execute(
+                "SELECT * FROM family_publish_batches WHERE id=? AND workspace_id=?", (bid, w)
+            ).fetchone()
+            if not b:
+                raise KeyError("publish_batch_not_found")
+            deliveries = [
+                dict(x)
+                for x in d.execute(
+                    "SELECT * FROM family_deliveries WHERE batch_id=? ORDER BY rowid", (bid,)
+                )
+            ]
+        states = {x["state"] for x in deliveries}
+        state = (
+            "UNKNOWN"
+            if "UNKNOWN" in states
+            else "PARTIAL"
+            if "PUBLISHED" in states and states != {"PUBLISHED"}
+            else "PUBLISHED"
+            if states == {"PUBLISHED"}
+            else "FAILED"
+        )
+        out = dict(b)
+        out.update(state=state, deliveries=deliveries)
+        return out
+
+    def retry_publish(self, w, u, bid):
+        result = self.publish_result(w, u, bid)
+        if any(x["state"] == "UNKNOWN" for x in result["deliveries"]):
+            raise ValueError("reconciliation_required")
+        retry = [x for x in result["deliveries"] if x["state"] in {"FAILED", "RETRYABLE"}]
+        if not retry:
+            raise ValueError("nothing_to_retry")
+        with self.db() as d:
+            for x in retry:
+                d.execute(
+                    "UPDATE family_deliveries SET state='PUBLISHED',attempt_count=attempt_count+1,last_attempt_at=?,error=NULL,error_code=NULL WHERE id=?",
+                    (time.time(), x["id"]),
+                )
+        return {
+            "id": bid,
+            "retried": [x["channel"] for x in retry],
+            "state": self.publish_result(w, u, bid)["state"],
+        }
+
+    def reconcile_publish(self, w, u, bid):
+        self.require(w, u, "publish")
+        with self.db() as d:
+            d.execute(
+                "UPDATE family_deliveries SET state='FAILED',error_code='provider_state_unknown' WHERE batch_id=? AND state='UNKNOWN'",
+                (bid,),
+            )
+        return self.publish_result(w, u, bid)
+
+    def weekly_summary(self, workspace_id: str, actor_id: str) -> dict:
+        """Return simple, family-friendly seven-day completion counts."""
+        self.membership(workspace_id, actor_id)
+        since = time.time() - 7 * 86400
+        with self.db() as d:
+            projects = d.execute(
+                "SELECT count(*) FROM family_projects WHERE workspace_id=? AND created_at>=?",
+                (workspace_id, since),
+            ).fetchone()[0]
+            reviews = d.execute(
+                "SELECT count(*) FROM family_reviews WHERE workspace_id=? AND decided_at>=? AND state='APPROVED'",
+                (workspace_id, since),
+            ).fetchone()[0]
+            posts = d.execute(
+                "SELECT count(*) FROM family_deliveries x JOIN family_publish_batches b ON b.id=x.batch_id WHERE b.workspace_id=? AND x.state='PUBLISHED' AND b.created_at>=?",
+                (workspace_id, since),
+            ).fetchone()[0]
+        return {
+            "projects_started": projects,
+            "drafts_approved": reviews,
+            "channels_published": posts,
+            "message": f"This week your family started {projects} projects, approved {reviews} drafts, and published to {posts} channels.",
+        }
+
+    def prepare_publish_batch(
+        self,
+        workspace_id: str,
+        actor_id: str,
+        asset_id: str,
+        version: int,
+        channels: list[str],
+        key: str,
+    ) -> dict:
+        """Create an idempotent queued batch without claiming provider success."""
+        self.require(workspace_id, actor_id, "publish")
+        payload = {"asset_id": asset_id, "revision_version": version, "channels": channels}
+        with self.db() as d:
+            old = self._idem(d, workspace_id, actor_id, key, payload)
+            if old:
+                return old
+            asset = d.execute(
+                "SELECT * FROM family_assets WHERE id=? AND workspace_id=?",
+                (asset_id, workspace_id),
+            ).fetchone()
+            approved = d.execute(
+                "SELECT id,reviewer_id,decided_at FROM family_reviews WHERE asset_id=? AND revision_version=? AND state='APPROVED'",
+                (asset_id, version),
+            ).fetchone()
+            if not asset or asset["version"] != version or not approved:
+                raise ValueError("approval_required_for_current_revision")
+            bid = _id()
+            now = time.time()
+            d.execute(
+                "INSERT INTO family_publish_batches VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    bid,
+                    workspace_id,
+                    asset_id,
+                    version,
+                    "QUEUED",
+                    json.dumps(channels),
+                    actor_id,
+                    now,
+                ),
+            )
+            deliveries = []
+            for channel in channels:
+                did = _id()
+                d.execute(
+                    "INSERT INTO family_deliveries(id,batch_id,channel,state,remote_id,error) VALUES(?,?,?,?,?,?)",
+                    (did, bid, channel, "QUEUED", None, None),
+                )
+                deliveries.append({"id": did, "channel": channel, "state": "QUEUED"})
+            out = {
+                "id": bid,
+                "state": "QUEUED",
+                "deliveries": deliveries,
+                "asset": {
+                    "id": asset_id,
+                    "content": asset["content"],
+                    "title": asset["title"],
+                    "version": version,
+                },
+                "approval": {
+                    "reviewer_id": approved["reviewer_id"],
+                    "decided_at": approved["decided_at"],
+                },
+            }
+            self._save_idem(d, workspace_id, actor_id, key, payload, out)
+            self._audit(
+                d,
+                workspace_id,
+                actor_id,
+                "PUBLISH_QUEUED",
+                bid,
+                {"channels": channels, "version": version},
+            )
+            return out
+
+    def complete_delivery(
+        self,
+        batch_id: str,
+        channel: str,
+        state: str,
+        remote_id: str | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        with self.db() as d:
+            d.execute(
+                "UPDATE family_deliveries SET state=?,remote_id=?,error=?,error_code=?,last_attempt_at=? WHERE batch_id=? AND channel=?",
+                (state, remote_id, error_code, error_code, time.time(), batch_id, channel),
+            )
+            states = {
+                r[0]
+                for r in d.execute(
+                    "SELECT state FROM family_deliveries WHERE batch_id=?", (batch_id,)
+                )
+            }
+            aggregate = (
+                "PUBLISHED"
+                if states == {"PUBLISHED"}
+                else "PARTIAL"
+                if "PUBLISHED" in states
+                else "FAILED"
+                if states <= {"FAILED", "RETRYABLE"}
+                else "UNKNOWN"
+                if "UNKNOWN" in states
+                else "PUBLISHING"
+            )
+            d.execute("UPDATE family_publish_batches SET state=? WHERE id=?", (aggregate, batch_id))

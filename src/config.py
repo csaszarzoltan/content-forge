@@ -5,6 +5,7 @@ Loaded from environment variables and/or .env file.
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o"
     LLM_PROVIDER: str = "openai"
     LLM_BASE_URL: str | None = None
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = Field(default="development", validation_alias="CONTENTFORGE_ENVIRONMENT")
     CORS_ORIGINS: str = "*"
     SECRET_KEY: str = "change-me-in-production"
     HEALTH_CHECK_LLM: bool = False
@@ -40,6 +41,9 @@ class Settings(BaseSettings):
     TWITTER_ACCESS_TOKEN_SECRET: str = ""
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
+    LINKEDIN_ACCESS_TOKEN: str = ""
+    LINKEDIN_AUTHOR_URN: str = ""
+    PUBLIC_APP_URL: str = "http://127.0.0.1:5173"
 
     # AI visibility polling settings (analysis brief §5 P0 / M4 / M7)
     AI_VISIBILITY_POLL_ENABLED: bool = False

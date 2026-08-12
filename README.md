@@ -970,3 +970,13 @@ cd frontend && npm run dev
 ```
 
 Troubleshooting: if Home cannot load, use its Retry action; draft and idea controls preserve entered text. A stale approval cannot publish and must be reviewed again.
+
+### Family Creator completion flow
+
+Family routes now require the normal ContentForge JWT. Open `#family`, sign in, then use Members to create bounded invitation links. Contributors edit through the preview-first editor; an 800 ms autosave uses optimistic versions and preserves unsaved text locally. Adults review the exact revision and can inspect per-channel publication results. Unknown provider states must be reconciled before retry.
+
+Security note: browser `X-User-*` headers are ignored. Public invitation previews return no invited email or project data. Pending invitation tokens created by older builds are invalidated because raw token storage was removed.
+
+### Paid-beta publishing configuration
+
+Family publication now calls the real LinkedIn/X connectors when credentials are configured. Set `LINKEDIN_ACCESS_TOKEN` plus `LINKEDIN_AUTHOR_URN`, or all four Twitter/X credential variables. Missing or expired connections are shown as Action required and never reported as published. The adult confirmation screen shows the approved revision, reviewer, destinations, visibility, and timing before sending.

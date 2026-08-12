@@ -377,3 +377,17 @@
 - Added responsive desktop/mobile family UI with explicit loading, empty, validation, success, retry, offline, focus, and reduced-motion behavior.
 - Added 10 backend behavior tests covering US-001 through US-009; changed family domain measured at 93% line coverage.
 - Added family API and user-flow documentation plus an auditable development report.
+
+#### Family Creator completion pass (2026-08-12)
+- Replaced family actor headers with the existing JWT current-user dependency.
+- Added private invitation preview, revocation, member listing, role changes, removal, and transactional last-owner protection.
+- Added secure migration that clears legacy raw pending invitation tokens while preserving token hashes.
+- Added asset detail, conflict-safe autosave, revision history, review detail with word diff, publish eligibility, result, retry, and reconciliation APIs.
+- Added authenticated sign-in, Members, preview-first Editor, and per-channel Publish Result experiences with responsive states.
+- Added nine completion tests covering US-010 through US-018; combined family domain coverage measured at 91%.
+
+#### Family paid-beta hardening (2026-08-12)
+- Completed invitation acceptance, calm adult publish confirmation, connection recovery, weekly family summary, family avatars, and private/public safety labels.
+- Connected family publishing to real LinkedIn/X connector execution when provider credentials are configured; missing credentials now produce `connection_required` instead of synthetic success.
+- Fixed config default isolation, CLI Typer runtime dependency, and video source-image reuse regressions.
+- Added queued provider batches, delivery completion, honest aggregate results, and weekly outcome reporting.
