@@ -980,3 +980,7 @@ Security note: browser `X-User-*` headers are ignored. Public invitation preview
 ### Paid-beta publishing configuration
 
 Family publication now calls the real LinkedIn/X connectors when credentials are configured. Set `LINKEDIN_ACCESS_TOKEN` plus `LINKEDIN_AUTHOR_URN`, or all four Twitter/X credential variables. Missing or expired connections are shown as Action required and never reported as published. The adult confirmation screen shows the approved revision, reviewer, destinations, visibility, and timing before sending.
+
+### Paid-beta scheduling and validation status
+
+The paid beta publishes immediately after adult confirmation. Scheduling is intentionally hidden until durable background execution, restart recovery, and timezone tests are implemented. See `docs/family-pilot.md` for the 5-10 household pilot and `docs/provider-sandbox-checklist.md` for real provider verification.

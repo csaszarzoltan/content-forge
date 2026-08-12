@@ -1,6 +1,6 @@
 /* ── Brand Kit — types, API helpers, and components ────────── */
 
-import React, {FormEvent, useCallback, useEffect, useRef, useState} from "react";
+import React, {FormEvent, useCallback, useEffect, useState} from "react";
 import {validationMessage} from "./flow";
 
 /* ── types ─────────────────────────────────────────────────── */
@@ -58,7 +58,8 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function fetchBrandKits(limit = 20, offset = 0): Promise<BrandKitListResponse> {
-  return apiRequest<BrandKitListResponse>("/api/v1/brand-kit");
+  const params = new URLSearchParams({limit: String(limit), offset: String(offset)});
+  return apiRequest<BrandKitListResponse>(`/api/v1/brand-kit?${params}`);
 }
 
 export async function createBrandKit(data: {name: string; description: string; brand_type: string}): Promise<BrandKit> {

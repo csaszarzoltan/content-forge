@@ -5,7 +5,6 @@ Loaded from environment variables and/or .env file.
 
 from __future__ import annotations
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o"
     LLM_PROVIDER: str = "openai"
     LLM_BASE_URL: str | None = None
-    ENVIRONMENT: str = Field(default="development", validation_alias="CONTENTFORGE_ENVIRONMENT")
+    ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "*"
     SECRET_KEY: str = "change-me-in-production"
     HEALTH_CHECK_LLM: bool = False
@@ -76,6 +75,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        env_prefix="CONTENTFORGE_",
     )
 
 

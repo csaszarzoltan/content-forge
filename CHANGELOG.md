@@ -391,3 +391,9 @@
 - Connected family publishing to real LinkedIn/X connector execution when provider credentials are configured; missing credentials now produce `connection_required` instead of synthetic success.
 - Fixed config default isolation, CLI Typer runtime dependency, and video source-image reuse regressions.
 - Added queued provider batches, delivery completion, honest aggregate results, and weekly outcome reporting.
+
+#### Release verification and pilot readiness (2026-08-12)
+- Hid unimplemented scheduling from the paid-beta UI and explicitly states immediate publication.
+- Fixed full frontend lint by preserving Brand Kit pagination parameters.
+- Added family pilot protocol/results template and provider sandbox checklist/results template.
+- Full backend regression: 2,599 collected tests, exit 0; frontend 39 tests, lint and production build exit 0.
