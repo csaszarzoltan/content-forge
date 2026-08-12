@@ -1,8 +1,12 @@
+# Features Done
+
 ## Features Done (this pass)
-- AI Video Generation pipeline: blog/script → scenes → voiceover → MP4 with job state machine, per-scene progress and retry (failed scenes only, no re-render of completed), partial export after max retries, **background worker (`VideoJobWorker`) that drives queued jobs end-to-end — TTS per scene → done, render → ready|failed (attempts ≤ 3)**, TTS provider abstraction (OpenAI/ElevenLabs/Coqui), style presets (explainer/documentary), voice selection, brand voice inheritance, MP4 export with resolution selection, long-post segmentation + combine (rendered clip concatenation), and a 5-step wizard UI (#video route).
-- Video job API: `POST/GET /api/v1/video/jobs`, `POST /jobs/{id}/retry`, `GET /jobs/{id}/export`, `POST /jobs/{parent}/combine`, `GET /voices` — full error contract (400/404/409/422/502/503, JSON bodies).
-- 185/186 video behavioral tests pass (one pre-tester interface/behavior contradiction on `retry_video_job` async vs sync — sync kept so the 3 retry-behavior tests pass; documented in CHANGELOG). Includes the BLOCKER-1 regression: real API create → real worker path → job reaches `ready` with a playable MP4 export (no store-seam scene manipulation).
-- 13 frontend video wizard tests pass (9 were RED-skipped).
+- Family Workspace and Guided Home: durable adult-owned workspaces, bounded roles, invitations, server-derived permissions, contextual Home, and responsive family navigation.
+- Guardian Review and Safe Publishing core: exact-revision review decisions, automatic supersession, contributor publish denial, idempotent adult publish batches, and audit records.
+- Simple Create Journey and Private Ideas: four-step goal-driven UI, deterministic multi-channel drafts, private deduplicated ideas, offline text preservation, and mobile-first controls.
+
 ## Sources
-- analysis-brief.md §6 (video pipeline requirements & task specs, t_dfd6e7fc)
-- CHANGELOG.md section this maps to: 0.15.0
+- research-findings.md items addressed: role-aware Family Home; guardian review and publish gate; goal-based create-to-publish journey; mobile idea capture.
+- implementation-plan.md requirements addressed: Features A-C backend contracts and primary Family Setup, Home, Journey, Idea, and Review UI screens.
+- user stories covered: US-001, US-002, US-003, US-004, US-005, US-006, US-007, US-008, US-009.
+- CHANGELOG.md section this maps to: Unreleased - Family Creator vertical slice.

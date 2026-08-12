@@ -47,6 +47,7 @@ from src.routers.translate import router as translate_router
 from src.routers.video import router as video_router
 from src.routers.video_analytics import router as video_analytics_router
 from src.routers.workspaces import router as workspaces_router
+from src.routers.family import router as family_router
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 
@@ -152,6 +153,7 @@ app.include_router(analytics_router)
 app.include_router(ai_visibility_router)
 app.include_router(seo_router)
 app.include_router(workspaces_router)
+app.include_router(family_router)
 app.include_router(constraints_router)
 app.include_router(video_analytics_router)
 app.mount(

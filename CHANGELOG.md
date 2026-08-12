@@ -369,3 +369,11 @@
 
 ### Features
 - Initial ContentForge scaffold with FastAPI
+
+#### Family Creator vertical slice (2026-08-12)
+- Added adult-owned family workspaces with owner, adult collaborator, teen contributor, and viewer permissions.
+- Added single-use seven-day invitation tokens, contextual Family Home, a four-step goal wizard, and private mobile idea capture.
+- Added exact-revision guardian review, approval supersession on edits, contributor publish denial, idempotent adult publication, and audit records.
+- Added responsive desktop/mobile family UI with explicit loading, empty, validation, success, retry, offline, focus, and reduced-motion behavior.
+- Added 10 backend behavior tests covering US-001 through US-009; changed family domain measured at 93% line coverage.
+- Added family API and user-flow documentation plus an auditable development report.

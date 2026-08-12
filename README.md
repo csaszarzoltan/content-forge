@@ -949,3 +949,24 @@ python scripts/run_backend.py
 ```
 
 This watches only `src/`, so installing frontend dependencies no longer restarts the API server. Python 3.11 installs SciPy 1.17.1, while Python 3.12 and later install SciPy 1.18.0.
+
+## Family Creator
+
+Open the SPA at `#family` to start the guided Family Creator experience. An adult creates a workspace, family members contribute private ideas and drafts, and only an adult can approve the exact current revision and publish it.
+
+### Roles
+
+- **Adult owner:** manages members, creates, reviews, and publishes.
+- **Adult collaborator:** creates, reviews, and publishes.
+- **Teen contributor:** creates and edits private work and submits it for review; cannot publish or manage credentials.
+- **Viewer:** read-only.
+
+The primary flow is **setup -> Home -> four-step project wizard -> exact-revision review -> adult publish**. The family API is under `/api/v1/family`; local/demo clients send `X-User-ID`, `X-User-Name`, and `X-User-Email`. Production deployments should map these actor values from authenticated identity at the trusted gateway.
+
+```bash
+python scripts/run_backend.py
+cd frontend && npm run dev
+# open http://127.0.0.1:5173/#family
+```
+
+Troubleshooting: if Home cannot load, use its Retry action; draft and idea controls preserve entered text. A stale approval cannot publish and must be reviewed again.
