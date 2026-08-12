@@ -13,11 +13,10 @@ import pytest
 # Mark as integration (uses TestClient/AsyncClient)
 pytestmark = pytest.mark.integration
 
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from src.main import app
 from src.routers.translate import router as translate_router
-from src.schemas.translation import TranslateRequest, TranslateResponse
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

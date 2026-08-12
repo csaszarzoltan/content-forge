@@ -204,4 +204,4 @@ class ComplianceScorer:
         return _flesch_kincaid_score(text)
 
 
-__all__ = ["ComplianceScorer", "ComplianceResult"]
+__all__ = ["ComplianceResult", "ComplianceScorer"]

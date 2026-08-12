@@ -6,8 +6,8 @@ Demonstrates scoring text against brand voice rules, including
 banned term detection, vocabulary analysis, and readability.
 """
 
-from brand_voice.presets import PresetManager
 from brand_voice.compliance import ComplianceScorer
+from brand_voice.presets import PresetManager
 
 
 def main():

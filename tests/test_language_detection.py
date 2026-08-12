@@ -16,20 +16,18 @@ from typing import get_type_hints
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
 from src.services.language_detection import (
-    SUPPORTED_LANGUAGES,
-    SHORT_TEXT_THRESHOLD,
     RELIABILITY_THRESHOLD,
+    SHORT_TEXT_THRESHOLD,
+    SUPPORTED_LANGUAGES,
     LanguageResult,
     detect_language,
     get_supported_languages,
     is_language_supported,
 )
-
 
 # ============================================================================
 # INTERFACE TESTS (should PASS immediately)

@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import inspect
 from pathlib import Path
-from typing import Any
 
 import pytest
-
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
@@ -22,7 +20,6 @@ from src.services.prompt_templates import (
     PromptTemplateRegistry,
     TemplateInfo,
 )
-
 
 # ===========================================================================
 # SECTION 1 - INTERFACE TESTS (should PASS immediately)

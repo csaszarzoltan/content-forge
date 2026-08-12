@@ -4,7 +4,7 @@ Represents a persisted brand voice profile.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import DateTime, Integer, String, Text, func
@@ -37,7 +37,7 @@ class BrandVoice(Base):
 
     def soft_delete(self) -> None:
         """Mark the record as deleted."""
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
     def increment_version(self) -> None:
         """Bump the version number."""

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import uuid
 
-from src.models.user import User
-
 import pytest
+
+from src.models.user import User
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick

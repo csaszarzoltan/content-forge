@@ -9,8 +9,8 @@ import inspect
 
 import pytest
 
-from src.constraints.registry import ConstraintRegistry
 from src.constraints.models import PlatformConstraints, TextConstraints
+from src.constraints.registry import ConstraintRegistry
 
 # ---------------------------------------------------------------------------
 # Interface tests — must PASS immediately

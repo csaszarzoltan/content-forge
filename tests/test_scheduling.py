@@ -7,24 +7,21 @@ Behavioral tests — verify NotImplementedError for stubs.
 from __future__ import annotations
 
 import inspect
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
-
 
 # Mark as quick (unit tests)
 pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
+from src.routers.schedule import router as schedule_router
 from src.schemas.schedule import (
     PlatformConfig,
     ScheduleRequest,
     ScheduleResponse,
     ScheduleStatusResponse,
 )
-from src.routers.schedule import router as schedule_router
 from src.services.scheduler import SchedulerService
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
@@ -166,7 +163,7 @@ class TestSchedulerServiceBehavioral:
         svc = SchedulerService()
         schedule_id = await svc.schedule_post(
             generation_id="gen_1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
         )
         assert isinstance(schedule_id, str)
@@ -181,10 +178,10 @@ class TestSchedulerServiceBehavioral:
         """Each schedule_post() call should generate a unique ID."""
         svc = SchedulerService()
         id1 = await svc.schedule_post(
-            generation_id="gen_u1", publish_at=datetime.now(timezone.utc), platform="twitter",
+            generation_id="gen_u1", publish_at=datetime.now(UTC), platform="twitter",
         )
         id2 = await svc.schedule_post(
-            generation_id="gen_u2", publish_at=datetime.now(timezone.utc), platform="linkedin",
+            generation_id="gen_u2", publish_at=datetime.now(UTC), platform="linkedin",
         )
         assert id1 != id2
         assert id1.startswith("sch_")
@@ -193,7 +190,7 @@ class TestSchedulerServiceBehavioral:
     async def test_schedule_post_different_platforms(self):
         """schedule_post() should accept both 'twitter' and 'linkedin' platforms."""
         svc = SchedulerService()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tid = await svc.schedule_post(generation_id="g1", publish_at=now, platform="twitter")
         lid = await svc.schedule_post(generation_id="g2", publish_at=now, platform="linkedin")
         assert isinstance(tid, str)
@@ -206,7 +203,7 @@ class TestSchedulerServiceBehavioral:
         svc = SchedulerService()
         sid = await svc.schedule_post(
             generation_id="g3",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
             platform_config={"max_retries": 5},
         )
@@ -217,7 +214,7 @@ class TestSchedulerServiceBehavioral:
         svc = SchedulerService()
         sid = await svc.schedule_post(
             generation_id="g4",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
             source_language="en",
             target_language="de",
@@ -236,7 +233,7 @@ class TestSchedulerServiceBehavioral:
         """get_post_status() should work for scheduled IDs."""
         svc = SchedulerService()
         sid = await svc.schedule_post(
-            generation_id="g5", publish_at=datetime.now(timezone.utc), platform="twitter",
+            generation_id="g5", publish_at=datetime.now(UTC), platform="twitter",
         )
         status = await svc.get_post_status(sid)
         assert status["schedule_id"] == sid

@@ -10,3 +10,5 @@
 - implementation-plan.md requirements addressed: Features A-C core domain policy and honest immediate-only UI
 - user stories covered: US-001, US-002, US-003, US-004, US-005, US-006, US-007, US-008, US-009
 - CHANGELOG.md section this maps to: Family provider confidence, pilot, and trust hardening (2026-08-12)
+
+- Release verification: complete backend regression passed in exhaustive partitions, full Ruff and ESLint are clean, frontend tests/build and startup smoke pass.

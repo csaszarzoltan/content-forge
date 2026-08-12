@@ -10,20 +10,17 @@ import inspect
 
 import pytest
 
-
-
 # Mark as quick (unit tests)
 pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
+from src.routers.content import router as content_router
 from src.schemas.content import (
-    GenerateRequest,
-    GenerationResponse,
     ComplianceScore,
     ContentParameters,
+    GenerateRequest,
+    GenerationResponse,
 )
-from src.routers.content import router as content_router
 from src.services.generator import ContentGenerator, GenerationResult
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

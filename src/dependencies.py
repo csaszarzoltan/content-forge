@@ -37,7 +37,7 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings_dep),
-) -> "User":
+) -> User:
     """Decode JWT, fetch the authenticated user from DB, or raise 401."""
     from src.services.auth_service import decode_token, get_user_by_id
 
@@ -71,7 +71,7 @@ async def get_optional_current_user(
     token: str | None = None,
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings_dep),
-) -> "User | None":
+) -> User | None:
     """Optional auth — return the User or None if no valid token provided."""
     if token is None:
         return None
@@ -94,7 +94,7 @@ async def get_optional_current_user(
 
 async def scope_query_by_user(
     db: AsyncSession = Depends(get_db),
-    current_user: "User" = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
 ) -> AsyncSession:
     """Yield a DB session with the current user context for query scoping.
 

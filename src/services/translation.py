@@ -149,8 +149,8 @@ class TranslationService:
         Returns (translated_text, prompt_tokens, completion_tokens).
         Raises RuntimeError if LLM provider is unavailable.
         """
-        from src.services.llm_provider import get_provider
         from src.config import get_settings
+        from src.services.llm_provider import get_provider
 
         settings = get_settings()
         try:

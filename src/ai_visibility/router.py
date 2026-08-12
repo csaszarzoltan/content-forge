@@ -16,9 +16,6 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
-from src.dependencies import get_db, get_optional_current_user
-
 from src.ai_visibility.schemas import (
     AIVisibilityTrendsResponse,
     ContentVisibilityResponse,
@@ -27,9 +24,11 @@ from src.ai_visibility.schemas import (
     ReferralIngestResponse,
 )
 from src.ai_visibility.service import AiVisibilityService
+from src.config import get_settings
+from src.dependencies import get_db, get_optional_current_user
 
 if TYPE_CHECKING:
-    from src.models.user import User  # noqa: F401
+    from src.models.user import User
 
 router = APIRouter(prefix="/api/v1/ai-visibility", tags=["ai-visibility"])
 
@@ -52,7 +51,7 @@ async def get_trends(
     engine: str | None = None,
     metric: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> AIVisibilityTrendsResponse:
     """Chart.js-ready trend series (7d/30d/90d), optional engine/metric filter."""
     try:
@@ -88,7 +87,7 @@ async def get_content_visibility(
     content_id: str,
     days: int = 30,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> ContentVisibilityResponse:
     """Per-content AI visibility snapshot over the window (default 30d)."""
     try:
@@ -102,7 +101,7 @@ async def refresh_content_visibility(
     content_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> PollResult:
     """On-demand visibility refresh (brief §5 M8 #2).
 

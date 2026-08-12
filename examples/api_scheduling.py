@@ -11,7 +11,7 @@ Prerequisites: ContentForge server running at http://localhost:8000
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from api_client import ContentForgeClient
 
@@ -56,7 +56,7 @@ def main() -> None:
     print()
 
     # 3. Schedule it for tomorrow
-    publish_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    publish_at = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     schedule = client.schedule_content(
         generation_id=gen_id,
         publish_at=publish_at,
@@ -66,7 +66,7 @@ def main() -> None:
         max_retries=3,
     )
     sch_id = schedule["schedule_id"]
-    print(f"Scheduled content:")
+    print("Scheduled content:")
     print(f"  Schedule ID: {sch_id}")
     print(f"  Status: {schedule['status']}")
     print(f"  Platform: {schedule['platform']}")
@@ -75,7 +75,7 @@ def main() -> None:
 
     # 4. Check status
     status = client.get_schedule_status(sch_id)
-    print(f"Schedule status check:")
+    print("Schedule status check:")
     print(f"  Status: {status['status']}")
     print(f"  Retries: {status['retry_count']}/{status['max_retries']}")
     print()

@@ -102,7 +102,7 @@ class AIRawMention(Base):
     # PRAGMA foreign_keys is off (the test fixture's default). The backref
     # approach keeps the reverse attribute on Generation without touching
     # src/models/generation.py.
-    generation: Mapped["Generation"] = relationship(
+    generation: Mapped[Generation] = relationship(
         backref=backref("ai_raw_mentions", cascade="all, delete-orphan")
     )
 
@@ -206,4 +206,4 @@ class AITrendAggregate(Base):
 
 
 # Avoid circular import (same lazy pattern as src/models/analytics.py).
-from src.models.generation import Generation  # noqa: E402
+from src.models.generation import Generation

@@ -6,7 +6,7 @@ Pre-development stub — columns per task spec t_6ffc403c.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint

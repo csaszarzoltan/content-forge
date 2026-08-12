@@ -1,10 +1,7 @@
 """Basic tests for ContentForge API."""
-from src.main import app
-
 import pytest
 
-
-
+from src.main import app
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick

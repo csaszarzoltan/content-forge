@@ -57,6 +57,7 @@ def test_workspace_summary_exposes_attention_counts(tmp_path: Path) -> None:
 
 def test_workspace_campaign_form_creates_and_redirects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi.testclient import TestClient
+
     from src.main import app
     from src.routers import workspaces
 
@@ -73,6 +74,7 @@ def test_workspace_campaign_form_creates_and_redirects(tmp_path: Path, monkeypat
 
 def test_workspace_campaign_form_preserves_accessible_error_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi.testclient import TestClient
+
     from src.main import app
     from src.routers import workspaces
 

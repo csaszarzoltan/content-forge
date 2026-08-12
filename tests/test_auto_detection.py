@@ -22,8 +22,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
-
 # Mark as quick (unit tests)
 pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
@@ -250,7 +248,7 @@ class TestAutoDetectionBehavioral:
     ):
         """AC-T7.1: detect_language(topic) is called during generate()."""
         try:
-            result = await generator.generate(
+            await generator.generate(
                 content_type="blog",
                 topic="Why Python is great for machine learning",
                 brand_voice_id=None,
@@ -453,24 +451,19 @@ class TestAutoDetectionIntegration:
     @pytest.mark.skip(reason="Full integration — needs DB + FastAPI TestClient")
     async def test_post_generate_returns_language_in_response(self):
         """AC-T7.1+7.2: POST /generate/{content_type} returns language in response body."""
-        ...
 
     @pytest.mark.skip(reason="Full integration — needs DB + FastAPI TestClient")
     async def test_non_english_topic_language_in_response(self):
         """AC-T7.1: Non-English topic returns detected language code."""
-        ...
 
     @pytest.mark.skip(reason="Full integration — needs DB + FastAPI TestClient")
     async def test_english_topic_works_unchanged(self):
         """AC-T7.4: English topic works without regression."""
-        ...
 
     @pytest.mark.skip(reason="Full integration — needs DB + FastAPI TestClient")
     async def test_generation_persists_language(self):
         """AC-T7.1: Language is persisted on Generation ORM record."""
-        ...
 
     @pytest.mark.skip(reason="Full integration — needs DB + FastAPI TestClient")
     async def test_backward_compatibility_no_language_field(self):
         """AC-T7.4: Existing generations without language still load."""
-        ...

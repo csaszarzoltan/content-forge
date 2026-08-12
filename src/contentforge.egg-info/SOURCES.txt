@@ -37,7 +37,12 @@ src/contentforge.egg-info/entry_points.txt
 src/contentforge.egg-info/requires.txt
 src/contentforge.egg-info/top_level.txt
 src/family/__init__.py
+src/family/permissions.py
+src/family/pilot.py
+src/family/privacy.py
+src/family/provider_verification.py
 src/family/store.py
+src/family/visibility.py
 src/models/__init__.py
 src/models/ab_test.py
 src/models/analytics.py
@@ -146,6 +151,7 @@ tests/test_db_models.py
 tests/test_dependencies.py
 tests/test_family_api.py
 tests/test_family_completion.py
+tests/test_family_release_hardening.py
 tests/test_language_detection.py
 tests/test_language_metadata_models.py
 tests/test_language_scheduling.py

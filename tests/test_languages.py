@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import inspect
 import time
-
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -65,7 +64,7 @@ class TestLanguageSchemasInterface:
 
     def test_language_info_status_is_literal(self):
         """status should be Literal['active', 'beta']."""
-        from typing import get_origin, get_args, Literal
+        from typing import Literal, get_args, get_origin
 
         annotation = LanguageInfo.model_fields["status"].annotation
         assert get_origin(annotation) is Literal

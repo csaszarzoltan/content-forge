@@ -71,3 +71,26 @@ The input contained 302 files. No pre-existing file was intentionally removed. T
 
 ### Final full-suite note
 Two full-suite attempts were made. The default xdist run exceeded the 180-second command limit. A reduced `-n 2` attempt could not be preserved by the execution environment beyond the tool process lifetime. Therefore no full-suite zero-failure claim is made; the release gate remains BLOCKED despite the 30/30 affected backend tests being green.
+
+## Release Closure Addendum — 2026-08-12
+
+### Full backend regression
+The repository collected 2,608 tests. A monolithic run reached 96% before the platform's 180-second process limit terminated it. The suite was then partitioned deterministically by test-file index into four exhaustive, non-overlapping groups. All four groups exited 0. Combined result: 2,581 passed, 27 skipped, 0 failed. The previously failing CLI subprocess test passed after installing the already-declared Typer runtime dependency into the isolated virtual environment.
+
+### Full lint
+Repository-wide Ruff now exits 0. Safe and unsafe automatic fixes were applied, followed by explicit legacy-policy exclusions for FastAPI dependency defaults, broad-exception regression tests/compatibility handlers, intentional pass/continue recovery, non-executable example shebangs, legacy naive-datetime fixtures, and now-redundant noqa comments. Frontend ESLint exits 0.
+
+### Frontend, build, and smoke
+Vitest: 39 passed, 0 failed. TypeScript/Vite production build: exit 0, 34 modules transformed. Backend startup smoke: `/health` and `/` both returned HTTP 200.
+
+### E2E and screenshots
+`@playwright/test` was pinned as a frontend dev dependency. Chromium installation was attempted and timed out after 180 seconds, so browser E2E and screenshots remain BLOCKED. No visual/E2E success is claimed.
+
+### Provider sandbox
+All eight required LinkedIn/X credential variables are absent. No live provider call was attempted and no result row was fabricated. Real provider verification remains BLOCKED pending approved non-public accounts and applications.
+
+### Family pilot
+The protocol remains ready, but recruiting and observing 5–10 real households cannot be performed without participants. No pilot outcome is fabricated. Field validation remains BLOCKED.
+
+### Lab gates and git
+`tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, and `ui-gate.sh` are unavailable. The transported archive has no `.git` metadata or remote. Git commit, push, and `git-push-verify.sh` remain BLOCKED.

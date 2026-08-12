@@ -109,12 +109,12 @@ class VoiceProfile(BaseModel):
         return self.model_dump(mode="python")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "VoiceProfile":
+    def from_dict(cls, data: dict[str, Any]) -> VoiceProfile:
         """Create a VoiceProfile from a dictionary."""
         return cls.model_validate(data)
 
     @model_validator(mode="after")
-    def _validate_attributes(self) -> "VoiceProfile":
+    def _validate_attributes(self) -> VoiceProfile:
         """Ensure all attribute values are within 0.0–1.0 range."""
         for attr in self.attributes:
             if not (0.0 <= attr.value <= 1.0):
@@ -125,9 +125,9 @@ class VoiceProfile(BaseModel):
 
 
 __all__ = [
-    "VoiceAttribute",
-    "VocabularyRules",
-    "ScenarioTone",
     "FormattingPrefs",
+    "ScenarioTone",
+    "VocabularyRules",
+    "VoiceAttribute",
     "VoiceProfile",
 ]

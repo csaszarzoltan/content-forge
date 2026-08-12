@@ -5,13 +5,10 @@ import inspect
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
 from src.services.meta_generator import MetaTagGenerator
-
-
 
 # ── SECTION 1: Interface Tests ──────────────────────────────────────────────
 

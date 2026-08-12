@@ -405,3 +405,10 @@
 - Added content-free pilot validation, aggregation, safety blocking, and privacy deletion planning primitives.
 - Renamed the visible family Calendar navigation to Activity; family publishing remains immediate-only.
 - Added nine release-hardening contract tests covering US-001 through US-009.
+
+#### Release closure verification (2026-08-12)
+- Completed the full backend regression in four exhaustive test-file partitions: 2,581 passed, 27 skipped, 0 failed from 2,608 collected tests.
+- Cleaned repository-wide Ruff findings; full Ruff and frontend ESLint now exit 0.
+- Reverified 39 frontend tests, production build, and backend startup health.
+- Pinned Playwright test tooling; Chromium provisioning remained blocked by the environment timeout.
+- Live LinkedIn/X sandbox and the 5–10-family field pilot remain explicitly blocked, with no synthetic evidence recorded.

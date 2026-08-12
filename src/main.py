@@ -38,6 +38,7 @@ from src.routers.brand_kit import router as brand_kit_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.constraints import router as constraints_router
 from src.routers.content import router as content_router
+from src.routers.family import router as family_router
 from src.routers.languages import router as languages_router
 from src.routers.publish import router as publish_router
 from src.routers.schedule import router as schedule_router
@@ -47,7 +48,6 @@ from src.routers.translate import router as translate_router
 from src.routers.video import router as video_router
 from src.routers.video_analytics import router as video_analytics_router
 from src.routers.workspaces import router as workspaces_router
-from src.routers.family import router as family_router
 from src.services.publish_service import PublishService
 from src.services.scheduler import SchedulerService
 

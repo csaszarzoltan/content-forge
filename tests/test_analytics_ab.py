@@ -18,16 +18,15 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.analytics_test_utils import (
-    seed_event,
-    seed_generation,
-)
 from src.models.ab_test import ABTest, ABVariant
 from src.routers.analytics import get_ab_results as ab_results_endpoint
 from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import ABResultsCorrelationResponse, VariantPerformance
 from src.services.analytics import AnalyticsService
-
+from tests.analytics_test_utils import (
+    seed_event,
+    seed_generation,
+)
 
 
 async def _seed_ab_test(

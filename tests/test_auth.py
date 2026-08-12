@@ -6,7 +6,6 @@ Behavioral tests — exercise endpoints and dependencies with real implementatio
 from __future__ import annotations
 
 import inspect
-
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -14,7 +13,7 @@ import pytest
 # Mark as integration (uses TestClient/AsyncClient)
 pytestmark = pytest.mark.integration
 
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -36,13 +35,13 @@ from src.schemas.auth import (
     UserResponse,
 )
 from src.services.auth_service import (
+    authenticate_user,
     create_access_token,
     create_refresh_token,
+    create_user,
     decode_token,
     hash_password,
     verify_password,
-    create_user,
-    authenticate_user,
 )
 
 # ============================================================================
@@ -141,11 +140,7 @@ class TestAuthRouterInterface:
     def test_router_endpoint_has_correct_methods(self):
         """Verify method types per endpoint."""
         for r in router.routes:
-            if "/auth/register" in r.path:
-                assert "POST" in r.methods
-            elif "/auth/login" in r.path:
-                assert "POST" in r.methods
-            elif "/auth/refresh" in r.path:
+            if "/auth/register" in r.path or "/auth/login" in r.path or "/auth/refresh" in r.path:
                 assert "POST" in r.methods
             elif "/auth/me" in r.path:
                 assert "GET" in r.methods
@@ -211,8 +206,9 @@ class TestAuthDependenciesInterface:
 
     def test_get_current_user_has_oauth2_scheme(self):
         """get_current_user should use OAuth2PasswordBearer with tokenUrl."""
-        from src.dependencies import oauth2_scheme
         from fastapi.security import OAuth2PasswordBearer
+
+        from src.dependencies import oauth2_scheme
         assert isinstance(oauth2_scheme, OAuth2PasswordBearer)
 
     def test_get_optional_current_user_importable(self):

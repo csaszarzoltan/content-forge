@@ -20,7 +20,6 @@ from src.ai_visibility.providers import ProviderRegistry
 from src.ai_visibility.schemas import PollResult
 from src.config import Settings
 
-
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (PASS immediately)
 # ============================================================================
