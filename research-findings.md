@@ -2,173 +2,229 @@
 
 ## Executive Summary
 
-ContentForge is a technically broad, English-language content-operations product, not yet a family product. Its React interface exposes thirteen workspaces and many specialist concepts at once. The visual system is coherent and calm, and several modules have solid loading, empty, error, progress, and retry states. However, the dominant experience is a feature map rather than a guided outcome. A new user must understand campaigns, assets, approvals, localization, governance, analytics, transcreation, video, connections, and admin before the product has established a simple first success.
+ContentForge now contains a genuine **Family Creator / Family Business vertical slice**, not merely a concept. The archive implements adult-owned workspaces, role-bound invitations, private idea capture, exact-revision review, adult-only publishing, idempotent channel deliveries, connection recovery, weekly summaries, responsive family navigation, and immediate-only paid-beta publishing. The implementation sits on a broad FastAPI and React content-operations platform. Verified project evidence includes `src/family/store.py`, `src/routers/family.py`, `frontend/src/family.tsx`, `tests/test_family_api.py`, `tests/test_family_completion.py`, `docs/family-workspace.md`, and the release evidence in `development-report.md`.
 
-The strongest commercially plausible interpretation of the requested family scenario is not “an app for children.” It is a **creator household or family-run micro-business** in which one or two adults own the account, a teenager or other family member contributes ideas and drafts, and publishing, billing, credentials, and privacy remain adult-controlled. General child-directed positioning would create disproportionate safeguarding, consent, data-minimization, and moderation obligations. The next pass should therefore preserve ContentForge's professional engine but add a simplified household-facing layer.
+The market evidence supports the problem more strongly than the exact positioning. Small and mid-sized businesses report that keeping social content fresh is difficult, while current tools split value between design, scheduling, approvals, and analytics. Verizon's 2025 survey of 600 SMB decision-makers found that 76% believed social media positively affected performance, but 54% struggled to keep content fresh and follow trends. Buffer, Planable, Metricool, Canva, Adobe Express, Publer, and Hootsuite all sell pieces of the workflow, yet none is positioned around a family-run creator household in which adults retain public-account control and a teenager contributes safely. [S1][S2][S3][S4][S5][S6][S7][S8]
 
-**Top recommendation:** build one coherent, mobile-friendly journey around (1) a role-aware Family Home, (2) guardian review and safe publishing, and (3) a goal-based create-to-publish wizard. Hide specialist modules behind progressive disclosure. Sell saved time, safe collaboration, and reliable publishing, not a long feature list.
+The next development pass should **not reintroduce scheduling**. The paid-beta UI correctly hides it because the documented path is immediate publishing and the project does not yet prove restart-safe scheduled execution plus timezone behavior in the family flow. The highest-value work is narrower:
+
+1. **Provider confidence and reconciliation (P0):** run real LinkedIn/X sandbox scenarios, expose connection capability checks and unknown-state reconciliation, and preserve channel-level idempotency.
+2. **Pilot instrumentation and guided onboarding (P0):** measure the existing 5-10-household protocol in-product, including first-draft time, ten-second next-action comprehension, invitation/review completion, recovery support, and weekly time saved.
+3. **Youth privacy and adult-controlled trust (P1):** move from role labels to explicit effective-permission views, retention/deletion controls, age-appropriate explanations, and auditable consent/role changes.
+
+This is a release-hardening and validation pass rather than another breadth expansion. A small product that can prove safe contribution, reliable adult publication, and real weekly time savings is more defensible than a broader content suite with unverified provider configuration.
 
 ## Project Understanding
 
 ### Verified current product
 
-- **Purpose:** AI-assisted creation, brand voice and visual identity, campaign workflow, approvals, localization/transcreation, publishing, analytics, AI visibility, and blog/script-to-video. Verified in `README.md`, `CHANGELOG.md`, `src/`, and `docs/`.
-- **Stack:** FastAPI, Pydantic v2, SQLAlchemy/SQLite, React 19, TypeScript, and Vite. Video rendering uses MoviePy and imageio-ffmpeg. See `pyproject.toml` and `frontend/package.json`.
-- **Principal shell:** `frontend/src/main.tsx` loads `/api/v1/workspace-overview`, renders a persistent left sidebar, and switches hash routes via `frontend/src/navigation.ts`.
-- **Primary user flow:** My Work or Campaigns -> campaign cockpit -> create channel asset -> modal editor -> save revision -> request review. Specialist flows exist for Brand Kit, Transcreation, and Video.
-- **Maturity:** broad implementation with extensive backend tests and focused frontend tests, but uneven product integration. The archive contains 71 Python test modules, unit/component tests for Brand Kit, Transcreation, and Video, and one Playwright transcreation specification.
+ContentForge v0.15.0 is an AI-assisted content operations application with brand voice and Brand Kit management, campaigns, approvals, localization/transcreation, publishing, analytics, AI visibility, and video generation (`README.md`, `CHANGELOG.md`, `pyproject.toml`). The backend uses FastAPI, Pydantic v2, SQLAlchemy/SQLite, and httpx. The frontend uses React 19, TypeScript, and Vite (`frontend/package.json`).
 
-### Existing GUI and observed use
+The family product is a bounded layer over that professional engine:
 
-The shell uses a dark green fixed sidebar, a light canvas, cards, status pills, and generous spacing (`frontend/src/styles.css`). Users can navigate directly to My Work, Campaigns, Content, Calendar, Approvals, Localization, Transcreate, Analytics, Brand Governance, Brand Kit, Connections, and Admin. The `video` route exists but is deliberately omitted from `NAV_ITEMS`, so the feature is implemented yet not normally discoverable (`frontend/src/navigation.ts`).
+- `src/family/store.py:FamilyStore` owns SQLite-backed workspaces, memberships, invitations, projects, ideas, assets, immutable revisions, reviews, publication batches, deliveries, connection state, reconciliation, and weekly counts.
+- `src/routers/family.py` exposes authenticated `/api/v1/family/...` routes and resolves the current JWT user rather than trusting actor headers.
+- `frontend/src/family.tsx:FamilyApp` provides a separate family shell with Home, Create, Projects, Review, and Calendar navigation, plus member and connection settings.
+- `frontend/src/family.tsx:Setup` gives a four-step setup sequence with explicit contributor limits and private-by-default copy.
+- `frontend/src/family.tsx:InvitationAccept` previews role and permissions before acceptance.
+- `frontend/src/family.tsx:PublishConfirm` and `PublishResult` implement calm adult confirmation and channel-level results. The scheduling choice is intentionally absent.
+- `tests/test_family_api.py` and `tests/test_family_completion.py` cover workspace idempotency, permissions, exact-revision review, invitation lifecycle, publication eligibility, idempotency, partial results, and weekly summaries.
 
-Strengths include consistent visual tokens, explicit loading and empty states, accessible alert/status roles in specialist screens, revision-aware editing, a five-step video wizard, and retry-oriented failure handling. The strongest UI is the Video Wizard because it narrows a complex operation into a staged path (`frontend/src/video.tsx:VideoWizard`). Brand Kit also provides immediate visual feedback, while Transcreation makes risks visible beside the text.
+### Principal family flow
 
-The core shell is less mature. Many workspaces are summary panels rather than complete task environments. The editor is a modal with a single textarea and three actions, while the documentation describes richer version comparison, inline findings, platform preview, and governance. There is no global onboarding, search, notification center, contextual help, pricing/usage surface, or clear first-run value path in the inspected frontend.
+1. An authenticated adult creates a Family Creator or Family Business workspace.
+2. The owner invites adult collaborators, teen contributors, or viewers.
+3. A contributor captures a private idea or completes the guided project journey.
+4. A mutable asset produces immutable revisions.
+5. A reviewer approves an exact revision. Later edits supersede that approval.
+6. An adult confirms immediate publication to selected channels.
+7. A queued batch records per-channel delivery state; successful deliveries retain their remote identifiers; only failed/retryable channels may be retried.
+8. The UI reports connection-required, unknown, failed, partial-success, or published outcomes honestly.
+
+### Maturity and verified constraints
+
+The archive's `development-report.md` records a clean full backend run over 2,599 collected tests, 39 passing frontend tests, clean frontend lint, successful production build, and backend/frontend startup smoke checks. It also records two important blocks: real provider sandbox execution was not performed because six credential variables were absent, and Playwright browser E2E could not run because Chromium installation timed out. These are project-reported results rather than newly rerun tests in this research-only phase.
+
+The hard constraint for planning is therefore: treat the mechanics as implemented, but do not claim provider-specific production proof, browser E2E proof, or pilot outcome proof. `provider-sandbox-results.csv` and `family-pilot-results.csv` are evidence templates, not successful outcomes.
 
 ## Current-State Gap Analysis
 
-| Area | Current evidence | Gap and family impact |
-|---|---|---|
-| Information architecture | 13 route concepts in `navigation.ts` | Too many equally weighted choices. A parent or teenager cannot predict where to start. |
-| First use | Shell immediately requests workspace overview | No goal selection, sample project, setup checklist, or time-to-value promise. |
-| Roles | Profile is hard-coded as “Content team / Professional workspace” | No household identity, invitations, minor/contributor roles, or permission preview. |
-| Creation | Campaign creation asks name, brief, comma-separated channels | This is implementation-shaped input, not a guided “what are you trying to make?” experience. |
-| Editor | Single modal textarea in `main.tsx:Editor` | No mobile idea capture, preview-first editing, comments, diff, or contextual guidance. |
-| Review | Approval queue displays asset id, risk, and state | Weak human context. Family approvers need thumbnail, author, changes, deadline, and plain-language risk. |
-| Safety | Some workflow controls and audit concepts exist | No guardian gate, age handling, child privacy mode, channel credential boundary, or adult-only billing controls. |
-| Discoverability | Video route works but is absent from navigation | Capabilities can become “hidden inventory” rather than perceived value. |
-| Responsiveness | Sidebar collapses to icon-only at 850px | There is no true mobile navigation, labels disappear, and touch workflows are not the primary design. |
-| Accessibility | Specialist modules use `role=alert`, `aria-live`, and labels | The shell lacks skip navigation; icon-only collapsed navigation and modal focus behavior need formal WCAG 2.2 testing. |
-| Trust and pricing | No visible usage, cost preview, privacy explanation, or cancellation model | Families will not pay for unpredictable credits or unclear data use. |
-| Product coherence | Many powerful modules are present | Breadth increases cognitive load and support cost before a single repeatable job is proven. |
+| Area | Verified state | Gap | Release implication |
+|---|---|---|---|
+| Backend regression | Project report: 2,599 collected, exit 0 | This phase is research-only and did not alter or rerun code | Preserve current baseline; require every later code pass to rerun the full backend suite. |
+| Frontend quality | Project report: 39 tests, lint, build, startup pass | Browser E2E is blocked | A paid beta still needs real browser coverage for invitation, review, publish, and recovery. |
+| Provider execution | Real connector paths and queued batches exist | No approved LinkedIn/X credential evidence | Do not market “verified publishing” per provider until the sandbox matrix is complete. |
+| Unknown provider state | `UNKNOWN` and reconciliation semantics exist in store/API | End-user evidence and real timeout behavior remain unproved | Make reconciliation a first-class UX, never a generic retry. |
+| Scheduling | General scheduling modules exist elsewhere; family UI hides scheduling | No durable family scheduled-job proof with restart/timezone tests | Keep hidden in first paid beta. |
+| Roles | Owner, adult collaborator, teen contributor, viewer implemented | Effective permissions are not presented as a centralized auditable matrix | Add capability view and server-enforced regression tests for every sensitive action. |
+| Invitations | Preview, expiry, single-use, revoke, accept implemented | Real households have not proved self-service comprehension | Measure completion and support minutes in pilot. |
+| Privacy state | Private/public labels present | Retention, deletion, consent and data-category transparency are incomplete | Avoid child-directed marketing until privacy operations are production-ready. |
+| Pilot | Protocol and CSV schema exist | No households enrolled and no outcomes | Pilot evidence is the next product gate, not optional marketing research. |
+| Value proof | Weekly summary counts projects, approvals and posts | “Hours saved” is not measured or user-correctable | Add lightweight, privacy-preserving outcome telemetry. |
+| Information architecture | Family mode is much narrower than the 13-workspace professional shell | Calendar currently cannot promise durable scheduling | Keep navigation label only if it clearly represents results/history, or hide until useful. |
+| Documentation | Family guide, sandbox checklist and pilot guide exist | Provider and pilot result files are intentionally empty/blocked | Preserve honest status and date all future evidence. |
 
 ## Target Users and Jobs to Be Done
 
-### Recommended primary segment
+### Primary segment
 
-**Family-run creator household or micro-business.** An adult owner manages the brand, accounts, payments, and final publishing. Another adult or teenager contributes ideas, drafts, images, translations, or video scene choices. The family wants to turn everyday knowledge into consistent posts, newsletters, shop updates, or community content without buying and learning several separate tools.
+The strongest target is a **family-run creator household or micro-business** where one or two adults own the relationship with external platforms and another family member, often a teenager, contributes ideas or drafts. This is narrower and more defensible than a general child-directed creator platform.
 
-### Roles
+### Roles and jobs
 
-- **Parent owner:** “Help me plan and publish consistently without endangering family privacy or wasting evenings.”
-- **Parent collaborator:** “Let me review, edit, or schedule work with a clear handoff.”
-- **Teen contributor:** “Let me add ideas and creative work from my phone without access to credentials, billing, or accidental publishing.”
-- **Younger child:** only an optional, adult-mediated contribution mode such as selecting approved photos or recording an idea. No independent publishing or public profile is recommended.
+- **Adult owner:** “Help us publish consistently without sharing credentials or losing control of what becomes public.”
+- **Adult collaborator:** “Let me review, correct, and publish a clearly identified version without duplicating successful posts.”
+- **Teen contributor:** “Let me make useful creative contributions from my phone while the product makes my limits obvious and respectful.”
+- **Viewer or supporter:** “Let me see progress without editing, publishing, billing, or account access.”
+- **Pilot facilitator/support lead:** “Show whether households can succeed without coaching and where recovery consumes support time.”
 
 ### Core jobs
 
-1. Capture a real-life idea quickly and turn it into an approved draft.
-2. Know what each family member should do next.
-3. Keep private material, credentials, and billing adult-only.
-4. Review the exact version before anything becomes public.
-5. Reuse family brand, tone, templates, and channels without repeated setup.
-6. See whether the subscription saved time or improved results.
+1. Reach a useful first draft in ten minutes or less.
+2. Recognize the next step in ten seconds or less.
+3. Accept a family invitation without support.
+4. Understand Private, Approved, Publishing, Public, Failed, and Verification required.
+5. Complete exact-version adult review without losing authorship context.
+6. Publish to LinkedIn/X once and recover only the failed channel.
+7. Restore an expired or under-scoped connection without developer help.
+8. Demonstrate at least two to three hours of weekly time saving before charging recurring family subscriptions.
 
 ## Target-Market Pain Points
 
-| Problem | Segment | Recurrence | Evidence | Confidence | Implication |
-|---|---|---:|---|---|---|
-| Tool overload and context switching across creation, approval, scheduling, and analytics | Small teams, creators, agencies | Repeated across category comparisons | Planable, Buffer, Hootsuite, Canva and ContentForge's own earlier research all consolidate parts of this workflow [S1][S2][S4][S5][S15] | HIGH | Do not add another top-level module. Unite existing capabilities around one job. |
-| Approval and version ambiguity | Teams and family collaborators | Common product-category requirement | Planable and Sprout document formal approval workflows; ContentForge already models revision-bound approval [S1][S3][S15] | HIGH | Make adult approval the differentiating safety feature, not an admin screen. |
-| Social publishing failures and unclear retries | Owners responsible for public accounts | Repeated in product reviews and the project's own recovery design | ContentForge has selective retry and partial-success semantics; Hootsuite and Buffer position centralized scheduling as core value [S2][S4][S15] | MEDIUM-HIGH | Surface plain-language recovery on Home and preserve successful channels. |
-| Subscription and credit uncertainty | Price-sensitive households and micro-businesses | Recurring SaaS buying objection | Competitors use free, per-channel, per-user, or tiered subscriptions [S1][S2][S4][S5][S6] | MEDIUM | Show included usage, forecast expensive AI/video actions, and cap spend. |
-| Children and teens need bounded participation | Families | Structural, not anecdotal | COPPA and age-appropriate design guidance emphasize parental consent, data minimization, and child-appropriate defaults [S7][S8] | HIGH | Adult-owned accounts, no behavioral advertising, minimal child data, and guardian-controlled permissions are prerequisites. |
-| Mobile capture is essential for household collaboration | Creators and teens | Category baseline | Canva, Adobe Express, Buffer, and Hootsuite all position mobile creation or management as part of the workflow [S2][S4][S5][S6] | HIGH | Replace icon-only collapse with a real bottom/drawer navigation and a one-tap idea inbox. |
-| AI output needs human control and provenance | Parents, brands, regulated teams | Increasing category concern | NIST AI RMF and the project's approval/audit architecture support human oversight [S9][S15] | HIGH | Label AI-generated material, preserve sources and revisions, and require adult review for public actions. |
+| User problem | Segment | Recurrence/evidence | Confidence | Implication |
+|---|---|---|---|---|
+| Keeping social content fresh is a sustained burden | SMB owners | Verizon found 54% of surveyed SMBs struggled to keep content fresh and follow trends; a separate 1,960-company survey identified time as the leading barrier for 50% [S1][S9] | HIGH | Sell a repeatable weekly workflow and time saving, not generic AI generation. |
+| Social effort is distributed across very small teams | Micro-businesses | TechBehemoths reported 51% relied on 2-3 people and 56.1% managed social media in-house [S9] | MEDIUM-HIGH | Household roles and handoffs match real small-team constraints. |
+| Approval features are valuable but often placed in higher tiers | Small teams | Planable makes required approvals a Pro feature; Buffer reserves content approval and access levels for Team; Metricool puts approval and role management in Advanced [S2][S3][S7] | HIGH | A simple adult gate can be the core paid value, if priced below agency tools. |
+| Per-seat, per-channel and per-workspace pricing becomes difficult to predict | Households and micro-businesses | Buffer charges per channel, Planable per workspace, Publer per social account plus members, and Hootsuite per user [S2][S3][S6][S8] | HIGH | Use a household bundle with included contributors, two verified channels, and explicit AI/video allowances. |
+| Family work can suffer from unclear authority and remembered verbal instructions | Family businesses | Family-business discussions repeatedly describe micromanagement, ambiguous ownership, and forgotten instructions; this is anecdotal but consistent [S10][S11] | LOW-MEDIUM | Exact revisions, explicit next actions and role boundaries reduce interpersonal friction. |
+| High-control parental tools can damage trust | Parent-teen pairs | A 19-pair study found collaborative transparency could support communication, but power imbalance made co-management difficult; later family-centered research favors collaboration over purely restrictive monitoring [S12][S13] | MEDIUM | Explain capabilities bilaterally; do not design covert monitoring or surveillance. |
+| Children and teens need privacy-protective defaults | Families | FTC guidance centers parental control for under-13 data and the 2025 amended COPPA rule; ICO guidance requires high-privacy defaults for child-accessible services [S14][S15][S16] | HIGH | Private-by-default is correct; add retention, consent and deletion operations before child-directed expansion. |
+| Provider failures are not binary | Adult publishers | The project itself models rate limit, permission, expired token, unknown state and partial success; platform tools emphasize centralized publishing but real APIs remain external systems | HIGH (project evidence) | Reconciliation and channel-level evidence are P0, not technical polish. |
+| Subscription fatigue raises the proof bar | Price-sensitive households | Public discussions show aversion to accumulating recurring subscriptions; evidence is broad consumer sentiment rather than category-specific willingness to pay [S17] | MEDIUM-LOW | Validate 2-3 hours saved and offer easy cancellation/export before optimizing price. |
 
 ## Competitor Weaknesses
 
-- **Canva:** extremely broad and visually friendly, but its breadth can make structured approval, governance, and repeatable multi-step content operations feel secondary. ContentForge can win on “safe handoff from idea to approved publication,” not on design breadth [S5].
-- **Adobe Express:** strong creation and brand tooling, but a household still needs a clear operational queue and role-specific publish boundary. ContentForge can coordinate work rather than compete as a full graphics suite [S6].
-- **Buffer:** approachable scheduling and per-channel packaging, but it is primarily a publication and engagement layer. ContentForge can differentiate before publishing through brand, localization, approval, and reuse [S2].
-- **Planable:** excellent collaboration and approvals, but less differentiated as an AI content production, localization, and video engine. ContentForge should copy its review clarity while keeping a smaller family-facing surface [S1].
-- **Hootsuite:** powerful and mature, but generally positioned for professional social teams. A family micro-business may perceive it as expensive and operationally heavy. ContentForge can offer a calmer, outcome-based entry product [S4].
+### Planable
+
+Planable is the closest workflow substitute because it combines visual creation, feedback, approval and publishing. Its official pricing page offers unlimited users but charges per workspace; required approval appears at Pro and multi-level approval at Enterprise. This is strong for agencies, but the product is not built around an adult-owned household, youth-safe contribution, private family ideas or a “no Publish button for contributors” mental model. [S3]
+
+### Buffer
+
+Buffer has the clearest small-business publishing model and a genuine free tier. Official pricing is per connected channel; Team adds unlimited team members, access levels and content approval workflows. Buffer is a strong substitute for publishing and lightweight collaboration, but it does not offer ContentForge's exact-revision guardian review, family invitation semantics, private/public education, brand voice, localization and content-production stack in one bounded journey. [S2]
+
+### Canva
+
+Canva's current pricing and product surface make it a formidable design and content-planning substitute. It offers a large template/asset ecosystem, social planning in paid tiers, and tiered approvals at Enterprise. Its advantage is immediate visual output. Its gap is operational assurance: a family still needs a product that explains role boundaries, binds adult approval to the exact revision, records channel-level delivery evidence, and handles unknown external state. [S4]
+
+### Adobe Express
+
+Adobe Express provides free and Premium creative tools, cross-device use, brand kits, version history and social scheduling. The official page currently lists scheduling to one account per network on Free and three on Premium. It is competitively priced for solo creation, so ContentForge should not compete on templates or image editing. The opportunity is the safe, auditable family handoff and provider recovery around finished content. [S5]
+
+### Metricool / Publer / Hootsuite
+
+Metricool and Publer offer broad network coverage and lower-cost scheduling; Metricool places roles and post approvals in Advanced, while Publer scales by accounts and members. Hootsuite provides professional review/approval and enterprise governance but is visibly designed for professional teams. These products prove demand for integrated calendars, analytics, approvals and automation, while leaving room for a calmer household bundle. [S6][S7][S8]
 
 ## Competitor Comparison
 
-Current public pages should be checked again immediately before commercial launch because packaging changes frequently. This research intentionally avoids unverified exact prices.
-
-| Product | Positioning/core flow | Packaging signal | UX strength | Exploitable gap |
-|---|---|---|---|---|
-| Canva | Template -> visual creation -> brand -> content planning | Free plus paid individual/team tiers [S5] | Familiar, visual, quick first result | Weak differentiation on governed family handoffs and publication audit. |
-| Adobe Express | Quick creative production, templates, brand, scheduling | Free and premium packaging [S6] | Polished creation and cross-device ecosystem | Less purpose-built “who does what next” household operations. |
-| Buffer | Connect channels -> create queue -> publish -> analyze | Free and paid plans with channel-based logic [S2] | Simple scheduler mental model | Limited end-to-end brand governance/localization/video coordination. |
-| Planable | Workspace -> create -> comment -> approve -> schedule | Free trial/free entry and paid workspace/team tiers [S1] | Review and approval clarity | Not a family-specific safety or broader AI production system. |
-| Hootsuite | Connect accounts -> calendar -> publish -> monitor/analyze | Professional tiered subscription [S4] | Comprehensive professional console | High perceived complexity for households and tiny businesses. |
+| Product | Target/positioning | Current official packaging signal | Core UX strength | Repeated or structural weakness | ContentForge opportunity |
+|---|---|---|---|---|---|
+| Planable | Agencies and brand teams | Free first 50 posts; Basic/Pro per workspace; approvals deepen by tier [S3] | Feed-like review and clear approval chain | Workspace/add-on costs grow; family safety is not the model | Household bundle with adult gate and no per-contributor fee. |
+| Buffer | Creators and small business | Free 3 channels; paid per channel; Team adds approvals/access [S2] | Simple queue and idea-to-publish flow | Costs scale with channels; less governance before publish | Exact-revision review plus safe channel recovery. |
+| Canva | Individuals, teams, enterprise | Free, Pro, Business, Enterprise; AI allowances and content planner vary [S4] | Fast visual first result and templates | Broad suite; provider evidence and family role semantics are secondary | Goal wizard feeding audited publishing rather than a design suite. |
+| Adobe Express | Individuals and creative teams | Free; Premium US$9.99/month; scheduling limits by plan [S5] | Cross-device creation, brand kits, resize and assets | Lightweight social management, not household operations | Focus on contributions, review and delivery confidence. |
+| Metricool | Social managers and agencies | Free; Starter from $20; Advanced from $53 with roles/approvals [S7] | Planner, analytics, reporting in one dashboard | Team safety is a higher-tier professional feature | Make simple adult approval standard in the family paid plan. |
+| Publer | Solopreneurs, creators, SMEs | Free; paid per social account, members configurable [S6] | Low-cost broad scheduling and automation | Account/member complexity; no family trust model | Predictable household price and private-by-default ideas. |
+| Hootsuite | Professional and enterprise social teams | Standard, Professional, Advanced, Enterprise; review/approval in Advanced [S8] | Comprehensive professional console | Per-user complexity and enterprise weight | Calm, narrow UI and supportable two-channel beta. |
 
 ## Validated Demand Signals
 
-1. **Collaboration beside the asset:** Planable makes feedback and approval part of the content review flow, and Sprout supports multi-step approval rules [S1][S3]. Implication: ContentForge should stop presenting approval primarily as a separate list of IDs.
-2. **One calendar and reliable scheduling:** Buffer and Hootsuite center their value on planning and publishing across channels [S2][S4]. Implication: the calendar must become actionable, not a mostly decorative month grid.
-3. **Templates and immediate visual output:** Canva and Adobe Express reduce time to first result through templates [S5][S6]. Implication: goal-based starters should precede workspace selection.
-4. **Governed AI:** NIST's AI risk guidance emphasizes governance and human oversight, while ContentForge already has version, approval, and audit foundations [S9][S15]. Implication: “adult reviewed” and “exact version published” can be a trust proposition.
-5. **Child privacy by default:** FTC COPPA resources and the UK ICO Children's Code require special treatment of children's data and defaults [S7][S8]. Implication: do not launch child accounts as a cosmetic role label.
-6. **Accessible touch interaction:** WCAG 2.2 adds focus and target-size expectations relevant to icon-only mobile navigation and dense action areas [S10]. Implication: family mode should be touch-first and keyboard/screen-reader tested.
+1. **Fresh-content pressure is measurable.** More than half of Verizon's SMB sample struggled to keep content fresh, while 76% still credited social media with positive business impact. This supports an assistive content workflow but not an unbounded AI feature set. [S1]
+2. **Approvals are monetized.** Three independent competitor structures reserve stronger approval, roles or workflow controls for paid tiers. That is a willingness-to-pay signal for controlled collaboration, though not proof for family-specific branding. [S2][S3][S7]
+3. **Low-friction creation is table stakes.** Canva and Adobe Express put templates, assets, brand tools and social planning into accessible individual plans. The product must reach a useful preview quickly and cannot rely on the depth of its backend as perceived value. [S4][S5]
+4. **Predictable pricing is itself differentiation.** Competitors variously charge by channel, account, member, workspace or user. A two-adult/four-contributor family bundle can be simpler if usage caps are explicit. [S2][S3][S6][S8]
+5. **Collaborative safety should not become surveillance.** Parent-teen research found value in transparency but also power-imbalance concerns. The product should show both adults and teens the same capability rules and avoid hidden monitoring. [S12][S13]
+6. **Private-by-default is regulatory and UX baseline.** FTC and ICO sources support parental control, data minimization and high-privacy defaults for services accessed by children. [S14][S15][S16]
+7. **Open-source alternatives reduce pure scheduler defensibility.** Postiz alone has a large active GitHub community, broad platform support and self-hosting. ContentForge must differentiate on the family mental model, evidence, privacy and integrated review rather than connector count. [S18]
 
 ## Market and Pricing Evidence
 
-The project competes with overlapping categories rather than one clean market: social scheduling, creative production, content collaboration, AI writing, localization, and video generation. A defensible TAM cannot be calculated from the available evidence without double counting, so no TAM or CAGR is asserted.
+This project spans several overlapping markets: social scheduling, content collaboration, AI creation, family organization and small-business marketing. A credible TAM or CAGR specific to “family creator operations” was not found, and combining adjacent market reports would double count. No TAM, CAGR, MRR or revenue forecast is asserted.
 
-Observed competitor packaging shows four recurring patterns: freemium entry, feature-tier subscriptions, per-user/workspace charging, and per-channel or usage limits [S1][S2][S4][S5][S6]. For a family-run micro-business, the recommended offer is:
+Current official pricing establishes a realistic comparison range:
 
-- **Free:** one adult, one project, limited drafts, watermark-free text, no connected publishing.
-- **Family Creator:** one adult owner plus up to four contributors, guardian review, two channels, clear monthly AI/video allowance, and a hard spend cap.
-- **Family Business:** two adult admins, more channels, brand kits, localization, analytics, audit export, and priority recovery.
-- Do not charge per child/contributor. Charge for adult-controlled value: connected channels, active brands, automation, and expensive generation.
-- Offer annual savings but keep monthly cancellation and usage export simple.
+- Adobe Express Premium is listed at US$9.99 per month and includes brand management plus scheduling to three accounts per social network. [S5]
+- Buffer's annual rates are $5/month per channel for Essentials and $10/month per channel for Team; Team includes unlimited members, access levels and approval workflows. [S2]
+- Planable lists Basic at $33/workspace/month and Pro at $49/workspace/month in the retrieved official page, with required approval in Pro and multi-level approval in Enterprise. [S3]
+- Metricool lists Starter from $20/month and Advanced from $53/month; Advanced includes team/client management, roles and post approval. [S7]
+- Publer lists Professional at $5/month and Business at $10/month before configuring social accounts and additional members. [S6]
+- Hootsuite's retrieved official plan page confirms per-user tiers and places content review/approval in Advanced, though localized numeric prices were not visible in the page extract and should not be inferred. [S8]
 
-Willingness to pay should be validated with a fake-door pricing test and 10 to 15 moderated interviews. The decisive question is not “Would you pay for AI?” but “Would you pay to save three or more hours per week and prevent accidental or off-brand publishing?”
+Recommended paid-beta pricing research, not a final price:
+
+- Test **CHF/EUR/USD 19-29 per household per month** for one brand, two verified channels, two adult admins, up to four non-billed contributors, review/audit, and a transparent AI allowance.
+- Compare against a **CHF/EUR/USD 190-240 annual** option, but do not preselect annual billing.
+- Offer a free trial that proves the first private draft and review but does not enable live provider publishing until an adult connects and verifies an account.
+- Do not charge per child/contributor. Charge for adult-controlled value: verified channels, brands, advanced generation and automation.
+- Add a hard monthly generation cap or spend cap. “Unlimited AI” claims are risky where provider costs are variable.
+
+The proposed range is an experiment anchored to competitor entry and team tiers, not demonstrated willingness to pay. The pilot must ask for a real purchase or deposit decision after the workflow, not an abstract “would you pay?” response.
 
 ## Modern UX Expectations
 
-### Baseline screens
+### Category-specific baseline
 
-1. Welcome and goal selection.
-2. Role-aware Home with one next action.
-3. Projects/Campaigns with template starters.
-4. Mobile idea inbox.
-5. Preview-first editor.
-6. Review inbox with author, revision, diff, risk, and due date.
-7. Calendar with actual scheduling controls.
-8. Connections and adult-only billing/privacy center.
-9. Activity and value report.
+1. **One-action Home:** role-aware next action, pending reviews, failed connections and recent projects.
+2. **Guided first outcome:** goal, audience, private draft, preview, review and result without exposing the professional shell.
+3. **Mobile capture:** one-tap idea entry, image permission explanation, offline draft preservation and touch-size controls.
+4. **Exact-version review:** author, revision, diff, privacy state, channel preview, approval consequence and supersession warning.
+5. **Connection health:** account identity, capabilities/scopes, expiry, last test, reconnect and a non-destructive sandbox check.
+6. **Honest delivery:** channel rows, remote identifiers, rate limits, permission failures, unknown state, reconciliation and selective retry.
+7. **Value report:** projects, approvals, publications, avoided duplicate retries, user-correctable time saved and connection support burden.
 
 ### State design
 
-Every async action needs labeled loading, success, empty, disabled, partial-success, offline, and retry states. Existing specialist screens are a good foundation. The core shell should add skeletons, preserve drafts across errors, prevent duplicate publish, and explain which channel succeeded.
+Every screen needs loading, empty, disabled, success, error, offline, partial-success and uncertain-external-state behavior. `frontend/src/family.tsx` already contains many of these patterns. The critical addition is to distinguish **FAILED** from **UNKNOWN**. Unknown means the product does not know whether a remote side effect occurred; a retry must be preceded by reconciliation.
 
-### Navigation and progressive disclosure
+### Responsiveness and accessibility
 
-Default family navigation should contain **Home, Create, Projects, Review, Calendar**. Brand, analytics, localization, video, connections, and admin should appear contextually or under “More.” Adults can enable Expert mode. Children and contributors should never see billing, credentials, member removal, or direct publish controls.
+The family shell's mobile bottom navigation is directionally correct. The next pass should verify WCAG 2.2 AA across the real browser flow, including keyboard focus, focus not obscured, 24-by-24 CSS pixel minimum targets or valid spacing exceptions, accessible authentication, status announcements and non-color-only delivery states. W3C's WCAG 2.2 documentation is the source of truth. [S19]
 
-### Accessibility, privacy, and trust
+### Trust, privacy and security indicators
 
-Target WCAG 2.2 AA, minimum touch target expectations, visible focus, skip navigation, focus trapping/restoration in dialogs, non-color status cues, reduced motion, captions/transcripts for generated video, and readable error recovery [S10]. For minors, collect the minimum data, avoid public profiles and targeted advertising, use high-privacy defaults, provide parental consent/management, and define deletion/retention behavior before launch [S7][S8]. AI-generated content should be labeled, source/revision history retained, and costly generation should show a usage estimate.
+- Display “Private to family,” “Approved for adult publishing,” “Public,” and “Verification required” as distinct states.
+- Show the effective permissions to the member whose account is affected, not only to the owner.
+- Keep provider credentials adult-only and never expose token values in evidence exports.
+- Collect no more youth data than needed; publish retention periods and support deletion/export.
+- Avoid targeted advertising and opaque engagement nudges in family mode.
+- Reauthenticate before credential, billing, ownership or destructive privacy actions.
+- Preserve an immutable minimum audit record while removing unnecessary personal linkage.
 
 ## Open-Source and Automation Opportunities
 
-| Opportunity | Fit with stack | Use |
-|---|---|---|
-| Radix UI or React Aria | React/TypeScript [S11][S12] | Accessible dialogs, menus, tabs, focus management, and composable primitives. |
-| React Hook Form + Zod | React/TypeScript [S13] | Replace ad hoc form state and improve field-level validation and draft preservation. |
-| TanStack Query | React [S14] | Cached server state, retries, request cancellation, optimistic updates only where safe. |
-| axe-core + Playwright | Existing component/E2E approach [S10][S16] | Automated accessibility and family-role permission regression tests. |
-| Web Share API and PWA shell | Browser standards | Mobile idea capture, installability, and share-to-ContentForge without native apps. |
-| OpenTelemetry | FastAPI/worker compatible [S17] | Measure time-to-first-value, generation failures, publish recovery, and funnel abandonment. |
-| Existing job/audit infrastructure | `src/product_ops.py`, video worker, approval models | Reuse idempotency, selective retry, exact-revision approval, and audit rather than inventing a parallel family backend. |
+| Opportunity | Evidence/compatibility | Recommended use | Risk |
+|---|---|---|---|
+| Postiz connector and job patterns | Active AGPL project with broad providers and an agent/API surface [S18] | Study retry, provider normalization and webhook handling; do not copy AGPL code into a differently licensed product without legal review | License compatibility and architectural mismatch. |
+| Playwright + axe-core | Existing Playwright config and E2E spec in project; W3C criteria define targets [S19] | Add role matrix, invite, review, publish-result and unknown-state browser tests | Browser binaries must be made deterministic in CI. |
+| OpenTelemetry | Compatible with FastAPI/httpx ecosystem | Correlate publish batch, provider attempt, callback and reconciliation without storing credentials/content | PII leakage if attributes are not allowlisted. |
+| Durable SQLite worker with lease/outbox | Fits current single-node paid beta | For future scheduling, persist due jobs, lease atomically, resume after restart, use Europe/Zurich/DST test matrix | Multi-instance scale and clock semantics. |
+| Webhooks plus polling reconciliation | Fits provider adapter design | Prefer webhook inbox with dedupe; use polling when no webhook or callback is delayed | Provider-specific limits and inconsistent remote identifiers. |
+| Privacy-preserving pilot events | Fits existing CSV protocol and family store | Record funnel timestamps, outcomes and support interventions without draft text | Small-sample overinterpretation. |
+| Capability registry | Fits connector abstraction | Normalize provider scopes into can_post_text, can_post_link, can_read_status and token_expiry | Providers may not expose all capabilities reliably. |
+
+Scheduling should remain out of the next pass. When revived, the acceptance bar is a persistent scheduled-job record, atomic lease, restart recovery, idempotent dispatch, timezone-aware display/storage, DST gap/fold tests, cancellation semantics, and browser-visible status.
 
 ## Differentiation Opportunities
 
-| Capability | Problem/user | Evidence and competitor gap | Value | Complexity | Risk | Priority | Success criterion |
-|---|---|---|---|---|---|---|---|
-| Family Home and role-aware navigation | Everyone gets the same expert UI | Category tools are team-oriented; child privacy requires bounded roles [S1][S3][S7][S8] | Faster activation and safer collaboration | MEDIUM | Treating a role label as real safety | P0 | 80% of test families identify their next action in 10 seconds; no restricted route is reachable by contributor role. |
-| Guardian review and publish gate | Minors or collaborators could publish the wrong version | Approval is validated demand; current project already versions decisions [S1][S3][S15] | Trust, fewer mistakes, paid-plan anchor | MEDIUM | Permission bypass or stale approval | P0 | 100% of public publish attempts by a minor/contributor require current-revision adult approval. |
-| Goal-based create-to-publish wizard | New users face 13 modules | Canva/Adobe Express win with templates; Video Wizard proves the pattern internally [S5][S6] | First-session value | MEDIUM | Oversimplifying expert needs | P0 | Median first approved draft under 10 minutes in usability tests. |
-| Mobile idea inbox | Ideas occur away from desktop | Cross-device creation is category baseline [S2][S4][S5][S6] | Habit formation and family participation | MEDIUM | Upload privacy and offline conflicts | P1 | 50% of active households capture at least one idea weekly. |
-| Transparent usage and family spend controls | AI/video costs feel unpredictable | Competitors use limits and paid tiers [S1][S2][S4][S5][S6] | Pricing trust and lower refund risk | LOW-MEDIUM | Incorrect cost forecast | P1 | Fewer than 2% of paid accounts exceed a chosen cap; usage-related support tickets under 3 per 100 accounts/month. |
-| Weekly value and learning report | Families cannot tell whether the tool earns its fee | Analytics exists but is operational rather than outcome-led | Retention and upsell | LOW | Vanity metrics | P1 | 40% weekly report open rate and 20% action click-through among active paid households. |
-| Privacy-safe family media vault | Personal images and child content create risk | Child privacy standards require minimization/default protection [S7][S8] | Trust differentiation | HIGH | Safeguarding, consent, deletion, moderation | P2 | 100% asset deletion SLA compliance; zero public assets without explicit adult action. |
+| Capability | Problem solved / user | Evidence | Competitor gap | Value | Complexity | Principal risk | Priority | Success criterion |
+|---|---|---|---|---|---|---|---|---|
+| Provider Confidence Center | Adults cannot distinguish configured from proven publishing | Project sandbox gap; competitors sell centralized publishing [S2][S7][S8] | Few products expose evidence-oriented sandbox state to tiny teams | Prevents false readiness and support escalations | MEDIUM | Provider app approval and sandbox limitations | P0 | LinkedIn and X scenario matrix completes with 0 duplicate posts and evidence for every case. |
+| Reconcile-before-retry | Unknown external state can create duplicate posts | Existing UNKNOWN/idempotency model | Generic tools often simplify failure into Retry | Protects family brand and trust | MEDIUM | Provider status APIs may be incomplete | P0 | 100% of UNKNOWN states block repost until reconciliation or audited override. |
+| Measured First Draft Journey | Feature breadth obscures value | SMB content freshness/time pain [S1][S9] | Creator tools optimize creation, not household handoff | Faster activation and clearer purchase decision | LOW-MEDIUM | Telemetry can become invasive | P0 | Pilot median first useful draft ≤10 min, with ≥80% unaided completion. |
+| Shared Permission Clarity | Adult/teen power boundaries are easily misunderstood | Family-centered privacy research [S12][S13] | Competitors use professional roles, not age-appropriate explanations | Trust without surveillance | MEDIUM | Oversimplified language may hide edge permissions | P1 | ≥90% of pilot participants correctly answer publish/billing/member capability questions. |
+| Privacy Operations Center | Private labels are insufficient without data lifecycle controls | FTC/ICO guidance [S14][S15][S16] | Schedulers rarely center household retention/deletion | Enables safer expansion and enterprise-grade trust | HIGH | Jurisdictional/legal design | P1 | Export and deletion tests pass for every data category; no orphan identifiable data in defined scope. |
+| Household Value Ledger | Subscription must prove time saved | Subscription fatigue plus SMB time pressure [S1][S9][S17] | Competitors report social metrics, not family workload | Supports retention and pricing | LOW | Self-reported time savings can be biased | P1 | ≥60% of pilot households report ≥2 hours saved/week by week four. |
+| Explicit Immediate-only Beta | Visible scheduling without durable execution breaks trust | Project constraint and current hidden UI | Competitors feature mature calendars | Honest smaller product | LOW | Perceived feature gap | P0 | Zero family UI claims or controls imply scheduled publishing until full scheduling acceptance suite passes. |
 
 ## User Stories (BDD)
 
@@ -176,322 +232,325 @@ Target WCAG 2.2 AA, minimum touch target expectations, visible focus, skip navig
 [
   {
     "id": "US-001",
-    "epic": "Family Workspace and Guided Home",
-    "role": "parent owner",
-    "action": "create a household workspace with clear roles",
-    "benefit": "everyone gets an appropriate, understandable experience",
-    "story": "As a parent owner, I want to create a household workspace with clear roles, so that everyone gets an appropriate, understandable experience.",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult owner",
+    "action": "test each connected publishing account before the first real family post",
+    "benefit": "I know whether LinkedIn and X are operational without risking a family draft",
+    "story": "As a adult owner, I want to test each connected publishing account before the first real family post, so that I know whether LinkedIn and X are operational without risking a family draft.",
     "gui_flow": [
-      "User opens Welcome screen -> sees three goal choices and a 3-minute setup estimate",
-      "User selects Family creator or Family business -> setup asks for workspace name and adult owner",
-      "User adds a member or chooses Skip for now -> role choices explain permissions in plain language",
-      "User selects a role -> preview shows exactly what that member can view and do",
-      "User finishes setup -> Home shows one recommended next action and a starter project"
+      "User opens Connections from Family Home -> sees each channel with Not tested, Healthy, or Action required state",
+      "User selects Test connection for LinkedIn -> sees the exact account name, granted capabilities, and test scope",
+      "User confirms a non-public sandbox action -> the system creates an idempotent provider test attempt",
+      "The provider responds -> the screen shows success, failure, rate limit, or unknown state in plain language",
+      "User opens Evidence -> sees timestamp, provider request correlation, sanitized response category, and no credential value",
+      "User returns Home -> publishing readiness reflects the latest verified connection state"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "create a household workspace with clear roles",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "a configured LinkedIn sandbox credential and an unused idempotency key",
+        "when": "the adult runs Test connection",
+        "then": "one provider attempt is recorded and the account becomes Healthy only after a confirmed remote identifier is returned"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "create a household workspace with clear roles",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "the same idempotency key already produced a confirmed post",
+        "when": "the adult repeats the test",
+        "then": "no second provider post is created and the prior remote identifier is returned"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "create a household workspace with clear roles",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "the provider times out after accepting the request",
+        "when": "the test finishes without a definitive response",
+        "then": "the connection is marked Verification required, automatic repost is blocked, and Reconcile is offered"
       }
     ]
   },
   {
     "id": "US-002",
-    "epic": "Family Workspace and Guided Home",
-    "role": "teen contributor",
-    "action": "join a shared project without seeing billing or credentials",
-    "benefit": "I can contribute safely without accessing adult controls",
-    "story": "As a teen contributor, I want to join a shared project without seeing billing or credentials, so that I can contribute safely without accessing adult controls.",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult publisher",
+    "action": "recover a partially successful multi-channel publish without repeating successful posts",
+    "benefit": "I can fix one channel safely",
+    "story": "As a adult publisher, I want to recover a partially successful multi-channel publish without repeating successful posts, so that I can fix one channel safely.",
     "gui_flow": [
-      "User opens Welcome screen -> sees three goal choices and a 3-minute setup estimate",
-      "User selects Family creator or Family business -> setup asks for workspace name and adult owner",
-      "User adds a member or chooses Skip for now -> role choices explain permissions in plain language",
-      "User selects a role -> preview shows exactly what that member can view and do",
-      "User finishes setup -> Home shows one recommended next action and a starter project"
+      "User opens a Publish Result with LinkedIn Published and X Failed -> sees an honest partial-success summary",
+      "User expands X -> sees the failure class and the next safe action",
+      "User selects Retry failed channel -> sees LinkedIn excluded from the retry set",
+      "User confirms -> a new X attempt reuses the original delivery idempotency identity",
+      "The provider responds -> only the X row changes state while LinkedIn preserves its remote identifier",
+      "User opens Audit details -> sees both attempts and the final aggregate result"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "join a shared project without seeing billing or credentials",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "a batch has one PUBLISHED and one FAILED delivery",
+        "when": "the adult retries failed channels",
+        "then": "only failed or retryable channels receive a provider call and successful remote identifiers remain byte-for-byte unchanged"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "join a shared project without seeing billing or credentials",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "the failed channel is rate limited with a retry-after value",
+        "when": "the adult opens the result",
+        "then": "Retry is disabled until the displayed provider-safe time and no request is sent early"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "join a shared project without seeing billing or credentials",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "the provider state is UNKNOWN",
+        "when": "the adult selects Retry",
+        "then": "the system runs reconciliation first and blocks a new post until the remote state is resolved or a documented manual override is recorded"
       }
     ]
   },
   {
     "id": "US-003",
-    "epic": "Family Workspace and Guided Home",
-    "role": "parent owner",
-    "action": "switch between family projects and see the next action",
-    "benefit": "I can coordinate work without searching across modules",
-    "story": "As a parent owner, I want to switch between family projects and see the next action, so that I can coordinate work without searching across modules.",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult owner",
+    "action": "reconnect an expired or under-scoped provider credential from the failed delivery",
+    "benefit": "I can restore publishing without technical support",
+    "story": "As a adult owner, I want to reconnect an expired or under-scoped provider credential from the failed delivery, so that I can restore publishing without technical support.",
     "gui_flow": [
-      "User opens Welcome screen -> sees three goal choices and a 3-minute setup estimate",
-      "User selects Family creator or Family business -> setup asks for workspace name and adult owner",
-      "User adds a member or chooses Skip for now -> role choices explain permissions in plain language",
-      "User selects a role -> preview shows exactly what that member can view and do",
-      "User finishes setup -> Home shows one recommended next action and a starter project"
+      "User opens a failed delivery -> sees Token expired or Permission missing instead of a generic error",
+      "User selects Reconnect account -> the Connections screen opens with the affected channel focused",
+      "User completes the approved provider OAuth flow -> the callback validates state and required scopes",
+      "The system runs a non-destructive capability check -> the account shows Healthy or Missing permission",
+      "User returns to the delivery -> Retry failed channel is enabled only when required capabilities are present",
+      "User retries -> the result records the new credential version without exposing the token"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "switch between family projects and see the next action",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "an expired token is attached to a failed delivery",
+        "when": "the owner completes reconnect with required scopes",
+        "then": "the connection becomes Healthy and only the failed delivery becomes retryable"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "switch between family projects and see the next action",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "OAuth succeeds but a required posting scope is absent",
+        "when": "the callback completes",
+        "then": "the UI lists the missing capability, keeps publish disabled, and stores no false Healthy state"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "switch between family projects and see the next action",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "the OAuth state value is invalid or expired",
+        "when": "the callback is received",
+        "then": "the connection is unchanged, the event is audited, and the user sees a safe restart action"
       }
     ]
   },
   {
     "id": "US-004",
-    "epic": "Guardian Review and Safe Publishing",
-    "role": "parent approver",
-    "action": "require approval before a minor publishes",
-    "benefit": "nothing goes public without an adult decision",
-    "story": "As a parent approver, I want to require approval before a minor publishes, so that nothing goes public without an adult decision.",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
+    "role": "new adult owner",
+    "action": "complete the first useful draft through one measured guided path",
+    "benefit": "I can judge value before learning the whole platform",
+    "story": "As a new adult owner, I want to complete the first useful draft through one measured guided path, so that I can judge value before learning the whole platform.",
     "gui_flow": [
-      "User opens a project -> sees draft status, owner, and publish gate",
-      "Contributor opens the editor -> publish control is replaced by Submit for review",
-      "Contributor submits -> approver receives an in-app task with the exact revision number",
-      "Approver opens review -> sees preview, changes, warnings, and contributor note",
-      "Approver approves or requests changes -> status and audit entry update immediately",
-      "If approved, adult selects Publish -> final confirmation lists channels and scheduled time"
+      "User signs in to a new family workspace -> sees one Start first project action",
+      "User selects a goal and audience -> sees a four-step progress indicator and a private-by-default notice",
+      "User captures an idea or chooses a starter -> the draft preview appears with an editable message",
+      "User saves the draft -> the system records time-to-first-useful-draft without storing keystroke content in telemetry",
+      "User sees the next action Submit for adult review -> the exact revision is identified",
+      "User completes the flow -> the weekly summary shows minutes saved as an estimate the user can correct"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "require approval before a minor publishes",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "a new owner has no projects",
+        "when": "the owner saves a non-empty first draft",
+        "then": "activation telemetry records one anonymous funnel event and elapsed seconds, with a target median of 600 seconds or less"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "require approval before a minor publishes",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "the browser goes offline after step two",
+        "when": "the owner continues editing and reconnects",
+        "then": "the draft is restored, no duplicate project is created, and elapsed time excludes the offline wait when reported"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "require approval before a minor publishes",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "draft generation fails",
+        "when": "the owner selects Retry",
+        "then": "entered goal and audience remain intact and the error event contains no draft text or credential data"
       }
     ]
   },
   {
     "id": "US-005",
-    "epic": "Guardian Review and Safe Publishing",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
     "role": "teen contributor",
-    "action": "submit a draft with a note for review",
-    "benefit": "my contribution can be reviewed without fear of accidental publishing",
-    "story": "As a teen contributor, I want to submit a draft with a note for review, so that my contribution can be reviewed without fear of accidental publishing.",
+    "action": "understand my next permitted action within ten seconds",
+    "benefit": "I can contribute without fearing accidental publication",
+    "story": "As a teen contributor, I want to understand my next permitted action within ten seconds, so that I can contribute without fearing accidental publication.",
     "gui_flow": [
-      "User opens a project -> sees draft status, owner, and publish gate",
-      "Contributor opens the editor -> publish control is replaced by Submit for review",
-      "Contributor submits -> approver receives an in-app task with the exact revision number",
-      "Approver opens review -> sees preview, changes, warnings, and contributor note",
-      "Approver approves or requests changes -> status and audit entry update immediately",
-      "If approved, adult selects Publish -> final confirmation lists channels and scheduled time"
+      "Teen opens Family Home -> sees a contributor label and one primary next action",
+      "Teen opens a private idea -> sees Private to family near the content title",
+      "Teen turns the idea into a draft -> sees Save draft and Submit for review controls",
+      "Teen opens the action menu -> Publish is absent and a short explanation is available",
+      "Teen submits the exact revision -> sees Waiting for adult review",
+      "Teen returns Home -> the next action changes to Capture another idea or respond to requested changes"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "submit a draft with a note for review",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "the signed-in member has TEEN_CONTRIBUTOR role",
+        "when": "the Home screen renders",
+        "then": "the first actionable control is contributor-permitted and no publish control exists in the DOM"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "submit a draft with a note for review",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "the teen edits a revision that was previously approved",
+        "when": "the save completes",
+        "then": "the prior approval is superseded and the state returns to Needs adult review"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "submit a draft with a note for review",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "the teen calls a publish endpoint directly",
+        "when": "the request is handled",
+        "then": "the server returns 403, creates no batch or provider attempt, and writes a permission-denied audit event"
       }
     ]
   },
   {
     "id": "US-006",
-    "epic": "Guardian Review and Safe Publishing",
-    "role": "parent approver",
-    "action": "see exactly what changed and approve the current version",
-    "benefit": "I can make a confident decision on the correct version",
-    "story": "As a parent approver, I want to see exactly what changed and approve the current version, so that I can make a confident decision on the correct version.",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
+    "role": "pilot facilitator",
+    "action": "export privacy-preserving pilot outcomes for five to ten households",
+    "benefit": "I can make a release decision from comparable evidence",
+    "story": "As a pilot facilitator, I want to export privacy-preserving pilot outcomes for five to ten households, so that I can make a release decision from comparable evidence.",
     "gui_flow": [
-      "User opens a project -> sees draft status, owner, and publish gate",
-      "Contributor opens the editor -> publish control is replaced by Submit for review",
-      "Contributor submits -> approver receives an in-app task with the exact revision number",
-      "Approver opens review -> sees preview, changes, warnings, and contributor note",
-      "Approver approves or requests changes -> status and audit entry update immediately",
-      "If approved, adult selects Publish -> final confirmation lists channels and scheduled time"
+      "Facilitator opens Admin Pilot dashboard -> sees enrolled household count and completion status",
+      "Facilitator filters by pilot cohort -> sees median draft time, invitation success, review success, recovery support, and weekly time-saved measures",
+      "Facilitator opens a metric -> sees its definition, denominator, and missing-data count",
+      "Facilitator selects Export -> receives a CSV with pseudonymous household IDs and no content text",
+      "Facilitator reviews safety-stop events -> sees any accidental-publication or permission incident highlighted",
+      "Facilitator records the release decision -> the report stores criteria values and rationale"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "see exactly what changed and approve the current version",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "at least five consenting pilot households have completed one week",
+        "when": "the facilitator opens the dashboard",
+        "then": "all required metrics show numerator, denominator, median or rate, and 95% confidence is not claimed for the small sample"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "see exactly what changed and approve the current version",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "a household withdraws consent",
+        "when": "the facilitator refreshes the cohort",
+        "then": "that household is excluded from future exports and its identifiable pilot linkage is deleted within the configured retention window"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "see exactly what changed and approve the current version",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "an accidental-publication or minor-permission incident exists",
+        "when": "the facilitator attempts to mark the pilot Go",
+        "then": "the system blocks Go until the safety stop is resolved and an adult reviewer records disposition"
       }
     ]
   },
   {
     "id": "US-007",
-    "epic": "Simple Create-to-Publish Journey",
-    "role": "parent creator",
-    "action": "start from a goal-based template",
-    "benefit": "I can get value in the first session",
-    "story": "As a parent creator, I want to start from a goal-based template, so that I can get value in the first session.",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
+    "role": "adult owner",
+    "action": "review and change every member's effective permissions in plain language",
+    "benefit": "I can maintain safe boundaries as family roles change",
+    "story": "As a adult owner, I want to review and change every member's effective permissions in plain language, so that I can maintain safe boundaries as family roles change.",
     "gui_flow": [
-      "User opens Home -> sees Start a project and one recommended template",
-      "User chooses a goal -> wizard asks only audience, message, channel, and due date",
-      "User adds text or media -> live preview shows the selected channel output",
-      "User clicks Create draft -> progress presents named stages and a cancel option",
-      "User reviews the result -> issue panel shows only blocking items first",
-      "User submits or publishes -> completion screen explains what happened and the next useful action"
+      "Owner opens Members -> sees each member, role, and effective capability summary",
+      "Owner selects a member -> sees Can and Cannot lists for ideas, drafts, review, publish, credentials, billing, and membership",
+      "Owner changes Teen contributor to Viewer -> sees the access impact before saving",
+      "Owner confirms -> active sessions are re-evaluated and new permissions apply immediately",
+      "Owner opens Audit -> sees who changed the role, when, and from/to values",
+      "Owner tests View as member -> sees a read-only preview without impersonating or exposing private credentials"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "start from a goal-based template",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "an adult owner views a teen member",
+        "when": "the member detail opens",
+        "then": "all seven sensitive capability categories are explicitly shown and Publish, credentials, billing, and member management are denied"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "start from a goal-based template",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "the only remaining owner is selected for demotion or removal",
+        "when": "the owner confirms",
+        "then": "the server returns 409, explains the last-owner rule, and makes no membership change"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "start from a goal-based template",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "a demoted member has an existing session",
+        "when": "the member performs a newly forbidden action",
+        "then": "server-side authorization denies it immediately without relying on cached UI state"
       }
     ]
   },
   {
     "id": "US-008",
-    "epic": "Simple Create-to-Publish Journey",
-    "role": "child collaborator",
-    "action": "contribute an idea or media item from a phone",
-    "benefit": "the family can capture ideas where they happen",
-    "story": "As a child collaborator, I want to contribute an idea or media item from a phone, so that the family can capture ideas where they happen.",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
+    "role": "adult owner",
+    "action": "control retention and delete a family member's contributed personal data",
+    "benefit": "I can honor household privacy choices",
+    "story": "As a adult owner, I want to control retention and delete a family member's contributed personal data, so that I can honor household privacy choices.",
     "gui_flow": [
-      "User opens Home -> sees Start a project and one recommended template",
-      "User chooses a goal -> wizard asks only audience, message, channel, and due date",
-      "User adds text or media -> live preview shows the selected channel output",
-      "User clicks Create draft -> progress presents named stages and a cancel option",
-      "User reviews the result -> issue panel shows only blocking items first",
-      "User submits or publishes -> completion screen explains what happened and the next useful action"
+      "Owner opens Privacy and data -> sees collected categories and retention periods",
+      "Owner selects a member -> sees ideas, drafts, audit records, and provider records separated by legal/operational need",
+      "Owner chooses Delete contributed personal data -> sees consequences and items that must be retained in de-identified audit form",
+      "Owner confirms with reauthentication -> a deletion job starts and progress is visible",
+      "The job completes -> content ownership is reassigned or removed according to the selected policy",
+      "Owner downloads a completion receipt -> it lists categories deleted, retained, and retention reasons"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "contribute an idea or media item from a phone",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "an owner requests deletion for a non-owner member",
+        "when": "the verified request completes",
+        "then": "personal profile data and private unreferenced ideas are removed within the configured target and retained audit entries are pseudonymized"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "contribute an idea or media item from a phone",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "a draft is part of a published batch",
+        "when": "deletion is requested",
+        "then": "the UI explains the immutable publication record and removes unnecessary profile linkage while preserving the minimal audit evidence"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "contribute an idea or media item from a phone",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "reauthentication fails",
+        "when": "the deletion request is submitted",
+        "then": "no deletion begins and the event is logged without revealing sensitive account details"
       }
     ]
   },
   {
     "id": "US-009",
-    "epic": "Simple Create-to-Publish Journey",
-    "role": "family business owner",
-    "action": "finish and publish a campaign without learning every module",
-    "benefit": "the product saves time instead of adding workflow overhead",
-    "story": "As a family business owner, I want to finish and publish a campaign without learning every module, so that the product saves time instead of adding workflow overhead.",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
+    "role": "teen contributor",
+    "action": "see why content is private or public and who can change that state",
+    "benefit": "I understand the boundary without surveillance or hidden rules",
+    "story": "As a teen contributor, I want to see why content is private or public and who can change that state, so that I understand the boundary without surveillance or hidden rules.",
     "gui_flow": [
-      "User opens Home -> sees Start a project and one recommended template",
-      "User chooses a goal -> wizard asks only audience, message, channel, and due date",
-      "User adds text or media -> live preview shows the selected channel output",
-      "User clicks Create draft -> progress presents named stages and a cancel option",
-      "User reviews the result -> issue panel shows only blocking items first",
-      "User submits or publishes -> completion screen explains what happened and the next useful action"
+      "Teen opens an idea -> sees Private to family with a one-sentence explanation",
+      "Teen opens a draft -> sees Private draft and the adults who may review it",
+      "Teen submits for review -> sees that submission does not make content public",
+      "Adult approves -> the teen sees Approved for adult publishing, not Published",
+      "Adult publishes -> the teen sees Public on LinkedIn or X with timestamp and account label",
+      "Teen opens Learn more -> sees the role rule and how to ask an adult for a change"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the user has a valid workspace and network connection",
-        "when": "finish and publish a campaign without learning every module",
-        "then": "the requested state is persisted, shown after refresh, and the primary flow completes in at most 6 screens"
+        "text": "a draft has never been published",
+        "when": "the teen views it",
+        "then": "the state label says Private and no public URL or misleading success language is shown"
       },
       {
         "type": "given",
-        "text": "the workspace has no other members or no prior content",
-        "when": "finish and publish a campaign without learning every module",
-        "then": "the interface shows a useful empty-state action and never presents an unlabelled blank panel"
+        "text": "a revision is approved but not published",
+        "when": "the teen views status",
+        "then": "the UI distinguishes Approved from Public and names the remaining adult action"
       },
       {
         "type": "given",
-        "text": "the API returns an error or the connection is interrupted",
-        "when": "finish and publish a campaign without learning every module",
-        "then": "no duplicate object or publication is created, entered data remains available, and a retry control names the failed step"
+        "text": "publication state cannot be confirmed from the provider",
+        "when": "the teen views status",
+        "then": "the UI says Verification required rather than Public and provides no retry control to the teen"
       }
     ]
   }
@@ -500,62 +559,113 @@ Target WCAG 2.2 AA, minimum touch target expectations, visible focus, skip navig
 
 ## Priority-Ranked Development Recommendations
 
-1. **P0: Introduce Family mode as a real permission and navigation model.** Adult owner, adult collaborator, teen contributor, and view-only roles must be server-enforced. Home should show only relevant tasks.
-2. **P0: Make approval the core trust loop.** Show preview, author, exact revision, changes, warnings, and channel destination. Any edit after approval invalidates that approval.
-3. **P0: Consolidate first value into a wizard.** Start from goals such as “promote our shop,” “share a family project,” or “publish this week's update.” Reuse existing campaign, brand, generation, validation, approval, and publishing services behind the wizard.
-4. **P1: Build mobile capture and proper mobile navigation.** Preserve drafts offline, upload with privacy warnings, and route every idea to an adult-controlled project.
-5. **P1: Add pricing trust.** Usage meter, pre-generation cost estimate, spend cap, no per-child charge, and straightforward export/cancel controls.
-6. **P1: Convert analytics into a weekly value report.** Time saved, items published, approval turnaround, recoveries, and best-performing reusable template.
-7. **P2: Consider younger-child contribution only after legal/privacy design review.** Until then, younger children should participate through an adult's session, not independent accounts.
+### P0.1 Complete real provider sandbox verification
+
+Use approved, non-public LinkedIn and X accounts. Execute and retain evidence for: successful post, expired token, permission failure, rate limit, timeout/unknown state, repeated idempotency key, partial success, and failed-channel-only retry. Evidence must include UTC timestamp, provider, sanitized account identifier, correlation/idempotency identity, request category, response category, remote identifier when confirmed, and cleanup action. No credential may appear in logs or exports.
+
+Exit gate: all scenarios have an observed result; duplicate external side effects are zero; unknown states are reconciled or explicitly unresolved; successful channels are never resent during selective retry.
+
+### P0.2 Add connection capability and reconciliation UX
+
+Turn the current mechanics into an adult-understandable surface. Connections should show account name, token expiry if known, granted/required posting capabilities, last successful provider check, last failure class, and an Evidence view. Publish Result should route expired-token and missing-scope failures directly to the affected connection. UNKNOWN must offer Reconcile, not Retry.
+
+Exit gate: five untrained adults can recover expired-token and missing-scope scenarios with no developer help; no participant retries an UNKNOWN state before reconciliation.
+
+### P0.3 Run instrumented 5-10-household pilot
+
+Implement minimal, consented pilot events and use the existing protocol. Measure: first useful draft, ten-second next-action recognition, contributor publish-rule comprehension, private/public distinction, invitation completion, review/publish completion, connection recovery support, and weekly hours saved. Keep raw content out of analytics.
+
+Exit gate: at least five households complete two weeks; no safety-stop event; ≥80% unaided invitation and review/publish completion; median first draft ≤10 minutes; ≥60% report ≥2 hours saved/week by week four or the product is repositioned.
+
+### P1.1 Privacy and effective-permission operations
+
+Add explicit capability views, role-change impact previews, immediate server-side revocation, data export, deletion/retention workflow, and age-appropriate explanations. Conduct legal review before marketing to under-13 users or collecting child personal data.
+
+### P1.2 Browser E2E and accessibility release gate
+
+Pin Chromium in CI and cover sign-in, setup, invite preview/accept, teen contribution, exact-revision approval, adult publish, partial success, reconcile, and reconnect. Include axe checks, keyboard-only interaction, 200% zoom, mobile viewport, reduced motion and status announcements.
+
+### P2. Durable scheduling only after validation
+
+Do not expose a date/time picker until restart-safe background execution, timezone conversion, DST, idempotency, cancellation and delayed-provider tests are green. If implemented, start with one timezone-aware scheduled post per batch before recurring schedules.
 
 ## Recommended Scope for the Next Development Pass
 
-Deliver a vertical slice, not seven disconnected features:
+**Include:**
 
-- New Welcome flow with Family Creator/Family Business goal choice.
-- Adult-owned workspace creation and real role/permission matrix.
-- Simplified five-item family navigation plus optional Expert mode for adults.
-- Home with setup checklist, one next action, review tasks, and recent projects.
-- Goal-based project wizard that creates a campaign, first asset, preview, and review request.
-- Guardian review screen with exact revision, diff summary, issue summary, approve/request changes.
-- Publish gate enforcing current adult approval and preserving selective-retry semantics.
-- Responsive drawer/bottom navigation, mobile idea capture, draft recovery.
-- Instrument activation, first draft, review, publish, and week-two return.
-- Run targeted component/API/E2E tests and the full regression suite after implementation.
+- provider sandbox harness and sanitized evidence model;
+- connection capability/health screen;
+- reconcile-before-retry UX and tests;
+- deep links from failed delivery to reconnect;
+- privacy-preserving pilot telemetry and export;
+- first-use funnel and ten-second comprehension measurement hooks;
+- effective-permission matrix for all family roles;
+- Playwright/axe release flow with deterministic browser provisioning;
+- updated `development-report.md`, provider results and pilot documentation in the later development phase.
 
-Explicitly out of scope: new AI providers, new social networks, advanced child accounts, a native mobile app, more analytics charts, and further top-level modules.
+**Exclude:**
+
+- scheduled publishing;
+- new social platforms;
+- general-purpose design editor expansion;
+- more AI generation modes;
+- child-directed marketing under age 13;
+- billing optimization before value proof;
+- enterprise multi-tenant features unrelated to the pilot.
+
+A coherent pass can be completed when one adult can connect a provider, prove it, invite a contributor, receive and review a draft, publish once, recover an injected failure, and explain every privacy/public state without support.
 
 ## Risks, Unknowns, and Assumptions
 
-- “Family users” is an inferred segment. The repository itself targets professional content teams. Validate the family-run business wedge before rebranding the whole product.
-- Minor accounts trigger legal and safeguarding work that varies by country. COPPA and UK guidance are reference points, not a complete legal determination [S7][S8].
-- Public pricing pages are dynamic and sometimes region-dependent. Exact competitor prices were not used as durable evidence and must be refreshed before launch.
-- Existing authentication and tenant scoping are uneven across documented endpoints. A family role UI without uniform server authorization would be unsafe.
-- The current `contentforge.db` is shipped in the archive as an intentional project asset, but production data handling, backups, retention, and deletion need separate review.
-- The product's breadth may be an asset for expert users, so simplification should be a mode and progressive disclosure strategy, not removal of proven backend capability.
-- No direct interviews, analytics, support-ticket corpus, or conversion data were provided. Demand confidence is based on product-category evidence and codebase fit.
+- **Provider access risk:** LinkedIn and X app approval, product access and sandbox behavior may constrain test coverage. This cannot be solved by mocks alone.
+- **No market category proof:** “Family Creator” is a hypothesis. Adjacent product demand is validated; family-specific willingness to pay is not.
+- **Small pilot sample:** Five to ten households can expose usability and severe safety failures but cannot establish population-level conversion or retention.
+- **Youth privacy jurisdiction:** COPPA and the ICO Children's Code are important baselines, not a complete global legal analysis. Obtain specialist counsel before child-directed launch.
+- **Role semantics:** “Teen contributor” is a product permission role, not verified age assurance. Do not infer age from role name.
+- **Provider unknown state:** Some providers may not offer enough status lookup to reconcile every timeout. Manual verification and documented override may remain necessary.
+- **Time-saved measurement:** Self-report is biased. Combine timestamps and user correction, and report medians with definitions.
+- **Archive artifacts:** Runtime `.db` files are pre-existing in the input and were preserved for project integrity in this research phase, even though final packaging rules normally exclude runtime databases if they are not intentional assets. They were not modified.
+- **Scheduling:** General scheduling code elsewhere in the repository does not prove the family paid-beta promise. The family UI should remain immediate-only.
+- **Testing evidence:** The regression/build claims are copied from project evidence and not independently rerun here because this phase forbids project changes other than this report and is focused on research.
 
 ## Sources
 
-Accessed 2026-08-12 unless a publication date is stated.
+Accessed 2026-08-12 unless otherwise noted.
 
-- **[S1]** Planable, product, approvals, and pricing pages: https://planable.io/ ; https://help.planable.io/hc/en-us/articles/21715462785180-Approvals-and-Approval-Workflows ; https://planable.io/pricing/
-- **[S2]** Buffer, product and pricing: https://buffer.com/ ; https://buffer.com/pricing
-- **[S3]** Sprout Social, “Message Approval Workflows”: https://support.sproutsocial.com/hc/en-us/articles/205974715-Message-Approval-Workflows
-- **[S4]** Hootsuite, plans and social media management product: https://www.hootsuite.com/plans ; https://www.hootsuite.com/platform
-- **[S5]** Canva, pricing and Content Planner: https://www.canva.com/pricing/ ; https://www.canva.com/pro/content-planner/
-- **[S6]** Adobe Express, pricing and content scheduler: https://www.adobe.com/express/pricing ; https://www.adobe.com/express/feature/content-scheduler
-- **[S7]** U.S. Federal Trade Commission, Children's Online Privacy Protection Rule guidance: https://www.ftc.gov/business-guidance/privacy-security/childrens-privacy
-- **[S8]** UK Information Commissioner's Office, Age Appropriate Design Code: https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/
-- **[S9]** NIST, AI Risk Management Framework: https://www.nist.gov/itl/ai-risk-management-framework
-- **[S10]** W3C, Web Content Accessibility Guidelines 2.2: https://www.w3.org/TR/WCAG22/
-- **[S11]** Radix UI documentation: https://www.radix-ui.com/primitives/docs/overview/introduction
-- **[S12]** React Aria documentation: https://react-spectrum.adobe.com/react-aria/
-- **[S13]** React Hook Form documentation: https://react-hook-form.com/ ; Zod: https://zod.dev/
-- **[S14]** TanStack Query documentation: https://tanstack.com/query/latest
-- **[S15]** Project evidence: `README.md`, `CHANGELOG.md`, `ContentForge fejlesztési terv és részletes GUI-koncepció.md`, `analysis/architecture-spec.md`, `docs/product-workspaces.md`, `frontend/src/main.tsx`, `frontend/src/navigation.ts`, `frontend/src/styles.css`.
-- **[S16]** Playwright accessibility testing guidance: https://playwright.dev/docs/accessibility-testing
-- **[S17]** OpenTelemetry Python documentation: https://opentelemetry.io/docs/languages/python/
-- **[S18]** Contentful localization workflow: https://www.contentful.com/products/platform/localization-and-translation/ ; https://www.contentful.com/help/ai-automations/workflows/localized-workflows/
-- **[S19]** Lokalise workflow management: https://lokalise.com/product/localization-workflow-management/ ; https://docs.lokalise.com/en/articles/9582608-workflows
-- **[S20]** EasyContent, content operations platform comparison: https://easycontent.io/resources/best-content-operations-platforms/
+- **[S1] Verizon Business.** “2025 State of Small Business Survey: Surge in AI, cybersecurity and social media demand.” 2025-05-20. https://www.verizon.com/about/news/2025-state-small-business-survey
+- **[S2] Buffer.** “Pricing.” Official product/pricing page. https://buffer.com/pricing
+- **[S3] Planable.** “Planable pricing: plans for agencies, brands, and enterprise teams.” Official pricing page. https://planable.io/pricing/
+- **[S4] Canva.** “Canva Pricing: Compare Free, Pro, Business and Enterprise plans.” Official pricing page. https://www.canva.com/pricing/
+- **[S5] Adobe.** “Pricing: Compare Free & Premium Plans | Adobe Express.” Official pricing page. https://www.adobe.com/express/pricing
+- **[S6] Publer.** “Social Media Management Plans for All Needs.” Official pricing page. https://publer.com/plans
+- **[S7] Metricool.** “Metricool Pricing: Find The Best Plan.” Official pricing page. https://metricool.com/pricing/
+- **[S8] Hootsuite.** “Hootsuite Plans, Prices, and Features.” Official plans page. https://www.hootsuite.com/plans
+- **[S9] TechBehemoths.** “How Small and Mid-Sized Businesses Use Social Media in 2025: Survey Results.” 2025-10-01. https://techbehemoths.com/blog/small-mid-sized-businesses-use-social-media-survey-results
+- **[S10] Reddit r/Entrepreneur.** “For those in family businesses, lessons learned?” Community discussion, 2019-05-26. https://www.reddit.com/r/Entrepreneur/comments/bt3rov/for_those_in_family_businesses_lessons_learned/
+- **[S11] Reddit r/smallbusiness.** “Family-Run Small Businesses... How To Deal With Family?” Community discussion, 2025-03-19. https://www.redditmedia.com/r/smallbusiness/comments/1jec9au/familyrun_small_businesses_how_to_deal_with_family/
+- **[S12] Akter et al.** “From Parental Control to Joint Family Oversight: Can Parents and Teens Manage Mobile Online Safety and Privacy as Equals?” Proc. ACM HCI, study of 19 parent-teen pairs; arXiv version updated 2024-04-16. https://arxiv.org/html/2204.07749v2
+- **[S13] Akter et al.** “Towards Collaborative Family-Centered Design for Online Safety, Privacy and Security.” 2024-04-04. https://arxiv.org/html/2404.03165v1
+- **[S14] U.S. Federal Trade Commission.** “Complying with COPPA: Frequently Asked Questions.” Notes COPPA Rule amendment of 2025-04-22. https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions
+- **[S15] U.S. Federal Trade Commission.** “Verifiable Parental Consent and the Children's Online Privacy Rule.” https://www.ftc.gov/business-guidance/privacy-security/verifiable-parental-consent-childrens-online-privacy-rule
+- **[S16] UK Information Commissioner's Office.** “Children's code guidance and resources” and “7. Default settings.” https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/ and https://cy.ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/7-default-settings/
+- **[S17] Reddit r/smallbusiness.** “Subscriptions fatigue.” Community discussion; weak qualitative evidence. https://www.reddit.com/r/smallbusiness/comments/kqcs7m/subscriptions_fatigue/
+- **[S18] GitroomHQ.** “Postiz: open-source social media scheduling tool.” GitHub repository, 34k+ stars in retrieved listing. https://github.com/gitroomhq/postiz-app
+- **[S19] W3C Web Accessibility Initiative.** “Understanding WCAG 2.2.” https://www.w3.org/WAI/WCAG22/Understanding/
+
+### Project sources
+
+- `pyproject.toml`
+- `CHANGELOG.md`
+- `development-report.md`
+- `src/family/store.py`
+- `src/routers/family.py`
+- `src/connectors/` and publishing services referenced by the family router
+- `frontend/src/family.tsx`
+- `frontend/src/styles.css`
+- `tests/test_family_api.py`
+- `tests/test_family_completion.py`
+- `docs/family-workspace.md`
+- `docs/family-pilot.md`
+- `docs/provider-sandbox-checklist.md`
+- `provider-sandbox-results.csv`
+- `family-pilot-results.csv`

@@ -984,3 +984,7 @@ Family publication now calls the real LinkedIn/X connectors when credentials are
 ### Paid-beta scheduling and validation status
 
 The paid beta publishes immediately after adult confirmation. Scheduling is intentionally hidden until durable background execution, restart recovery, and timezone tests are implemented. See `docs/family-pilot.md` for the 5-10 household pilot and `docs/provider-sandbox-checklist.md` for real provider verification.
+
+## Family paid-beta release hardening
+
+Family mode uses immediate publishing only. Provider credentials are treated as **configured, not verified** until a non-public LinkedIn or X sandbox test returns a confirmed remote identifier. Unknown external provider state must be reconciled before retry. Family roles expose a shared capability model, and pilot measurement accepts only consented, content-free events. Scheduling remains hidden; the family navigation uses Activity for publication history.

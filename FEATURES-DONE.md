@@ -1,13 +1,12 @@
 # Features Done
 
 ## Features Done (this pass)
-- Release regression verification: full backend exit 0, frontend 39/39, full lint and production build green, backend/frontend startup smoke green.
-- Paid-beta scheduling clarity: unverified scheduling hidden and immediate publication clearly stated.
-- Pilot readiness: 5-10 household protocol, safety rules, measurement schema, targets, and go/no-go rule.
-- Sandbox readiness: eight-scenario provider checklist and evidence schema with truthful BLOCKED status when credentials are absent.
+- Provider confidence primitives: confirmed-remote-ID success, ambiguous-state handling, selective retry, and secret-safe evidence.
+- Family trust policy: explicit role capabilities and consistent private, approved, public, partial, failed, and verification-required labels.
+- Pilot safety primitives: content-free event validation, measurable cohort aggregation, and critical-incident blocking.
 
 ## Sources
-- research-findings.md items addressed: trust, safe publishing, recovery, willingness-to-pay validation, and measurable family outcomes.
-- implementation-plan.md requirements addressed: release verification, publishing honesty, and UX completion.
-- user stories covered: US-010 through US-018 remain implemented.
-- CHANGELOG.md section this maps to: Release verification and pilot readiness (2026-08-12).
+- research-findings.md items addressed: provider confidence, pilot instrumentation, permission clarity, privacy-state clarity
+- implementation-plan.md requirements addressed: Features A-C core domain policy and honest immediate-only UI
+- user stories covered: US-001, US-002, US-003, US-004, US-005, US-006, US-007, US-008, US-009
+- CHANGELOG.md section this maps to: Family provider confidence, pilot, and trust hardening (2026-08-12)

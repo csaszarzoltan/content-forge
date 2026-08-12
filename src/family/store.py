@@ -11,6 +11,8 @@ import time
 import uuid
 from pathlib import Path
 
+from src.family.permissions import capabilities_for
+
 ROLES = {
     "ADULT_OWNER": {"manage_members", "create", "edit", "review", "publish", "view"},
     "ADULT_COLLABORATOR": {"create", "edit", "review", "publish", "view"},
@@ -236,6 +238,7 @@ CREATE TABLE IF NOT EXISTS family_audit(id TEXT PRIMARY KEY,workspace_id TEXT,ac
             "workspace": ws,
             "membership": m,
             "permissions": perms,
+            "capabilities": capabilities_for(m["role"]),
             "navigation": nav,
             "onboarding": {"percent": 75},
         }

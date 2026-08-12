@@ -1,80 +1,73 @@
 # Development Report
 
 ## Implemented Scope
-
-Release verification and pilot-readiness pass: hid unverified scheduling, fixed two full-suite regressions discovered during a clean rerun, fixed full frontend lint, reran the complete backend and frontend checks, verified production build and startup, created a provider sandbox evidence pack, and created a 5-10 household pilot protocol with measurable go/no-go criteria.
+Implemented production domain policies for provider confidence, family pilot safety, explicit role capabilities, privacy-state language, and immediate-only family UI. Credential presence now means Not tested, never Healthy. Added a member capability API and corrected the pre-existing Brand Kit default-pagination regression.
 
 ## Research Items Addressed
-
-Reliability before release, honest provider claims, immediate-only paid-beta publishing, and real-family validation of comprehension, safety, recovery, and time saved.
+Provider success must require a remote identifier; unknown provider state must reconcile before retry; selective retry excludes successful and unknown channels; pilot payloads reject content/secrets; critical pilot incidents block GO; teen contributors have no publish capability; approved and provider-unknown states are not public.
 
 ## Plan Requirements Completed
-
-Backend/full frontend regression, lint, build, startup smoke, scheduling removal, provider credential check, provider sandbox protocol, and family pilot instrumentation are complete. Live provider posting and browser E2E are blocked by missing credentials and Chromium respectively.
+Core policy and compatibility work for Features A-C is complete. The full planned persistent provider-attempt store, OAuth callbacks, pilot admin dashboard, consent persistence, privacy deletion transaction UI, and live provider evidence remain blocked/partial and are not claimed complete.
 
 ## User Stories Covered
-
-US-010 through US-018 remain implemented. Scheduling is no longer presented as available. No story is reported as provider-sandbox verified without real account evidence.
+- US-001: PASS for outcome classification; live sandbox BLOCKED.
+- US-002: PASS for selective retry policy; live partial-provider execution BLOCKED.
+- US-003: PASS for secret-safe evidence; real OAuth recovery BLOCKED.
+- US-004: PASS for content-free pilot event validation; persistent telemetry PARTIAL.
+- US-005: PASS for role capability policy and existing server denial.
+- US-006: PASS for metric aggregation/safety blocking; 5-10 household field pilot BLOCKED.
+- US-007: PASS for explicit capability matrix and API.
+- US-008: PASS for deletion planning primitive; transactional deletion flow PARTIAL.
+- US-009: PASS for visibility mapping.
 
 ## Architecture Decisions
-
-Settings now use a `CONTENTFORGE_` environment prefix, preventing host `ENVIRONMENT` leakage while retaining a normal `ENVIRONMENT` model field. Video image mapping preserves known generation image references while rejecting unrelated missing images. Brand Kit pagination now sends its limit/offset parameters rather than leaving lint-only unused arguments.
+Added pure, typed family modules for permissions, visibility, provider normalization, pilot metrics, and privacy planning. Kept FastAPI, SQLite, React and existing routes. No production dependency was added.
 
 ## UI and UX Implementation
-
-Removed the schedule radio option from final confirmation and replaced it with plain paid-beta copy that publication occurs immediately. Existing invitation, adult confirmation, connection recovery, weekly summary, privacy labels, avatars, and concrete channel feedback remain.
+The visible family Calendar label is now Activity and publishing remains immediate-only. Connections distinguish Not tested from Not configured. Full planned new screens were not completed. Browser screenshots were not produced because Playwright is not a declared dependency and Chromium was unavailable.
 
 ## TDD Evidence
-
-The first full run found two failures: Settings signature/default behavior and broken-image fallback. Both were reproduced with `pytest --lf`, fixed, and targeted tests passed 12/12. The final complete backend suite then exited 0.
+RED: `tests/test_family_release_hardening.py` initially failed collection because the five planned modules did not exist. GREEN: 9/9 new contracts passed. Broader family group: 30/30 passed.
 
 ## Tests and Coverage
-
-- Full backend collection: 2,599 tests.
-- Full backend execution: exit 0, zero failures. The repository's quiet/xdist configuration omits a numeric passed summary, so the collected count and exit code are recorded separately.
-- Frontend Vitest: 39 passed, 0 failed, 5 files.
-- Full frontend ESLint: exit 0, zero errors/warnings.
-- Production TypeScript/Vite build: exit 0, 34 modules transformed.
-- Prior family-domain coverage remains 91%; this pass changed only narrow configuration/video/frontend release-hardening paths.
+- Targeted: `.venv/bin/python -m pytest tests/test_family_api.py tests/test_family_completion.py tests/test_family_release_hardening.py -q` -> 30 passed, 0 failed.
+- Frontend: `npm test` -> 39 passed, 0 failed after fixing default Brand Kit pagination compatibility.
+- Full backend: run with default xdist exceeded execution limits; retried with `-n 2` and result recorded below when completed.
+- Coverage: not measured; pytest-cov is not installed. No coverage percentage is claimed.
 
 ## Lab Quality Gates
-
-`tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, and `ui-gate.sh`: BLOCKED, unavailable in the environment.
+`tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, `ui-gate.sh`: BLOCKED, scripts absent. `git-push-verify.sh`: BLOCKED, script and Git metadata absent.
 
 ## Lint, Formatting, Type-Check, Build, and Startup Results
-
-Ruff changed scope PASS. Full frontend lint PASS. Frontend tests PASS 39/39. Build PASS. Backend `/health` returned HTTP 200 and frontend root returned HTTP 200. Chromium installation was attempted with a 180-second allowance and timed out; no browser executable is present, so Playwright E2E/screenshots are BLOCKED and not claimed green.
+- Changed-scope Ruff: PASS after 6 automatic fixes.
+- Full Ruff: FAIL, 286 pre-existing repository-wide findings, 182 automatically fixable; unrelated files were not mass-rewritten.
+- Frontend ESLint: PASS, zero findings.
+- TypeScript/Vite production build: PASS, 34 modules transformed.
+- Backend startup: PASS; `/health` HTTP 200 and `/` HTTP 200 on port 8099.
+- E2E: BLOCKED, no installed Playwright runner/browser in the transported project.
 
 ## Files Added
-
-`docs/family-pilot.md`, `family-pilot-results.csv`, `docs/provider-sandbox-checklist.md`, and `provider-sandbox-results.csv`.
+`src/family/permissions.py`, `src/family/visibility.py`, `src/family/provider_verification.py`, `src/family/pilot.py`, `src/family/privacy.py`, `tests/test_family_release_hardening.py`.
 
 ## Files Modified
-
-`frontend/src/family.tsx`, `frontend/src/brandkit.tsx`, `src/config.py`, `src/services/video_scenes.py`, README, CHANGELOG, and development report.
+`src/family/store.py`, `src/routers/family.py`, `frontend/src/family.tsx`, `frontend/src/brandkit.tsx`, `README.md`, `CHANGELOG.md`, `FEATURES-DONE.md`, `development-report.md`.
 
 ## Deferred or Blocked Items
-
-- Live LinkedIn/X sandbox: BLOCKED because all six provider credential variables are absent. No real post was attempted and no synthetic result was recorded.
-- E2E/screenshots: BLOCKED because Chromium installation timed out and no browser binary exists.
-- Five-to-ten-family pilot outcomes: BLOCKED pending real recruited households. Protocol, result schema, safety stop conditions, targets, and release rule are complete.
-- Git push/lab gates: BLOCKED because the archive has no Git metadata/remote and gate scripts are unavailable.
+Live LinkedIn/X sandbox scenarios are blocked because no approved credentials were supplied. Five-to-ten-household outcomes require recruited participants. Planned OAuth, persistent pilot administration, privacy transaction UI, Chromium E2E, lab gates, coverage measurement, and git push are blocked or incomplete.
 
 ## Known Limitations
-
-The pilot CSV is intentionally empty. Scheduling is hidden. Provider result CSV marks every unexecuted scenario BLOCKED. Real sandbox evidence requires non-public provider accounts and approved applications.
+This delivery is a partial implementation of the approved plan. It must not be marketed as live-provider verified or pilot validated. Scheduling remains hidden.
 
 ## Integrity Verification
-
-The complete tree is cleaned of `.venv`, `node_modules`, build output, caches, runtime databases, and browser downloads before packaging. ZIP integrity, listing, separate extraction, required documents, and root layout are verified.
+The input contained 302 files. No pre-existing file was intentionally removed. Temporary `.venv`, `node_modules`, `dist`, caches, and runtime artifacts are removed before packaging. Final ZIP integrity and separate extraction are verified.
 
 ## Traceability Matrix
-
-- Release regression: full backend exit 0, frontend 39/39, lint/build/startup pass.
-- Provider validation: checklist/results file complete; execution BLOCKED by missing credentials.
-- Scheduling: hidden from paid-beta UI and documented immediate-only.
-- Family pilot: protocol, metrics, CSV schema, safety stops, and go/no-go rule complete; outcomes require real participants.
+- Provider proof | US-001..003 | classification/evidence/retry policy | 3 new tests | PARTIAL/BLOCKED live
+- Pilot evidence | US-004..006 | event validation/aggregation/safety | 3 new tests | PARTIAL/BLOCKED field pilot
+- Family trust | US-007..009 | capabilities/deletion plan/visibility | 3 new tests | PARTIAL
 
 ## Suggested Commit Message
+`family: add provider confidence, pilot safety, and trust policies — 30 backend family tests and 39 frontend tests passing`
 
-`release: verify full regression and prepare provider sandbox and family pilot`
+### Final full-suite note
+Two full-suite attempts were made. The default xdist run exceeded the 180-second command limit. A reduced `-n 2` attempt could not be preserved by the execution environment beyond the tool process lifetime. Therefore no full-suite zero-failure claim is made; the release gate remains BLOCKED despite the 30/30 affected backend tests being green.

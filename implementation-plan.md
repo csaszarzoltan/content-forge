@@ -2,382 +2,397 @@
 
 ## Executive Summary
 
-The previous development pass established a real Family Creator backend and a polished setup/Home/create/review shell, but its own `development-report.md` identifies the largest remaining product gaps: browser identity is still represented by trusted-looking client headers, invitation/member management lacks a complete UI, the contribution journey has no real preview-first editor, and adult publishing lacks confirmation/result/recovery screens. This plan selects three coherent completion features rather than expanding breadth:
+This pass turns the existing Family Creator paid-beta mechanics into a **provable, supportable release candidate**. It selects three integrated features from the research: **Provider Confidence and Reconciliation**, **Pilot Instrumentation and Guided Onboarding**, and **Youth Privacy and Adult-Controlled Trust**. The pass does not add another publishing network, generation mode, or visible scheduling promise.
 
-1. **Trusted Family Access and Invitations**: authenticate family API actors from the existing JWT system, complete invitation acceptance and member administration, and eliminate browser-controlled actor identity in production paths.
-2. **Preview-first Editor and Review Handoff**: finish contributor editing, conflict-safe autosave, offline draft preservation, exact-version submission, and adult comparison/decision UI.
-3. **Safe Publish Confirmation and Recovery**: finish adult confirmation, schedule choice, per-channel progress, selective retry, connection recovery, and unknown-state reconciliation.
+The implementation reuses FastAPI, the current SQLite-backed `FamilyStore`, React 19, TypeScript, Vite, Vitest, and Playwright. It introduces no production third-party dependency. New domain modules separate provider verification, pilot aggregation, permission policy, visibility language, and privacy operations from the already large router/store. SQLite tables are added through the repository's current idempotent create/alter startup pattern, preserving existing databases. Existing `/api/v1/family` contracts remain valid; new fields are additive and new endpoints are namespaced beneath the same prefix.
 
-These features close the exact PARTIAL/BLOCKED items recorded after the first Family Creator implementation and deliver the sellable promise identified by research: family members can contribute simply while adults retain trustworthy control over what becomes public. No new AI provider, network, billing system, media vault, or native app is included.
+A complete release candidate must satisfy two evidence tracks. Automated checks must finish with zero backend failures, zero frontend test failures, zero lint failures, a successful production build and startup smoke, and zero critical browser E2E failures. Provider claims additionally require observed LinkedIn and X sandbox evidence from approved non-public accounts. If credentials or provider approval are unavailable, automated implementation may pass, but provider verification remains **BLOCKED**, never “passed.”
+
+Scheduling remains hidden in family mode. Its future return requires persistent due jobs, atomic leasing, restart recovery, timezone and DST tests, cancellation, idempotent dispatch, and browser-visible execution history.
 
 ## Current-State Validation
 
-- The input is a complete 295-file project containing `research-findings.md`, the previous `implementation-plan.md`, and `development-report.md`.
-- Implemented family foundations are real: `src/family/store.py` persists workspaces, memberships, invitations, projects, assets, revisions, reviews, ideas, publish batches, deliveries, idempotency records, and audit events. `src/routers/family.py` exposes additive family endpoints. `frontend/src/family.tsx` implements Setup, Home, Journey, Idea, and Review surfaces.
-- The first development report truthfully marks US-002, US-004, US-005, US-008, and US-009 as partial, notes no invitation acceptance UI, contributor editor, publish confirmation/result screen, or completed Playwright verification, and warns that production identity currently depends on actor headers.
-- Existing authentication already supports JWT register/login/refresh/current user in `src/routers/auth.py`, `src/dependencies.py`, and `src/services/auth_service.py`. The correct next step is to integrate family membership with `get_current_user`, not to add another identity system.
-- Existing operations already model immutable revisions, approval supersession, audit events, idempotency, and per-channel deliveries. The plan extends those contracts without replacing the professional/expert workflows.
-- The current family UI uses the existing React 19/Vite/CSS stack and established design tokens. A frontend rewrite would add risk without user value.
+The research matches the extracted project:
+
+- `src/family/store.py` implements adult-owned workspaces, membership roles, seven-day invitations, private ideas, projects/assets/revisions, exact-revision reviews, idempotent publish batches, per-channel deliveries, selective retry, reconciliation and weekly counts.
+- `src/routers/family.py` uses JWT `get_current_user`, constructs real LinkedIn/X connectors when credentials exist, records `connection_required` otherwise, and exposes publish result, retry, reconcile, connection and weekly-summary routes.
+- `frontend/src/family.tsx` supplies a separate family shell, four-step setup, Home, idea capture, guided project creation, invitation acceptance, Members, editor/review, Connections, publish confirmation and channel results.
+- `tests/test_family_api.py` and `tests/test_family_completion.py` exercise the existing SQLite domain. The release report states 2,599 backend tests collected with exit 0, 39 frontend tests passing, clean frontend lint/build and successful startup smoke.
+- `docs/provider-sandbox-checklist.md` and `provider-sandbox-results.csv` are an honest verification framework, not proof of successful live posting. `docs/family-pilot.md` and `family-pilot-results.csv` similarly define a pilot but contain no outcome proof.
+- `frontend/playwright.config.ts` and one transcreation E2E exist, but the project has no family E2E and does not list `@playwright/test` in `frontend/package.json`. The development pass must add and pin that dev dependency and deterministic Chromium provisioning.
+- Existing `research-findings.md` contains nine complete stories, three per selected feature. This plan refines all nine without changing their IDs.
+
+Current weaknesses that directly determine scope:
+
+1. Connections are called `HEALTHY` from credential presence alone; capability, expiry and live evidence are not represented.
+2. The publish endpoint performs connector calls inline and classifies most connector failures too coarsely. Unknown state is modeled by the store but is not produced from timeout/ambiguous provider results through a dedicated application service.
+3. Retry currently mutates store state but the route does not execute a provider retry, so paid-beta recovery is not end-to-end complete.
+4. Pilot metrics are external CSV fields only. There is no consented cohort, privacy-preserving event model, aggregate dashboard or go/no-go computation.
+5. Roles are server enforced, but Members does not show a complete effective-capability matrix and there is no family privacy/export/deletion workflow.
+6. Scheduling is removed from publish confirmation, but Calendar still appears in navigation. In this pass it becomes an immediate-publication history view called **Activity**, avoiding an implied scheduling promise while preserving route compatibility.
 
 ## Research Priorities
 
-1. Preserve adult control and child-appropriate bounded participation through server-enforced identity and roles.
-2. Make review understandable beside the content, with exact revision, author, preview, and measurable change requests.
-3. Make public outcomes trustworthy through confirmation, idempotency, per-channel status, selective retry, and reconciliation.
-4. Reduce family cognitive load with progressive disclosure and plain-language recovery.
-5. Complete the real user journey before adding monetization dashboards, networks, or AI breadth.
+1. **P0 provider proof:** successful LinkedIn/X posting, expired token, permission denial, rate limit, ambiguous provider outcome, repeated idempotency key, partial success and failed-channel-only retry.
+2. **P0 pilot proof:** first useful draft time, ten-second next action, contributor publish-boundary comprehension, visibility-state comprehension, unaided invitation, unaided review/publish, recovery support, and weekly time saved.
+3. **P1 youth/family trust:** visible effective permissions, immediate server enforcement, age-appropriate state explanations, data export/deletion and retention transparency.
+4. **Release honesty:** immediate publishing only; no scheduled-job UI until durable execution is proved.
+5. **Release quality:** full regression, lint, build, startup, browser E2E, accessibility and lab gates.
 
 ## Selected Scope for This Pass
 
-### Feature A: Trusted Family Access and Invitations
+### Feature A: Provider Confidence and Reconciliation
 
-Stories US-010 to US-012. Replace actor headers with the existing JWT dependency on every family route; add safe invitation preview, acceptance, revocation, member listing, role update, removal, and last-owner invariant; build Invitation and Members screens.
+Satisfies US-001, US-002 and US-003. Add a durable connection profile and provider verification-attempt model, normalized failure taxonomy, capability checks, evidence view, real provider sandbox runner, end-to-end selective retry, and reconcile-before-retry behavior. The normal publish path and sandbox path share connector adapters and classification but use separate records and explicit `purpose` values.
 
-### Feature B: Preview-first Editor and Review Handoff
+### Feature B: Pilot Instrumentation and Guided Onboarding
 
-Stories US-013 to US-015. Add a route-addressable editor with 800 ms autosave, optimistic concurrency, IndexedDB draft recovery, desktop split preview/mobile Edit-Preview tabs, revision history, exact-version submission, improved review detail, text diff, stale-state handling, and decision recovery.
+Satisfies US-004, US-005 and US-006. Add opt-in pilot cohorts, pseudonymous household enrollment, content-free funnel events, metric aggregation/export, safety-stop decisions, and an adult-only Pilot dashboard. Instrument the existing first-draft, invitation, review/publish and recovery flows without collecting draft text, tokens or provider response bodies.
 
-### Feature C: Safe Publish Confirmation and Recovery
+### Feature C: Youth Privacy and Adult-Controlled Trust
 
-Stories US-016 to US-018. Add connection-aware confirmation, exact approved revision summary, local/UTC scheduling display, idempotent batch creation, progress polling, per-channel result, selective retry, reconnect deep links, and unknown-state reconciliation.
+Satisfies US-007, US-008 and US-009. Centralize role capabilities, show effective permissions to owners and affected members, add member data export/deletion with reauthentication and retention receipts, and use one visibility-state vocabulary across Home, Editor, Review and Publish Result.
+
+These features are coherent because the live provider flow creates the exact recovery evidence the pilot measures, while permission and visibility clarity prevent the pilot from validating an unsafe mental model.
 
 ## Deferred Scope and Rationale
 
-1. Billing, usage meters, and spend caps: still require a reliable usage ledger and are a monetization phase after the core journey is complete.
-2. Weekly value report: requires trustworthy production event data.
-3. Full image/media vault: ownership metadata, malware scanning, deletion SLA, and retention controls exceed this completion pass.
-4. Offline binary image queue: text draft/idea recovery is included; binary background sync remains browser/storage sensitive.
-5. Independent younger-child accounts and age assurance: require legal/safeguarding design.
-6. New social networks: reliability for current destinations precedes channel breadth.
-7. Rich inline comments and collaborative cursors: exact revision diff and decision reason solve the selected review job with less complexity.
-8. Transactional invitation email: this pass creates copyable/revocable links; provider selection, consent, and deliverability belong to an infrastructure phase.
-9. Billing/admin redesign and advanced analytics: unrelated to completing contribution-to-publication.
+1. **Durable scheduled publication:** deferred to the next reliability phase. Prerequisites: persisted due jobs, atomic lease/heartbeat, restart pickup, UTC storage, IANA timezone display, Europe/Zurich DST gap/fold tests, cancellation, outbox or equivalent deduplication, and E2E evidence.
+2. **Additional social networks:** deferred until LinkedIn and X both pass the complete sandbox matrix. More adapters would increase unproved surface area.
+3. **Recurring schedules/content calendar authoring:** deferred with scheduling. This pass renames family Calendar navigation to Activity while preserving `#calendar` as an alias.
+4. **Child-directed under-13 launch and age assurance:** deferred pending privacy counsel, consent implementation validation and jurisdiction analysis. `TEEN_CONTRIBUTOR` remains a permission role, not proof of age.
+5. **Billing and paid-plan enforcement:** deferred until at least five households complete the pilot and value/time-saving thresholds are met.
+6. **New AI generation or design features:** deferred because evidence identifies trust, provider proof and comprehension as the bottlenecks.
+7. **Multi-instance queue infrastructure:** deferred; the paid-beta remains a single-node SQLite deployment. Provider attempts are durable, but interactive publish execution remains request/worker bounded rather than a general distributed queue.
+8. **Enterprise SSO/SCIM and cross-tenant administration:** unrelated to the validated family beta.
+
+Deferred item count: 8.
 
 ## User Stories (BDD)
 
 ```json
 [
   {
-    "id": "US-010",
-    "epic": "Trusted Family Access and Invitations",
-    "role": "parent owner",
-    "action": "invite a family member through a clear, revocable link",
-    "benefit": "the right person joins with the intended permissions",
-    "story": "As a parent owner, I want to invite a family member through a clear, revocable link, so that the right person joins with the intended permissions.",
+    "id": "US-001",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult owner",
+    "action": "test each connected publishing account before the first real family post",
+    "benefit": "I know whether LinkedIn and X are operational without risking a family draft",
+    "story": "As a adult owner, I want to test each connected publishing account before the first real family post, so that I know whether LinkedIn and X are operational without risking a family draft.",
     "gui_flow": [
-      "Owner opens Workspace menu -> sees Members and invitations with role summaries",
-      "Owner selects Invite member -> modal asks email and role and shows allowed and blocked actions",
-      "Owner submits -> API creates a seven-day single-use invitation and UI shows Copy invitation link",
-      "Recipient opens the link -> invitation screen shows workspace, inviter, role, expiry, and privacy summary",
-      "Recipient signs in and selects Join workspace -> membership is created and Family Home opens",
-      "Owner returns to Members -> new member appears as Active and the invitation is marked Accepted"
+      "User opens Connections from Family Home -> sees each channel with Not tested, Healthy, or Action required state",
+      "User selects Test connection for LinkedIn -> sees the exact account name, granted capabilities, and test scope",
+      "User confirms a non-public sandbox action -> the system creates an idempotent provider test attempt",
+      "The provider responds -> the screen shows success, failure, rate limit, or unknown state in plain language",
+      "User opens Evidence -> sees timestamp, provider request correlation, sanitized response category, and no credential value",
+      "User returns Home -> publishing readiness reflects the latest verified connection state"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "an authenticated adult owner enters a valid email and non-owner role",
-        "when": "they create an invitation",
-        "then": "one hashed, seven-day invitation is persisted and the raw token is returned only in the creation response"
+        "text": "a configured LinkedIn sandbox credential and an unused idempotency key",
+        "when": "the adult runs Test connection",
+        "then": "one provider attempt is recorded and the account becomes Healthy only after a confirmed remote identifier is returned"
       },
       {
         "type": "given",
-        "text": "an invitation remains pending",
-        "when": "the owner revokes it",
-        "then": "the invitation becomes REVOKED and subsequent preview or acceptance returns 410 without creating membership"
+        "text": "the same idempotency key already produced a confirmed post",
+        "when": "the adult repeats the test",
+        "then": "no second provider post is created and the prior remote identifier is returned"
       },
       {
         "type": "given",
-        "text": "the API or network fails during creation",
-        "when": "the owner retries with the same idempotency key",
-        "then": "only one pending invitation exists and entered email and role remain visible"
+        "text": "the provider times out after accepting the request",
+        "when": "the test finishes without a definitive response",
+        "then": "the connection is marked Verification required, automatic repost is blocked, and Reconcile is offered"
       }
     ]
   },
   {
-    "id": "US-011",
-    "epic": "Trusted Family Access and Invitations",
+    "id": "US-002",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult publisher",
+    "action": "recover a partially successful multi-channel publish without repeating successful posts",
+    "benefit": "I can fix one channel safely",
+    "story": "As a adult publisher, I want to recover a partially successful multi-channel publish without repeating successful posts, so that I can fix one channel safely.",
+    "gui_flow": [
+      "User opens a Publish Result with LinkedIn Published and X Failed -> sees an honest partial-success summary",
+      "User expands X -> sees the failure class and the next safe action",
+      "User selects Retry failed channel -> sees LinkedIn excluded from the retry set",
+      "User confirms -> a new X attempt reuses the original delivery idempotency identity",
+      "The provider responds -> only the X row changes state while LinkedIn preserves its remote identifier",
+      "User opens Audit details -> sees both attempts and the final aggregate result"
+    ],
+    "acceptance_criteria": [
+      {
+        "type": "given",
+        "text": "a batch has one PUBLISHED and one FAILED delivery",
+        "when": "the adult retries failed channels",
+        "then": "only failed or retryable channels receive a provider call and successful remote identifiers remain byte-for-byte unchanged"
+      },
+      {
+        "type": "given",
+        "text": "the failed channel is rate limited with a retry-after value",
+        "when": "the adult opens the result",
+        "then": "Retry is disabled until the displayed provider-safe time and no request is sent early"
+      },
+      {
+        "type": "given",
+        "text": "the provider state is UNKNOWN",
+        "when": "the adult selects Retry",
+        "then": "the system runs reconciliation first and blocks a new post until the remote state is resolved or a documented manual override is recorded"
+      }
+    ]
+  },
+  {
+    "id": "US-003",
+    "epic": "Provider Confidence and Reconciliation",
+    "role": "adult owner",
+    "action": "reconnect an expired or under-scoped provider credential from the failed delivery",
+    "benefit": "I can restore publishing without technical support",
+    "story": "As a adult owner, I want to reconnect an expired or under-scoped provider credential from the failed delivery, so that I can restore publishing without technical support.",
+    "gui_flow": [
+      "User opens a failed delivery -> sees Token expired or Permission missing instead of a generic error",
+      "User selects Reconnect account -> the Connections screen opens with the affected channel focused",
+      "User completes the approved provider OAuth flow -> the callback validates state and required scopes",
+      "The system runs a non-destructive capability check -> the account shows Healthy or Missing permission",
+      "User returns to the delivery -> Retry failed channel is enabled only when required capabilities are present",
+      "User retries -> the result records the new credential version without exposing the token"
+    ],
+    "acceptance_criteria": [
+      {
+        "type": "given",
+        "text": "an expired token is attached to a failed delivery",
+        "when": "the owner completes reconnect with required scopes",
+        "then": "the connection becomes Healthy and only the failed delivery becomes retryable"
+      },
+      {
+        "type": "given",
+        "text": "OAuth succeeds but a required posting scope is absent",
+        "when": "the callback completes",
+        "then": "the UI lists the missing capability, keeps publish disabled, and stores no false Healthy state"
+      },
+      {
+        "type": "given",
+        "text": "the OAuth state value is invalid or expired",
+        "when": "the callback is received",
+        "then": "the connection is unchanged, the event is audited, and the user sees a safe restart action"
+      }
+    ]
+  },
+  {
+    "id": "US-004",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
+    "role": "new adult owner",
+    "action": "complete the first useful draft through one measured guided path",
+    "benefit": "I can judge value before learning the whole platform",
+    "story": "As a new adult owner, I want to complete the first useful draft through one measured guided path, so that I can judge value before learning the whole platform.",
+    "gui_flow": [
+      "User signs in to a new family workspace -> sees one Start first project action",
+      "User selects a goal and audience -> sees a four-step progress indicator and a private-by-default notice",
+      "User captures an idea or chooses a starter -> the draft preview appears with an editable message",
+      "User saves the draft -> the system records time-to-first-useful-draft without storing keystroke content in telemetry",
+      "User sees the next action Submit for adult review -> the exact revision is identified",
+      "User completes the flow -> the weekly summary shows minutes saved as an estimate the user can correct"
+    ],
+    "acceptance_criteria": [
+      {
+        "type": "given",
+        "text": "a new owner has no projects",
+        "when": "the owner saves a non-empty first draft",
+        "then": "activation telemetry records one anonymous funnel event and elapsed seconds, with a target median of 600 seconds or less"
+      },
+      {
+        "type": "given",
+        "text": "the browser goes offline after step two",
+        "when": "the owner continues editing and reconnects",
+        "then": "the draft is restored, no duplicate project is created, and elapsed time excludes the offline wait when reported"
+      },
+      {
+        "type": "given",
+        "text": "draft generation fails",
+        "when": "the owner selects Retry",
+        "then": "entered goal and audience remain intact and the error event contains no draft text or credential data"
+      }
+    ]
+  },
+  {
+    "id": "US-005",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
     "role": "teen contributor",
-    "action": "accept an invitation after authenticating",
-    "benefit": "the app can enforce my identity and role without trusting browser-supplied actor headers",
-    "story": "As a teen contributor, I want to accept an invitation after authenticating, so that the app can enforce my identity and role without trusting browser-supplied actor headers.",
+    "action": "understand my next permitted action within ten seconds",
+    "benefit": "I can contribute without fearing accidental publication",
+    "story": "As a teen contributor, I want to understand my next permitted action within ten seconds, so that I can contribute without fearing accidental publication.",
     "gui_flow": [
-      "Recipient opens invitation URL -> sees a safe preview without private project data",
-      "Recipient selects Sign in to join -> authentication screen preserves the invitation token",
-      "Recipient signs in with the invited email -> app returns to the invitation screen",
-      "Recipient selects Join workspace -> server compares authenticated email with invitation email",
-      "Success state names the role and permitted actions -> user selects Go to Home",
-      "Family Home loads server-derived navigation and hides adult-only destinations"
+      "Teen opens Family Home -> sees a contributor label and one primary next action",
+      "Teen opens a private idea -> sees Private to family near the content title",
+      "Teen turns the idea into a draft -> sees Save draft and Submit for review controls",
+      "Teen opens the action menu -> Publish is absent and a short explanation is available",
+      "Teen submits the exact revision -> sees Waiting for adult review",
+      "Teen returns Home -> the next action changes to Capture another idea or respond to requested changes"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "a valid invitation email matches the authenticated user email",
-        "when": "the user accepts",
-        "then": "one active membership is created and the session derives actor ID and email exclusively from the verified JWT"
+        "text": "the signed-in member has TEEN_CONTRIBUTOR role",
+        "when": "the Home screen renders",
+        "then": "the first actionable control is contributor-permitted and no publish control exists in the DOM"
       },
       {
         "type": "given",
-        "text": "the same user opens an already accepted token",
-        "when": "the screen loads",
-        "then": "the API returns ALREADY_JOINED and a Home destination without a duplicate row"
+        "text": "the teen edits a revision that was previously approved",
+        "when": "the save completes",
+        "then": "the prior approval is superseded and the state returns to Needs adult review"
       },
       {
         "type": "given",
-        "text": "the authenticated email differs or token is expired/revoked",
-        "when": "the user attempts acceptance",
-        "then": "the API returns 403 or 410, reveals no workspace content, and creates no membership"
+        "text": "the teen calls a publish endpoint directly",
+        "when": "the request is handled",
+        "then": "the server returns 403, creates no batch or provider attempt, and writes a permission-denied audit event"
       }
     ]
   },
   {
-    "id": "US-012",
-    "epic": "Trusted Family Access and Invitations",
-    "role": "parent owner",
-    "action": "manage family roles without removing the last owner",
-    "benefit": "workspace control cannot be accidentally lost",
-    "story": "As a parent owner, I want to manage family roles without removing the last owner, so that workspace control cannot be accidentally lost.",
+    "id": "US-006",
+    "epic": "Pilot Instrumentation and Guided Onboarding",
+    "role": "pilot facilitator",
+    "action": "export privacy-preserving pilot outcomes for five to ten households",
+    "benefit": "I can make a release decision from comparable evidence",
+    "story": "As a pilot facilitator, I want to export privacy-preserving pilot outcomes for five to ten households, so that I can make a release decision from comparable evidence.",
     "gui_flow": [
-      "Owner opens Members -> sees active members, roles, joined dates, and pending invitations",
-      "Owner opens a member menu -> allowed role changes are listed",
-      "Owner selects a new role -> confirmation summarizes permissions gained and lost",
-      "Owner confirms -> membership role updates and an audit event is recorded",
-      "Affected member refreshes -> navigation and actions immediately match the new role",
-      "Owner attempts to demote or remove the final owner -> action is disabled with explanatory text"
+      "Facilitator opens Admin Pilot dashboard -> sees enrolled household count and completion status",
+      "Facilitator filters by pilot cohort -> sees median draft time, invitation success, review success, recovery support, and weekly time-saved measures",
+      "Facilitator opens a metric -> sees its definition, denominator, and missing-data count",
+      "Facilitator selects Export -> receives a CSV with pseudonymous household IDs and no content text",
+      "Facilitator reviews safety-stop events -> sees any accidental-publication or permission incident highlighted",
+      "Facilitator records the release decision -> the report stores criteria values and rationale"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "two active owners exist",
-        "when": "one owner changes the other to ADULT_COLLABORATOR",
-        "then": "the role changes, audit records old and new roles, and session permissions update"
+        "text": "at least five consenting pilot households have completed one week",
+        "when": "the facilitator opens the dashboard",
+        "then": "all required metrics show numerator, denominator, median or rate, and 95% confidence is not claimed for the small sample"
       },
       {
         "type": "given",
-        "text": "only one active owner exists",
-        "when": "that owner attempts demotion or removal",
-        "then": "the API returns 409 last_owner_required and no membership changes"
+        "text": "a household withdraws consent",
+        "when": "the facilitator refreshes the cohort",
+        "then": "that household is excluded from future exports and its identifiable pilot linkage is deleted within the configured retention window"
       },
       {
         "type": "given",
-        "text": "a non-owner calls member-management endpoints",
-        "when": "authorization runs",
-        "then": "the API returns 403 and does not reveal the member list"
+        "text": "an accidental-publication or minor-permission incident exists",
+        "when": "the facilitator attempts to mark the pilot Go",
+        "then": "the system blocks Go until the safety stop is resolved and an adult reviewer records disposition"
       }
     ]
   },
   {
-    "id": "US-013",
-    "epic": "Preview-first Editor and Review Handoff",
+    "id": "US-007",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
+    "role": "adult owner",
+    "action": "review and change every member's effective permissions in plain language",
+    "benefit": "I can maintain safe boundaries as family roles change",
+    "story": "As a adult owner, I want to review and change every member's effective permissions in plain language, so that I can maintain safe boundaries as family roles change.",
+    "gui_flow": [
+      "Owner opens Members -> sees each member, role, and effective capability summary",
+      "Owner selects a member -> sees Can and Cannot lists for ideas, drafts, review, publish, credentials, billing, and membership",
+      "Owner changes Teen contributor to Viewer -> sees the access impact before saving",
+      "Owner confirms -> active sessions are re-evaluated and new permissions apply immediately",
+      "Owner opens Audit -> sees who changed the role, when, and from/to values",
+      "Owner tests View as member -> sees a read-only preview without impersonating or exposing private credentials"
+    ],
+    "acceptance_criteria": [
+      {
+        "type": "given",
+        "text": "an adult owner views a teen member",
+        "when": "the member detail opens",
+        "then": "all seven sensitive capability categories are explicitly shown and Publish, credentials, billing, and member management are denied"
+      },
+      {
+        "type": "given",
+        "text": "the only remaining owner is selected for demotion or removal",
+        "when": "the owner confirms",
+        "then": "the server returns 409, explains the last-owner rule, and makes no membership change"
+      },
+      {
+        "type": "given",
+        "text": "a demoted member has an existing session",
+        "when": "the member performs a newly forbidden action",
+        "then": "server-side authorization denies it immediately without relying on cached UI state"
+      }
+    ]
+  },
+  {
+    "id": "US-008",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
+    "role": "adult owner",
+    "action": "control retention and delete a family member's contributed personal data",
+    "benefit": "I can honor household privacy choices",
+    "story": "As a adult owner, I want to control retention and delete a family member's contributed personal data, so that I can honor household privacy choices.",
+    "gui_flow": [
+      "Owner opens Privacy and data -> sees collected categories and retention periods",
+      "Owner selects a member -> sees ideas, drafts, audit records, and provider records separated by legal/operational need",
+      "Owner chooses Delete contributed personal data -> sees consequences and items that must be retained in de-identified audit form",
+      "Owner confirms with reauthentication -> a deletion job starts and progress is visible",
+      "The job completes -> content ownership is reassigned or removed according to the selected policy",
+      "Owner downloads a completion receipt -> it lists categories deleted, retained, and retention reasons"
+    ],
+    "acceptance_criteria": [
+      {
+        "type": "given",
+        "text": "an owner requests deletion for a non-owner member",
+        "when": "the verified request completes",
+        "then": "personal profile data and private unreferenced ideas are removed within the configured target and retained audit entries are pseudonymized"
+      },
+      {
+        "type": "given",
+        "text": "a draft is part of a published batch",
+        "when": "deletion is requested",
+        "then": "the UI explains the immutable publication record and removes unnecessary profile linkage while preserving the minimal audit evidence"
+      },
+      {
+        "type": "given",
+        "text": "reauthentication fails",
+        "when": "the deletion request is submitted",
+        "then": "no deletion begins and the event is logged without revealing sensitive account details"
+      }
+    ]
+  },
+  {
+    "id": "US-009",
+    "epic": "Youth Privacy and Adult-Controlled Trust",
     "role": "teen contributor",
-    "action": "edit a channel draft with live preview and conflict-safe autosave",
-    "benefit": "I can create confidently without accidental overwrite or publishing",
-    "story": "As a teen contributor, I want to edit a channel draft with live preview and conflict-safe autosave, so that I can create confidently without accidental overwrite or publishing.",
+    "action": "see why content is private or public and who can change that state",
+    "benefit": "I understand the boundary without surveillance or hidden rules",
+    "story": "As a teen contributor, I want to see why content is private or public and who can change that state, so that I understand the boundary without surveillance or hidden rules.",
     "gui_flow": [
-      "Contributor opens a draft from Home -> editor shows title, channel, revision, and Saved state",
-      "Contributor types -> status changes to Unsaved then Saving after 800 ms idle",
-      "Autosave succeeds -> status announces Saved as vN and preview updates",
-      "Contributor switches Edit and Preview on mobile -> content and channel constraints remain visible",
-      "Contributor opens revision history -> sees author, time, and immutable version list",
-      "Contributor selects Submit for review -> note sheet opens and no Publish control is present"
+      "Teen opens an idea -> sees Private to family with a one-sentence explanation",
+      "Teen opens a draft -> sees Private draft and the adults who may review it",
+      "Teen submits for review -> sees that submission does not make content public",
+      "Adult approves -> the teen sees Approved for adult publishing, not Published",
+      "Adult publishes -> the teen sees Public on LinkedIn or X with timestamp and account label",
+      "Teen opens Learn more -> sees the role rule and how to ask an adult for a change"
     ],
     "acceptance_criteria": [
       {
         "type": "given",
-        "text": "the current expected version matches the server",
-        "when": "autosave runs after 800 ms idle",
-        "then": "one new revision is created, status announces vN, and preview displays the saved content"
+        "text": "a draft has never been published",
+        "when": "the teen views it",
+        "then": "the state label says Private and no public URL or misleading success language is shown"
       },
       {
         "type": "given",
-        "text": "another user saved first",
-        "when": "autosave receives a conflict",
-        "then": "editor blocks further autosave and offers Reload latest and Copy my draft without losing local text"
+        "text": "a revision is approved but not published",
+        "when": "the teen views status",
+        "then": "the UI distinguishes Approved from Public and names the remaining adult action"
       },
       {
         "type": "given",
-        "text": "the request fails or device goes offline",
-        "when": "autosave runs",
-        "then": "local draft remains in IndexedDB, status says Saved on this device, and sync retries once online without duplicate revisions"
-      }
-    ]
-  },
-  {
-    "id": "US-014",
-    "epic": "Preview-first Editor and Review Handoff",
-    "role": "teen contributor",
-    "action": "submit the exact current draft with a note",
-    "benefit": "an adult reviews the version I intended",
-    "story": "As a teen contributor, I want to submit the exact current draft with a note, so that an adult reviews the version I intended.",
-    "gui_flow": [
-      "Contributor selects Submit for review -> sheet shows current revision and receiving adult role",
-      "Contributor enters an optional note up to 500 characters -> counter updates",
-      "Contributor confirms -> server binds one pending review to the current revision",
-      "Success state shows Waiting for review and exact revision",
-      "Contributor chooses Continue editing -> warning explains that a new save supersedes the request",
-      "Contributor saves a change -> previous request becomes Superseded and a new submission is required"
-    ],
-    "acceptance_criteria": [
-      {
-        "type": "given",
-        "text": "a non-empty current revision has no matching pending review",
-        "when": "the contributor submits",
-        "then": "one PENDING review is created for that exact version and Home shows Waiting for review"
-      },
-      {
-        "type": "given",
-        "text": "the same revision already has a pending review",
-        "when": "the contributor submits again",
-        "then": "the existing review is returned and no duplicate notification or review row is created"
-      },
-      {
-        "type": "given",
-        "text": "submission fails",
-        "when": "the contributor retries",
-        "then": "note and draft remain available and the same client request key prevents duplicate review creation"
-      }
-    ]
-  },
-  {
-    "id": "US-015",
-    "epic": "Preview-first Editor and Review Handoff",
-    "role": "parent approver",
-    "action": "compare the submitted revision with its predecessor and decide",
-    "benefit": "I can approve or request precise changes with confidence",
-    "story": "As a parent approver, I want to compare the submitted revision with its predecessor and decide, so that I can approve or request precise changes with confidence.",
-    "gui_flow": [
-      "Parent opens Review queue -> card shows human title, contributor, channel, age, risk, and revision",
-      "Parent opens a card -> preview and decision panel load with contributor note",
-      "Parent selects Changes tab -> additions and removals are labeled in text and color",
-      "Parent selects Request changes -> 10-1000 character required reason appears",
-      "Parent confirms -> asset returns to Draft and contributor Home shows the reason",
-      "Alternatively parent approves -> exact revision receives approval and Publish action becomes available"
-    ],
-    "acceptance_criteria": [
-      {
-        "type": "given",
-        "text": "a current pending review is opened by an adult reviewer",
-        "when": "they approve it",
-        "then": "review records reviewer, timestamp, reason, and APPROVED state and asset exposes Publish"
-      },
-      {
-        "type": "given",
-        "text": "a submitted revision is no longer current",
-        "when": "the reviewer opens it",
-        "then": "the screen labels Superseded, disables decision controls, and links to the current request if present"
-      },
-      {
-        "type": "given",
-        "text": "decision submission fails",
-        "when": "the reviewer retries",
-        "then": "typed reason remains, server state is refreshed, and no second decision is recorded"
-      }
-    ]
-  },
-  {
-    "id": "US-016",
-    "epic": "Safe Publish Confirmation and Recovery",
-    "role": "parent approver",
-    "action": "confirm destinations, approved revision, and timing before publishing",
-    "benefit": "I know exactly what will become public",
-    "story": "As a parent approver, I want to confirm destinations, approved revision, and timing before publishing, so that I know exactly what will become public.",
-    "gui_flow": [
-      "Parent opens an approved project -> primary action reads Publish approved vN",
-      "Parent selects it -> confirmation displays reviewer, revision, preview, connected accounts, and channels",
-      "Parent chooses Publish now or future schedule -> summary updates in local timezone with UTC detail",
-      "Parent selects Confirm publish -> button disables and progress lists one row per channel",
-      "Each row moves through Queued, Publishing, and terminal state -> screen reader receives concise updates",
-      "Completion screen shows Published, Partial success, or Needs attention with next actions"
-    ],
-    "acceptance_criteria": [
-      {
-        "type": "given",
-        "text": "the current revision has a matching adult approval and selected accounts are healthy",
-        "when": "the adult confirms",
-        "then": "one idempotent batch is created and every selected channel receives one delivery row"
-      },
-      {
-        "type": "given",
-        "text": "approval becomes stale before confirmation",
-        "when": "the adult confirms",
-        "then": "API returns 409 approval_required_for_current_revision and UI returns to Review without creating a batch"
-      },
-      {
-        "type": "given",
-        "text": "the confirmation request times out",
-        "when": "the adult selects Check status",
-        "then": "the same idempotency key resolves the existing batch or safely creates it once, never duplicating deliveries"
-      }
-    ]
-  },
-  {
-    "id": "US-017",
-    "epic": "Safe Publish Confirmation and Recovery",
-    "role": "parent owner",
-    "action": "retry only failed channels after partial success",
-    "benefit": "successful posts are preserved and not duplicated",
-    "story": "As a parent owner, I want to retry only failed channels after partial success, so that successful posts are preserved and not duplicated.",
-    "gui_flow": [
-      "Parent opens Publish result -> each channel row shows status, time, and remote link or error",
-      "One channel is Published and another is Retryable -> page headline says Partial success",
-      "Parent selects Retry failed channels -> confirmation lists only failed channels",
-      "Parent confirms -> successful row stays locked and unchanged",
-      "Retrying channel moves through Queued and Publishing -> result refreshes",
-      "All channels succeed -> batch headline changes to Published and retry control disappears"
-    ],
-    "acceptance_criteria": [
-      {
-        "type": "given",
-        "text": "a batch contains published and retryable deliveries",
-        "when": "the adult retries",
-        "then": "only retryable delivery IDs are queued and published remote IDs and attempt counts remain unchanged"
-      },
-      {
-        "type": "given",
-        "text": "a batch has no failed or retryable channels",
-        "when": "the adult calls retry",
-        "then": "API returns 409 nothing_to_retry and UI offers View result only"
-      },
-      {
-        "type": "given",
-        "text": "a failed channel has unknown external state",
-        "when": "the adult attempts retry",
-        "then": "UI requires Check status first and backend performs no external send until reconciliation marks it retryable"
-      }
-    ]
-  },
-  {
-    "id": "US-018",
-    "epic": "Safe Publish Confirmation and Recovery",
-    "role": "family business owner",
-    "action": "understand and recover expired connection or unknown external state",
-    "benefit": "I can resolve publishing problems without technical knowledge",
-    "story": "As a family business owner, I want to understand and recover expired connection or unknown external state, so that I can resolve publishing problems without technical knowledge.",
-    "gui_flow": [
-      "Owner opens a project with connection issue -> publish gate names the affected channel",
-      "Owner selects Fix connection -> Connections panel opens with account and required action",
-      "Owner reconnects or selects Check connection -> health check returns Healthy or Action required",
-      "Owner returns to publish confirmation -> healthy channels are selected and blocked channels are disabled",
-      "Owner confirms healthy destinations -> progress and result are visible",
-      "If a provider response is unknown -> result offers Check status, not Retry, until reconciliation completes"
-    ],
-    "acceptance_criteria": [
-      {
-        "type": "given",
-        "text": "a selected connection is expired before batch creation",
-        "when": "the owner opens confirmation",
-        "then": "the channel is disabled with Reconnect and no delivery is created for it"
-      },
-      {
-        "type": "given",
-        "text": "at least one other selected connection is healthy",
-        "when": "the owner removes the blocked channel and confirms",
-        "then": "healthy channels publish while the blocked channel remains unattempted and clearly listed"
-      },
-      {
-        "type": "given",
-        "text": "provider state is unknown after submission",
-        "when": "the owner checks status",
-        "then": "the app reconciles by remote identifier, redacts provider secrets, and enables retry only after a definitive failed state"
+        "text": "publication state cannot be confirmed from the provider",
+        "when": "the teen views status",
+        "then": "the UI says Verification required rather than Public and provides no retry control to the teen"
       }
     ]
   }
@@ -386,294 +401,613 @@ Stories US-016 to US-018. Add connection-aware confirmation, exact approved revi
 
 ## Product Requirements
 
-### Feature A requirements
+### Feature A: Provider Confidence and Reconciliation
 
-**Evidence addressed:** research demands bounded participation and child-appropriate defaults; the development report flags browser actor headers and missing invitation/member UI.
+**Research problem and evidence:** connector mechanics exist, but the configured provider applications and accounts have not been proved. Credential presence is not health. Provider outcomes include confirmed success, authentication failure, authorization failure, rate limit, transient failure and unknown external state.
 
-**Behavior and API rules**
-- All `/api/v1/family/*` endpoints use `Depends(get_current_user)` and derive actor ID/email/display name from the verified access token. `X-User-*` values are ignored and never used as identity.
-- Invitation preview is public only to the token holder and returns workspace display name, inviter display name, role, allowed/blocked capability labels, expiry, and status. It returns no project, member list, email, or internal IDs beyond invitation ID.
-- Invitation acceptance requires JWT authentication and exact normalized email match. Tokens contain at least 256 bits, are SHA-256 hashed at rest, single-use, seven-day expiry, and revocable.
-- Owner-only member APIs list active members and pending invitations; update roles; remove members; revoke invitations. The last active owner may not be demoted or removed.
-- Membership changes invalidate family session/navigation immediately on the next API request. Audit records actor, old/new role, target, and timestamp.
-- Idempotency is required for invitation creation and acceptance. Body mismatch with reused key returns 409.
+**Inputs and validation**
 
-**Validation and failures**
-- Email uses the project's Pydantic email validation; role allowlist excludes `ADULT_OWNER` for invitations.
-- Wrong email returns 403; expired/revoked token returns 410; unknown token returns 404 with the same generic public copy.
-- Non-owner management requests return 403; cross-workspace targets return 404.
+- Supported channels for this pass are exactly `linkedin` and `twitter`; API presentation label for Twitter is `X`.
+- Provider test requests accept `channel`, `scenario`, `idempotency_key`, and an optional `cleanup_requested` boolean. `scenario` is one of `success`, `expired_token`, `permission_denied`, `rate_limit`, `unknown_state`, `idempotency_replay`, `partial_success`, `selective_retry`.
+- Live scenario execution is adult-owner only and available only when `CONTENTFORGE_PROVIDER_SANDBOX_ENABLED=true` and the provider account is marked non-public/test in configuration. The API returns 409 `sandbox_not_enabled` otherwise.
+- The server generates unique non-sensitive markers in the form `CF-SBX-<UTC date>-<12 random hex>`; user-entered post text is not accepted by the sandbox endpoint.
+- Idempotency keys must be 16-128 printable ASCII characters. Reuse with an identical canonical request returns the original attempt. Reuse with a changed request returns 409.
+- Evidence stores response class, HTTP status, provider request/correlation ID when safely available, confirmed remote ID/URL, attempt count and timestamps. It never stores access tokens, authorization headers, cookies, raw response bodies, personal account identifiers or post content beyond the generated marker.
 
-**Backward compatibility:** expert APIs remain unchanged. The family SPA must use Bearer tokens. A development-only authentication fixture may create tokens; production must not have header fallback.
+**Business rules**
 
-**Non-goals:** SSO, age verification, invitation email sending, organization-wide SCIM.
+- Connection health states are `NOT_CONFIGURED`, `NOT_TESTED`, `HEALTHY`, `ACTION_REQUIRED`, `RATE_LIMITED`, and `VERIFICATION_REQUIRED`.
+- Delivery states remain backward compatible and include `QUEUED`, `PUBLISHING`, `PUBLISHED`, `FAILED`, `RETRYABLE`, and `UNKNOWN`.
+- Only a confirmed provider remote identifier permits `PUBLISHED` and connection `HEALTHY` after a test.
+- A timeout, connection reset after request transmission, malformed success response without remote ID, or provider 5xx with uncertain side effect becomes `UNKNOWN` and connection `VERIFICATION_REQUIRED`.
+- `UNKNOWN` cannot be retried. Reconcile must run first. If a provider lookup confirms publication, mark `PUBLISHED`; if it confirms absence, mark `RETRYABLE`; if lookup is unsupported or still ambiguous, preserve `UNKNOWN` and provide manual verification instructions.
+- Selective retry calls only `FAILED`/`RETRYABLE` deliveries. It never calls a `PUBLISHED`, `UNKNOWN`, or currently `PUBLISHING` delivery.
+- Rate limits store `retry_after_at` when supplied. Retry returns 409 before that UTC time.
+- Successful delivery records and remote IDs are immutable. A second completion with a conflicting remote ID returns 409 and emits a high-severity audit event.
+- Sandbox cleanup is best effort and recorded separately. Failure to delete a sandbox post does not erase successful publish evidence.
 
-### Feature B requirements
+**Outputs and failure behavior**
 
-**Evidence addressed:** current family UI has no route-addressable editor; research and Planable-style workflows demand contextual review and unambiguous versions.
+- All errors use `{"detail": "stable_machine_code", "message": "plain language", "correlation_id": "..."}` for new routes. Existing FastAPI error bodies remain accepted on old routes for backward compatibility.
+- UI never calls a connection Healthy merely because secrets exist.
+- Live credentials missing: `NOT_CONFIGURED`, no network call.
+- Expired/invalid token: `ACTION_REQUIRED`, error code `auth_expired`, primary action `Reconnect account`.
+- Missing scope/permission: `ACTION_REQUIRED`, code `permission_missing`, list of normalized missing capabilities when known.
+- Rate limit: `RATE_LIMITED`, display provider-safe UTC/local retry time, disable retry.
+- Unknown: `VERIFICATION_REQUIRED`, action `Reconcile status`; no retry button.
 
-**Behavior**
-- Editor loads asset, project, current revision, permissions, channel constraints, and preview from a workspace-scoped endpoint.
-- Autosave begins 800 ms after last input; one request is active at a time; further changes queue one latest save. `expected_version` prevents overwrite.
-- On 409, autosave stops. `Reload latest` replaces the editor only after confirmation; `Copy my draft` copies/local-downloads the unsaved text. Local text is never silently dropped.
-- IndexedDB stores workspace/asset/user/version/text/updated time. Online success deletes the matching local snapshot. Offline state is explicit.
-- Desktop 1024+ uses 55/45 editor-preview split. Tablet 768-1023 uses stacked cards. Mobile below 768 uses labeled Edit/Preview tabs and sticky action bar.
-- Preview supports LinkedIn and X plain-text cards, visible character count, and warning when source exceeds platform guidance; no silent truncation.
-- Revision drawer lists version, author, timestamp, and status. Read-only comparisons are produced server-side with `difflib` and returned as labeled added/removed/unchanged segments.
-- Submit-review sheet binds the current version and optional 500-character note. New edit supersedes pending/approved review.
-- Review detail includes title, project, contributor, channel, revision, note, preview, diff, findings, audit timestamps, and current/stale status.
+**Dependencies:** existing connectors, `PublishService`, `FamilyStore`, settings and JWT. Add only `@playwright/test` as a frontend dev dependency for browser verification.
 
-**Failures:** loading has skeleton; not found is generic; offline preserves local; validation focuses summary; failed decision retains reason; stale review disables decisions.
+**Backward compatibility:** preserve every existing family endpoint and response field. Add fields only. Preserve existing idempotency semantics. Keep `twitter` as the API identifier. Do not change general non-family publishing routes.
 
-**Non-goals:** WYSIWYG rich text, real-time collaboration, inline annotations, AI rewrite controls.
+**Measurable acceptance criteria:** all US-001..003 criteria; 100% of ambiguous attempts block retry; exact replay causes zero second provider calls; a partial batch retries only failed/retryable channels; evidence scan finds no configured secret value.
 
-### Feature C requirements
+**Non-goals:** provider app application/approval, production-account posting, third provider, scheduled publishing, automatic deletion guarantees, or a generic connector framework rewrite.
 
-**Evidence addressed:** research highlights publishing trust and partial-success recovery; previous implementation has domain primitives but no sellable confirmation/result UX.
+### Feature B: Pilot Instrumentation and Guided Onboarding
 
-**Behavior**
-- Publish eligibility endpoint returns current revision, matching approval, reviewer/time, selected destination accounts, connection health, allowed schedule range, and blocking reasons.
-- Only adult owner/collaborator can publish. Current revision must have `APPROVED`; stale approval returns 409.
-- `publish_at` is absent for now or RFC 3339 future time. UI displays local timezone and UTC detail. Past times return 422.
-- Idempotency key spans confirmation timeout/retry. Same body returns existing batch; different body returns 409.
-- Batch state is derived from deliveries: `QUEUED`, `PUBLISHING`, `PUBLISHED`, `PARTIAL`, `FAILED`, or `UNKNOWN`.
-- Result endpoint returns per-channel account label, state, attempt count, timestamps, safe error code/message, remote URL/ID when known, and allowed actions.
-- Retry endpoint targets only `FAILED` or `RETRYABLE`; published rows are immutable. `UNKNOWN` requires reconciliation.
-- Reconciliation checks connector status by remote identifier where available. No second send occurs while unknown.
-- When no real connector is configured, family production API must not fabricate published success. It returns `CONNECTION_REQUIRED`; deterministic fake connectors are test-only fixtures.
+**Research problem and evidence:** the protocol exists, but no in-product evidence shows that households understand the model or save time.
 
-**Non-goals:** new connectors, content analytics, billing credits, queue infrastructure migration.
+**Inputs and validation**
+
+- Adult owner creates a pilot cohort with name (2-80 characters), start/end dates, target household count 5-10, consent text version and metric target version.
+- Enrollment creates a random `participant_code`; exported data never contains workspace ID, user ID, email, member name or draft content.
+- An owner must explicitly opt the workspace into the pilot. Opt-in records UTC timestamp, consent version and actor. Withdrawal stops collection immediately.
+- Event names are allowlisted: `journey_started`, `first_draft_saved`, `next_action_answered`, `invite_previewed`, `invite_accepted`, `review_opened`, `review_decided`, `publish_completed`, `connection_recovery_started`, `connection_recovery_completed`, `support_intervention`, `weekly_time_reported`, `critical_incident_reported`.
+- Event attributes are schema-limited primitives. Reject keys named or matching `content`, `text`, `caption`, `token`, `secret`, `authorization`, `email`, `name`, `url`, or `remote_id`.
+- Client durations are advisory. Server timestamps are authoritative for start/end; paused/offline seconds are recorded separately and excluded from active duration.
+
+**Business rules**
+
+- Instrument only enrolled workspaces. Non-enrolled workspaces produce no pilot event rows.
+- First useful draft completes on the first successful non-empty saved revision in the first pilot project, not on LLM generation or text entry.
+- The ten-second question is a moderated/pilot task with explicit start and recorded answer; normal navigation telemetry is not repurposed as a covert comprehension score.
+- Support intervention count increments only through facilitator action after the documented 90-second threshold.
+- Withdrawal removes the workspace-to-participant linkage and excludes events from future aggregates/exports. Event rows may remain only under a non-linkable participant code according to the declared research retention period.
+- Pilot decision states are `DRAFT`, `GO`, `NO_GO`, `BLOCKED_SAFETY`. Any unresolved critical incident forces `BLOCKED_SAFETY` and prevents GO.
+- Dashboard reports numerator, denominator and missing count for every rate. It reports medians for durations and never presents inferential confidence claims for this cohort.
+- Time saved is `max(0, prior_weekly_hours - pilot_weekly_hours)` and remains marked self-reported.
+
+**Outputs and failure behavior**
+
+- Export CSV uses the existing `family-pilot-results.csv` column order plus `consent_version`, `withdrawn_at`, and `data_completeness`. Notes are excluded from default export; a separate adult-reviewed qualitative export may include redacted notes.
+- Dashboard displays `No households enrolled`, skeleton, partial-data, export-ready, safety-blocked and API-error/retry states.
+- Failed telemetry must never block the user's draft, invitation, review or publish action. It logs a redacted warning with correlation ID and retries at most once in the browser session.
+
+**Backward compatibility:** weekly summary remains available. Additive `pilot` fields appear only for enrolled workspaces. Existing family flows work with pilot disabled, which is the default.
+
+**Acceptance criteria:** all US-004..006 criteria; event content-key rejection; zero pilot rows for unconsented workspaces; export contains no direct identifier; safety incident blocks GO; pilot metrics reproduce fixture calculations exactly.
+
+**Non-goals:** product analytics for all customers, session replay, keystroke capture, draft analysis, automated recruitment, incentives, causal time-saving claims or statistical significance claims.
+
+### Feature C: Youth Privacy and Adult-Controlled Trust
+
+**Research problem and evidence:** role enforcement exists, but users need a shared, understandable permission and visibility model plus data lifecycle controls.
+
+**Inputs and validation**
+
+- Capability categories are exactly `ideas`, `drafts`, `review`, `publish`, `connections`, `billing`, `members`, each with `view`, `create`, `edit`, `decide`, or `manage` actions as applicable.
+- Existing roles remain `ADULT_OWNER`, `ADULT_COLLABORATOR`, `TEEN_CONTRIBUTOR`, `VIEWER`. Billing remains denied for every role until billing is implemented; UI says `Not available in this beta` rather than implying a hidden entitlement.
+- Role updates accept only these values and require owner authority. The last-owner rule remains.
+- Privacy export/deletion is available to adult owners for a selected membership. Destructive requests require a fresh-auth proof issued within the previous five minutes.
+- Deletion options are `DELETE_PRIVATE_CONTRIBUTIONS` and `PSEUDONYMIZE_PROFILE_AND_PRIVATE_CONTRIBUTIONS`. The preview endpoint returns counts and retained categories before confirmation.
+
+**Business rules**
+
+- Server policy is the source of truth; UI derives from the same serialized capability matrix returned by session/member endpoints.
+- Role changes apply on the next request. No long-lived authorization cache is introduced.
+- `View as member` is a projection of capabilities and navigation, not impersonation. It never issues a token for the selected member or exposes their private data.
+- Visibility states are `PRIVATE_IDEA`, `PRIVATE_DRAFT`, `WAITING_FOR_REVIEW`, `APPROVED_FOR_ADULT_PUBLISHING`, `PUBLISHING`, `PUBLIC`, `PARTIALLY_PUBLIC`, `VERIFICATION_REQUIRED`, `PUBLICATION_FAILED`.
+- Approved is never rendered as public. Unknown provider state is `VERIFICATION_REQUIRED`, never public.
+- Deletion removes or pseudonymizes member profile linkage, private unreferenced ideas, and eligible private draft authorship in one transaction. Published batch/delivery evidence is retained only with pseudonymous actor reference and documented retention reason.
+- Audit event payloads are minimized; no token, draft content, email or display name is written for privacy operations.
+- Completion receipt records request ID, categories deleted, categories pseudonymized, categories retained, reasons and completion UTC time. It contains no deleted content.
+
+**Failure behavior**
+
+- Last-owner demotion/removal returns 409 and no partial update.
+- Failed reauthentication returns 401 and creates no deletion job.
+- Deletion transaction failure rolls back all data changes and leaves state `FAILED_RETRYABLE`; receipt is not issued.
+- Missing membership returns 404 to owners and does not reveal former membership details to non-owners.
+
+**Backward compatibility:** preserve role names and existing membership endpoints. Extend responses with capability and visibility objects. Existing clients can ignore them.
+
+**Acceptance criteria:** all US-007..009 criteria; policy matrix and UI agree for all four roles; role downgrade blocks the next forbidden API request; deletion is transactional; labels are consistent across all family screens.
+
+**Non-goals:** legal determination of parental authority, age verification, under-13 onboarding, global GDPR/CCPA automation, billing controls, or deletion of remote provider posts.
 
 ## UI and UX Specification
 
-### Personas and journey
+### Personas and primary journey
 
-- Parent owner manages members and resolves connections.
-- Adult collaborator reviews and publishes.
-- Teen contributor edits and submits from phone.
-- Viewer reads only.
+- Adult owner: prove connections, manage members/privacy, review and publish.
+- Adult collaborator: create, review, publish and recover, but cannot manage membership or privacy deletion.
+- Teen contributor: capture ideas, edit drafts, submit review and understand status; no connection/publish/member/privacy controls.
+- Pilot facilitator: adult-authorized internal role exposed only when `PILOT_ADMIN_USER_IDS` contains the current user ID. It manages cohort evidence, not family content.
 
-Primary journey: recipient accepts invitation -> teen opens assigned draft -> autosaves and previews -> submits exact version -> parent reviews diff -> confirms approved revision and destinations -> observes per-channel progress -> recovers only failed channel.
+Primary journey: Sign in -> Home next action -> connection verification if needed -> Create private project -> Submit exact revision -> Adult Review -> immediate Publish -> channel Result -> reconcile/reconnect on failure -> weekly/pilot outcome.
 
-### Navigation
+### Information architecture and navigation
 
-Keep Family Home, Create, Projects, Review, Calendar. Add adult workspace-menu items `Members`, `Connections`, and `Privacy`. Route guards consume server permissions and redirect forbidden routes to Home with `You do not have access to that area`; server authorization remains authoritative.
+Keep the current family shell and hash routing. Desktop/tablet navigation: **Home, Create, Projects, Review, Activity**. `Activity` replaces the visible `Calendar` label; `#calendar` redirects to or renders `#activity` for compatibility. Owner-only Settings links: **Members, Connections, Privacy & data**. Pilot Admin is never in family navigation; authorized facilitators access `#pilot-admin` directly and see an `Admin` badge.
 
-### Design system
+### Design system decision
 
-Reuse existing CSS tokens and family classes. Extract reusable primitives into `frontend/src/family/ui/`: Button, Field, Dialog, Drawer, Tabs, StatusBadge, Skeleton, InlineError, EmptyState, Toast, ProgressRows. No runtime component library. Add `@axe-core/playwright` only as a dev dependency if not already available.
+Reuse `frontend/src/styles.css` and existing family tokens. Do not add a component library in this pass. The UI surface is bounded and the existing project has no component dependency; adding one increases bundle and integration risk. Extract local reusable components into `frontend/src/family/` rather than keeping all behavior in `family.tsx`.
 
-Minimum 44x44 touch targets; 4.5:1 normal text contrast; 3:1 large text/non-text control contrast; 2 px high-contrast focus ring with 2 px offset; no color-only status. Respect reduced motion. Dialogs trap focus, Escape closes only non-destructive dialogs, and focus returns to opener.
+Required tokens:
+
+- spacing: 4, 8, 12, 16, 24, 32, 48 px;
+- radii: 8 px controls, 12 px cards, 16 px major panels;
+- minimum control height: 44 px; minimum pointer target 24x24 CSS px with at least 8 px separation where 44 px is impossible;
+- focus: 3 px high-contrast outline with 2 px offset;
+- text contrast: at least 4.5:1; large text/UI graphics at least 3:1;
+- states: green/confirmed, amber/action required/rate limited, red/failed/destructive, blue/private/in progress, slate/neutral. Every state includes icon and text.
+- motion: transitions <=180 ms; under `prefers-reduced-motion: reduce`, remove movement and use immediate state changes.
+
+Breakpoints: mobile `<640px`, tablet `640-1023px`, desktop `>=1024px`. Mobile uses bottom navigation and one-column cards. Tablet uses a compact side rail and two-column layouts only when each column remains at least 320 px. Desktop limits reading width to 1200 px and uses a 280 px detail sidebar where specified.
+
+### Accessibility behavior
+
+- Add a first-focus skip link to `main`.
+- Every view has one `h1`; cards use ordered heading levels.
+- Status updates use a single polite `aria-live` region; destructive/reconciliation errors use `role=alert`.
+- Dialogs trap focus, close on Escape only when cancellation is safe, restore focus to the opener and have labelled title/description.
+- Tables have captions, header cells and responsive card alternatives on mobile.
+- Tabs use the ARIA tab pattern and arrow-key navigation.
+- Icon-only buttons have explicit accessible names.
+- Form errors are linked with `aria-describedby`; focus moves to the first invalid field after submission.
+- Screens never indicate state by color alone.
 
 ## Screen Inventory and User Flows
 
-### 1. Invitation Preview and Acceptance `#/join/:token`
+### 1. Family Home
 
-Header has logo and Sign in/out. Body card shows workspace, inviter, role, expiry, `You can` and `You cannot` lists, privacy copy, and primary `Join workspace`. Unauthenticated users see `Sign in to join`; token persists through auth. Expired/revoked state shows `Ask the owner for a new invitation`; already joined shows `Go to Home`. Skeleton mirrors card. Generic token error reveals no email or project data.
+**Purpose:** one next action and immediate trust/readiness summary.
 
-### 2. Members and Invitations `#/settings/members`
+**Layout:** top workspace header; next-action hero; three status cards for `Draft & review`, `Connections`, and `This week`; recent projects; family ideas; owner-only links to Members, Connections and Privacy.
 
-Adult-only. Header: `Family members`, subtitle, primary `Invite member`. Active members table/cards show avatar initials, display name, masked email for non-self, role, joined date, and menu. Pending section shows role, expiry, Copy link, Revoke. Invite dialog has email, role cards, permission preview, validation, Cancel/`Create invitation`. Role-change dialog lists gained/lost permissions. Last owner actions are disabled with visible explanation.
+**Primary CTA:** contextual `Start first project`, `Review draft`, `Verify connection`, `Reconcile result`, or `Continue project`. **Secondary:** `Capture idea`.
 
-### 3. Preview-first Editor `#/projects/:projectId/assets/:assetId`
+**States:** skeleton cards while loading; empty project starter; offline banner with last successful refresh; partial panel failure with panel-level Retry; contributor view omits adult controls; safety block displays `Adult help needed` without exposing provider details.
 
-Top: breadcrumb, title, channel badge, revision selector, autosave live region. Main: editor and preview split; character count and channel warnings beneath editor. Sticky footer: contributors `Submit for review`; adults `Review current version`; no contributor Publish. Revision history drawer opens from header. Conflict banner contains `Reload latest`, `Copy my draft`, and current server version. Offline banner names local save time.
+**Flow:** owner opens Home -> sees `Verify connection` when no provider has passed -> opens Connections -> verifies or reconnects -> returns to Home -> CTA changes to `Start first project`.
 
-### 4. Submit Review Dialog
+### 2. Connections
 
-Shows exact revision, receiving adult role, optional note field/counter, warning that later edits supersede review, Cancel and `Submit version N`. Success toast and status panel show `Waiting for review`. Failed submission retains note and offers Retry.
+**Purpose:** distinguish configured credentials from proved provider capability.
 
-### 5. Review Queue `#/review`
+**Layout:** page header (`Connections`, explanation that tests use non-public accounts); provider cards; each card shows account alias, health state, capabilities, token expiry if known, last verified UTC/local time, last failure, and actions; Evidence drawer lists sanitized attempts.
 
-Filters Pending, Needs changes, Completed; search by title/project. Cards show title, contributor, channel, age, risk, version, and status. Empty state says `No reviews waiting` and links Home. Loading skeleton and per-panel Retry are required.
+**Primary CTAs:** `Test LinkedIn`, `Test X`, `Reconnect account`, or `Reconcile status` depending on state. **Secondary:** `View evidence`, `Return to publish`.
 
-### 6. Review Detail `#/review/:reviewId`
+**States:** `Not configured`, `Not tested`, `Testing`, `Healthy`, `Action required`, `Rate limited until <time>`, `Verification required`; test confirmation dialog; success toast; failure explanation; disabled test with exact reason when sandbox disabled.
 
-Header identifies project/title/version/status. Desktop: preview left, sticky decision panel right. Tabs: Preview, Changes, Checks, Activity. Changes uses `Added`, `Removed`, `Unchanged` labels plus semantic `<ins>/<del>`. Decision panel offers `Approve current version` and `Request changes`; reason validation is inline and summarized. Superseded screen disables decisions and links current review.
+**Recovery:** expired token deep-links to reconnect; permission missing lists required capability; unknown state shows only Reconcile. Focus returns to the provider card after dialog completion.
 
-### 7. Publish Confirmation `#/projects/:projectId/publish`
+### 3. Provider Test Confirmation
 
-Header says `Publish approved vN`. Approval card shows reviewer/time and view-review link. Destination rows show channel, account, connection health, and checkbox. Timing control offers `Now` or `Schedule`; schedule displays local and UTC. Summary preview is read-only. Primary exactly `Confirm publish`; disabled states list blockers. Timeout recovery changes primary to `Check publish status` with same idempotency key.
+**Purpose:** prevent accidental public posting and explain evidence/cleanup.
 
-### 8. Publish Progress and Result `#/publish/:batchId`
+**Layout:** modal with provider account alias, generated marker preview, non-public/test-account attestation, scenario, cleanup behavior and warning. Checkbox `I confirm this is an approved non-public test account` is mandatory.
 
-Headline and aggregate badge. Per-channel rows show account, live state, time, remote link, and safe error. Poll every 2 seconds while non-terminal, stop after terminal/unmount, and use `aria-live=polite` for aggregate changes only. Partial state primary `Retry failed channels`; unknown primary `Check status`; expired connection `Reconnect`. Successful rows have no retry control. Empty/not found/error states are explicit.
+**Primary CTA:** `Run sandbox test`. **Secondary:** `Cancel`.
 
-### 9. Connection Recovery Panel `#/settings/connections?returnTo=`
+**Validation/error:** button disabled until checked; 409 sandbox disabled remains in dialog; network ambiguity closes no dialog automatically and changes body to `Provider state needs verification` with `Open reconciliation`.
 
-Shows only selected family workspace accounts. Each row: channel, account, health, last check, permissions, `Reconnect` or `Check connection`. Return link preserves publish context. No secret/token values are rendered.
+### 4. Provider Evidence Detail
 
-### Responsive behavior
+**Purpose:** auditable, secret-free attempt record.
 
-- Mobile `<768`: top bar plus existing five-item bottom nav; one-column screens; editor tabs; sticky review/publish actions above safe-area inset.
-- Tablet `768-1023`: compact rail, stacked editor/preview, two-column member cards.
-- Desktop `>=1024`: 220 px sidebar; editor 55/45 split; review 65/35; max content 1400 px.
+**Layout:** breadcrumb; outcome banner; definition list for provider, scenario, timestamps, attempt count, HTTP class, local correlation ID, idempotency fingerprint, remote ID when confirmed and cleanup state; attempt timeline; copy-safe JSON button containing only allowlisted fields.
 
-### Full flow and recovery
+**Primary CTA:** `Reconcile status` when unknown, `Reconnect account` for auth/permission, otherwise `Back to connections`. **Secondary:** `Download evidence CSV` for owner/pilot facilitator.
 
-Teen opens invitation, authenticates, joins, opens draft, edits offline, reconnects and autosaves, submits v3. Parent reviews v3 changes, approves, opens publish confirmation, sees one expired connection and reconnects, confirms two channels. One publishes, one becomes retryable. Parent retries only failed channel; published row remains unchanged; batch becomes Published. Every failure retains entered data and offers one safe next action.
+**Empty/error:** no raw provider body; unavailable evidence displays a stable local attempt ID and Retry loading action.
+
+### 5. Publish Confirmation
+
+**Purpose:** calm adult-only immediate publication of an approved exact revision.
+
+**Layout:** privacy/approval banner; content preview; approved revision and reviewer; channel checkboxes with connection health; immediate-publication statement; consequences.
+
+**Primary CTA:** `Publish now`. **Secondary:** `Back to review`.
+
+**Rules:** no date/time/scheduling control. Disable an unhealthy channel with `Fix connection`. If all selected channels are unhealthy, disable Publish and focus the first explanation.
+
+### 6. Publish Result
+
+**Purpose:** honest channel-level final or recoverable state.
+
+**Layout:** aggregate banner; one row/card per channel with state, attempt time, remote link, error explanation and next action; audit/evidence accordion.
+
+**Primary CTA by state:** `View public post`, `Retry failed channel`, `Reconnect account`, or `Reconcile status`. `UNKNOWN` never displays Retry. **Secondary:** `Back home`.
+
+**Partial flow:** LinkedIn Published, X Failed -> user expands X -> clicks Retry failed channel -> confirmation explicitly says LinkedIn will not be resent -> only X changes to Publishing -> final result updates; LinkedIn remote ID remains visible and unchanged.
+
+### 7. Guided Create Journey
+
+**Purpose:** first useful private draft with consented timing.
+
+**Layout:** existing four steps retained: goal, project/audience, message/CTA, channels/summary. Persistent progress, private-by-default notice and Save state.
+
+**Primary CTA:** `Continue` then `Create private draft`. **Secondary:** `Back`, `Save and exit`.
+
+**Instrumentation:** when enrolled, a small `Pilot measurement on` badge links to data explanation. No draft text enters measurement events. Offline state stores draft locally, displays `Saved on this device`, and syncs once with the same idempotency key.
+
+### 8. Contributor Home and Editor
+
+**Purpose:** safe contribution with visible limits.
+
+**Layout:** role badge `Teen contributor`; next action; visibility badge next to title; editor; revision/save state; permission explanation link.
+
+**Primary CTA:** `Save private draft` or `Submit for adult review`. There is no Publish element in DOM. **Secondary:** `Why can't I publish?` opens a non-modal explanation.
+
+**Error/edge:** direct prohibited API action renders `An adult controls public publishing` without suggesting credential access. Editing an approved revision immediately shows `Approval needs to be repeated`.
+
+### 9. Invitation Preview and Acceptance
+
+**Purpose:** self-service acceptance with role clarity.
+
+**Layout:** workspace, inviter display name if available, expiry, role, Can/Cannot matrix, private-default notice, sign-in/join action.
+
+**Primary CTA:** `Join workspace`. **Secondary:** `Sign in with another account`.
+
+**States:** checking skeleton; expired/revoked generic unavailable state; email mismatch with account-switch action; success confirmation and Home redirect. Pilot instrumentation records only timestamps/outcome and participant code.
+
+### 10. Review Inbox and Review Detail
+
+**Purpose:** approve exact content with visible author, revision and visibility effect.
+
+**Layout:** inbox filters; detail header; content and word diff; author/role; current state; decision panel.
+
+**Primary CTA:** `Approve revision` or `Request changes`. **Secondary:** `Back to inbox`.
+
+**Rules:** approval copy says `Approved for adult publishing`, not public. Request changes requires reason. Superseded revision disables decision and links to current revision.
+
+### 11. Members and Effective Permissions
+
+**Purpose:** owner management and shared capability clarity.
+
+**Layout:** member list; selected-member detail; Can/Cannot table across seven categories; role selector; impact preview; audit summary; `View as member` projection.
+
+**Primary CTA:** `Save role change`. **Secondary:** `View as member`, `Remove member`.
+
+**States:** owner-only edit controls; affected member receives read-only capability view; last-owner action disabled with explanation and backed by 409; role save success moves focus to updated role heading.
+
+### 12. Privacy & Data
+
+**Purpose:** data-category transparency, export and deletion.
+
+**Layout:** collection/retention overview; member selector; data category counts; `Export member data`; destructive `Delete or pseudonymize`; request history.
+
+**Primary CTA:** `Export data` or, within destructive dialog, `Continue to reauthentication`. **Secondary:** `Cancel`.
+
+**Deletion flow:** preview counts -> choose policy -> display retained publication/audit reasons -> reauthenticate -> confirm exact member -> processing state -> completion receipt. Failure rolls back and offers `Retry request`; no content preview is shown.
+
+### 13. Activity
+
+**Purpose:** immediate publication history without a scheduling promise.
+
+**Layout:** chronological batches grouped by date; filters `All`, `Published`, `Needs action`; channel/state rows and links to results.
+
+**Primary CTA:** row-specific `Open result`. Empty state: `No publication activity yet` plus `Create a private draft`. `#calendar` resolves here but UI title is Activity.
+
+### 14. Pilot Admin Dashboard
+
+**Purpose:** conduct a 5-10-household pilot and make a documented go/no-go decision.
+
+**Layout:** cohort selector; consent/enrollment card; metric cards with definitions/denominators/missing counts; household pseudonymous table; safety incidents; exports; decision panel.
+
+**Primary CTAs:** `Create cohort`, `Export pilot CSV`, `Record decision`. **Secondary:** `Enroll workspace`, `Withdraw household`, `View metric definition`.
+
+**States:** unauthorized 404-style screen; no cohort; loading skeleton; partial data; safety blocked red banner; decision confirmation. GO button is disabled when a critical incident remains unresolved or fewer than five active households have required completion.
+
+### End-to-end success and recovery
+
+Success: owner signs in -> verifies LinkedIn/X -> creates a private draft -> teen edits/submits -> adult opens Review and approves exact revision -> Publish now -> both channel rows become Published -> Activity and weekly/pilot metrics update.
+
+Friendly recovery: X times out after request transmission -> result says Verification required -> Retry is absent -> owner selects Reconcile -> provider confirms no post -> X becomes Retryable -> owner retries X only -> LinkedIn is not called -> X succeeds -> aggregate becomes Published. If reconciliation cannot decide, state stays Verification required with manual-check instructions and correlation ID.
 
 ## Architecture and Technical Design
 
-### Backend boundaries
+### Component boundaries
 
-- Refactor `src/routers/family.py` to inject `current_user: User = Depends(get_current_user)` and delegate only.
-- Extend `src/family/store.py` for revocation, member administration, asset detail, revision list/diff, eligibility, result, retry, and reconciliation. Keep parameterized SQL and workspace scoping.
-- Add `src/family/permissions.py` for named permissions and exhaustive map; migrate inline role map without changing effective current permissions.
-- Add `src/family/service.py` for invitation/JWT orchestration, editor DTO assembly, publish eligibility/derivation/retry/reconciliation.
-- Add `src/schemas/family.py` for request/response models and enums. Remove untyped dict response construction from router.
-- Reuse `src/services/publish_service.py` connectors, but inject fake connectors only in tests. Do not preserve synthetic production success.
+- `src/family/permissions.py`: immutable role/capability policy and serialization.
+- `src/family/visibility.py`: pure domain-to-UI visibility mapping and messages.
+- `src/family/provider_verification.py`: scenario validation, safe marker generation, outcome classification, evidence allowlist and provider test orchestration.
+- `src/family/connections.py`: connection profile/capability normalization and health computation.
+- `src/services/family_publish.py`: application service for initial publish, selective retry and reconciliation; router no longer owns connector loop.
+- `src/family/pilot.py`: event schema allowlist, aggregation, go/no-go rules and CSV generation.
+- `src/family/privacy.py`: export inventory, deletion preview, transactional execution and receipt construction.
+- `src/family/store.py`: persistence primitives and migrations only; retain public methods for compatibility.
+- `src/routers/family.py`: thin HTTP validation/auth/error mapping.
+- Frontend split into `frontend/src/family/FamilyApp.tsx`, `Home.tsx`, `Connections.tsx`, `Publish.tsx`, `Members.tsx`, `Privacy.tsx`, `PilotAdmin.tsx`, `types.ts`, `api.ts`, `components.tsx`; keep `frontend/src/family.tsx` as a compatibility export.
 
-### Frontend boundaries
+### Data flow and state management
 
-Split the current monolithic `frontend/src/family.tsx` into `family/api.ts`, `session.tsx`, `routes.tsx`, `offline-drafts.ts`, shared UI primitives, and screen components. Keep `FamilyApp` as composition root. Use React local/context state, AbortController, and one polling hook; no new state library.
+Continue React local state and fetch helpers; do not introduce Redux or a query library. Each page owns `idle/loading/success/error` state and aborts stale requests with `AbortController`. Provider/publish result polling uses bounded backoff (1s, 2s, 4s, then 5s, maximum 60s) and stops on terminal state or unmount. All mutations include an idempotency key generated once per user intent and retained across browser retry.
 
-### Data changes
+Server flow: router authenticates -> application service checks capability -> store opens transaction -> connector call occurs outside a long SQLite write transaction -> result classifier normalizes outcome -> store atomically records attempt/delivery/audit -> response serializer returns additive contract.
 
-- Add `revoked_at` to invitations.
-- Add `updated_at` to memberships/assets/reviews.
-- Add delivery `attempt_count`, `last_attempt_at`, `error_code`, `external_state_checked_at`.
-- Add publish batch `idempotency_key`, `publish_at`, `updated_at` if absent.
-- Store invitation raw token nowhere. The current `token_once` column must be migrated to null and no longer written. Existing pending raw tokens are invalidated during migration because secure recovery is impossible; document this breaking security migration.
-- Add indexes for workspace memberships, pending reviews, project assets, batch deliveries, invitation token hash.
+### Persistence changes
 
-Use additive SQLite migration in store initialization matching repository convention, plus migration tests against a copy of the current schema.
+Add idempotently:
 
-### Exact APIs
+- `family_connections`: `id`, `workspace_id`, `channel`, `account_alias`, `state`, `capabilities_json`, `token_expires_at`, `last_verified_at`, `last_error_code`, `updated_at`; unique `(workspace_id, channel)`.
+- `family_provider_attempts`: `id`, `workspace_id`, `batch_id`, `delivery_id`, `connection_id`, `purpose`, `scenario`, `idempotency_key_hash`, `marker`, `state`, `http_status`, `provider_correlation_id`, `remote_id`, `error_code`, `retry_after_at`, `cleanup_state`, `started_at`, `completed_at`, `attempt_count`.
+- `family_pilot_cohorts`: cohort metadata, target count, consent/metric versions and decision state.
+- `family_pilot_participants`: pseudonymous code, cohort/workspace linkage, consent/withdrawal timestamps. Workspace linkage is nullable and cleared on withdrawal.
+- `family_pilot_events`: participant code, allowlisted event, numeric/boolean attributes JSON, server timestamp, client elapsed/offline seconds.
+- `family_pilot_incidents`: severity, status, privacy-safe category, timestamps, disposition.
+- `family_privacy_requests`: selected membership pseudonymous reference, policy, state, preview/result JSON, requested/completed timestamps and actor.
+- `family_reauth_proofs`: hashed one-time proof, actor, purpose, issued/expires/used timestamps.
 
-- `GET /api/v1/family/invitations/{token}/preview`
-- `POST /api/v1/family/invitations/{token}/accept` with `Idempotency-Key`
-- `GET /api/v1/family/workspaces/{id}/members`
-- `PATCH /api/v1/family/workspaces/{id}/members/{membershipId}` body `{role}`
-- `DELETE /api/v1/family/workspaces/{id}/members/{membershipId}`
-- `DELETE /api/v1/family/workspaces/{id}/invitations/{invitationId}`
-- `GET /api/v1/family/assets/{assetId}`
-- `PUT /api/v1/family/assets/{assetId}/autosave` body `{content, expected_version, client_updated_at}`
-- `GET /api/v1/family/assets/{assetId}/revisions`
-- `GET /api/v1/family/reviews/{reviewId}`
-- Existing submit/decision endpoints remain, now JWT-authenticated and typed.
-- `GET /api/v1/family/assets/{assetId}/publish-eligibility`
-- `POST /api/v1/family/publish-batches` with required idempotency header and optional `publish_at`
-- `GET /api/v1/family/publish-batches/{batchId}`
-- `POST /api/v1/family/publish-batches/{batchId}/reconcile`
-- `POST /api/v1/family/publish-batches/{batchId}/retry`
+Add to `family_deliveries`: `retry_after_at`, `provider_attempt_id`, `state_verified_at`. Add to `family_audit` no new content-bearing columns.
 
-All private object lookups return 404 across workspace boundaries. Error codes remain in `detail`; field errors use Pydantic 422 shape.
+Migrations follow current PRAGMA inspection and `ALTER TABLE` behavior in `FamilyStore.__init__`. Every migration is idempotent and tested against a copied pre-change SQLite fixture. No existing row is deleted or rewritten during migration.
+
+### Alternatives considered
+
+- **Celery/Redis:** rejected for this pass; unnecessary infrastructure for interactive paid-beta verification.
+- **New component library:** rejected; current design system can satisfy scope and dependencies should remain small.
+- **Raw provider response storage:** rejected for secret/PII risk. Store normalized allowlisted evidence.
+- **Retry on timeout:** rejected because it can duplicate external posts.
+- **General analytics SDK:** rejected because pilot consent/data minimization need a narrower event schema.
+- **Hard-delete all historical evidence:** rejected because publication integrity requires a minimal pseudonymous audit record.
 
 ## Data, API, and Compatibility Changes
 
-Existing expert APIs and hash routes remain. Family route request identity changes intentionally: `X-User-*` no longer authenticates. The SPA must obtain/store the existing access token and send `Authorization: Bearer`. Development E2E seeds users and tokens using auth endpoints or fixtures. Legacy raw invitation tokens are revoked by migration. Existing accepted memberships, projects, assets, reviews, ideas, and batches are preserved.
+All endpoints require JWT except invitation preview and provider OAuth callbacks. Owner-only routes explicitly check `ADULT_OWNER`; pilot routes also require configured facilitator allowlist.
 
-No backend runtime dependency is added. Frontend dev dependency `@axe-core/playwright` is permitted. Use browser IndexedDB directly.
+### Connection and provider verification APIs
+
+- `GET /api/v1/family/connections?workspace_id=<id>&return_to=<hash>` -> `{items:[{id,channel,label,account_alias,state,capabilities:{required,granted,missing},token_expires_at,last_verified_at,last_error_code,actions:[]}],return_to}`.
+- `POST /api/v1/family/connections/{connection_id}/sandbox-tests` with header `Idempotency-Key` and body `{workspace_id,scenario,cleanup_requested,test_account_attested}` -> 202 attempt summary.
+- `GET /api/v1/family/provider-attempts/{attempt_id}?workspace_id=<id>` -> sanitized evidence only.
+- `GET /api/v1/family/provider-attempts?workspace_id=<id>&channel=<optional>&limit=50` -> paginated sanitized attempts.
+- `POST /api/v1/family/provider-attempts/{attempt_id}/reconcile` -> updated attempt/delivery state; 409 when not reconcilable.
+- `POST /api/v1/family/connections/{connection_id}/recheck` -> non-posting capability/token check; never creates content.
+- OAuth start returns server-generated state and PKCE data where provider supports it; callbacks validate state, bind workspace/actor and redirect to the sanitized `return_to`. Existing direct external URLs are removed from API responses once server OAuth initiation exists.
+
+### Publish APIs
+
+- Existing `POST /publish-batches` remains and returns additive `correlation_id`, `immediate:true`, and normalized delivery fields.
+- Existing `POST /publish-batches/{batch_id}/retry` becomes async and executes connector calls for eligible channels; optional body `{workspace_id,channels}`, where omitted means all eligible. Existing query-only call remains accepted for one compatibility release.
+- Existing `POST /publish-batches/{batch_id}/reconcile` executes provider lookup when available and returns per-channel evidence. Existing query parameter remains accepted.
+- `GET /publish-batches/{batch_id}` adds `can_retry`, `can_reconcile`, `retry_after_at`, `attempt_id`, and privacy-safe `message` per delivery.
+
+### Pilot APIs
+
+- `POST /api/v1/family/pilot/cohorts`; `GET /pilot/cohorts`; `GET /pilot/cohorts/{id}`.
+- `POST /pilot/cohorts/{id}/enroll` with `workspace_id` and consent version.
+- `POST /pilot/participants/{code}/withdraw`.
+- `POST /pilot/events` accepts one allowlisted event; returns 204. It is non-blocking to product flows.
+- `GET /pilot/cohorts/{id}/metrics` returns definitions, numerators, denominators, missing counts, medians and threshold state.
+- `GET /pilot/cohorts/{id}/export.csv` downloads pseudonymous CSV.
+- `POST /pilot/cohorts/{id}/incidents`; `PATCH /pilot/incidents/{id}` for disposition.
+- `POST /pilot/cohorts/{id}/decision` with `GO|NO_GO`; server derives `BLOCKED_SAFETY` and rejects invalid GO.
+
+### Permission/privacy APIs
+
+- `GET /workspaces/{id}/members` adds `capability_summary` to each member.
+- `GET /workspaces/{id}/members/{membership_id}/capabilities` returns role, seven categories, Can/Cannot text and navigation projection.
+- Existing role PATCH accepts `preview=true` as a dry run or add `POST .../role-preview` if query dry-run conflicts with FastAPI docs; selected contract is `POST /members/{id}/role-preview` with `{role}`.
+- `POST /privacy/reauth` with password uses existing auth verification and returns a one-time five-minute proof.
+- `GET /privacy/members/{membership_id}/preview?workspace_id=<id>`.
+- `POST /privacy/members/{membership_id}/export` -> 202 privacy request; `GET /privacy/requests/{id}` returns state and a one-time download URL when ready.
+- `POST /privacy/members/{membership_id}/delete` with `workspace_id`, `policy`, `reauth_proof`, `preview_hash` -> 202.
+- `GET /privacy/requests/{id}/receipt` returns JSON/CSV receipt after completion.
+
+### Compatibility guarantees
+
+- No endpoint removal.
+- No role, route prefix, state or field rename in backend storage contracts.
+- `#calendar` remains a route alias, while visible text becomes Activity.
+- Old SQLite databases open and migrate automatically; migration failure aborts startup before serving traffic.
+- Pilot is disabled by default. Sandbox live execution is disabled by default.
+- Existing general ContentForge workspaces remain unchanged.
 
 ## Security and Privacy Considerations
 
-- JWT is the only family identity source. Reject missing/invalid token with 401 and `WWW-Authenticate: Bearer`.
-- Membership and object scope checks precede serialization; cross-workspace response is 404.
-- Raw invitation token is only in create response and URL, never DB/log/analytics. Hash compare uses constant-time comparison where practical.
-- Invitation preview omits invited email and internal workspace data.
-- Last-owner invariant is transactionally enforced.
-- Autosave only accepts text, size max 100,000 characters; local drafts are namespaced by user/workspace/asset and cleared on logout.
-- Publish errors redact connector credentials and response bodies. Logs include correlation ID, actor/workspace/entity, safe event, and outcome only.
-- CSRF is mitigated by Authorization header token rather than cookie auth. CORS stays explicit.
-- No claim of COPPA compliance; no age or behavioral advertising data is added.
+- Secrets stay in settings/environment and are redacted from logs, exceptions, evidence and test snapshots. Add a test that loads unique sentinel secrets and scans response/log artifacts for them.
+- OAuth state is random, single-use, actor/workspace-bound and expires in ten minutes. Use PKCE where supported. Redirect targets are allowlisted local hash routes, never arbitrary URLs.
+- Provider evidence uses normalized fields only. Hash idempotency keys before persistence in attempt evidence; retain the existing idempotency storage behavior needed for request replay.
+- All connection, provider evidence, pilot, member and privacy queries are workspace-scoped server side.
+- Pilot collection requires explicit versioned consent, can be withdrawn, and rejects content-like attribute names.
+- Privacy export/download URLs are one-time, expire in ten minutes and require the requesting owner session.
+- Deletion uses one transaction and a preview hash to prevent deleting a changed data set without another preview.
+- Reauthentication proof is one-time, purpose-bound and expires in five minutes.
+- `View as member` cannot create an impersonation session.
+- Teen and viewer APIs remain server-denied for publishing, connections, member management, pilot administration and privacy deletion.
+- Rate-limit sandbox execution per workspace/provider to five attempts per hour and one concurrent attempt.
+- Log correlation IDs, machine error codes and state transitions, but not post text, draft text, emails, tokens, raw provider bodies or qualitative pilot notes.
 
 ## Test Strategy (TDD)
 
-### RED-first tests
+### RED-first workflow
 
-Create failing tests named/tagged US-010 through US-018 before implementation. Each of the 27 acceptance criteria maps to a unique parametrized ID such as `US-010-AC1`.
+Before implementation, create failing tests derived directly from every acceptance criterion. Do not weaken or skip them after implementation. Tests use fake provider transports for deterministic error classes and real temporary SQLite files for persistence. Live sandbox tests are separately marked `provider_sandbox` and never run in the default suite.
 
-### Backend
+### Feature A tests
 
-- `tests/test_family_auth_invites.py`: JWT-only identity; spoofed headers ignored; preview minimization; accept/revoke/idempotency/expiry/wrong email.
-- `tests/test_family_members.py`: permission matrix, role changes, cross-workspace 404, last-owner transaction.
-- `tests/test_family_editor.py`: asset DTO, 800 ms behavior at component level, expected-version conflict, revisions, diff, stale review.
-- `tests/test_family_publish_flow.py`: eligibility, schedule validation, idempotency, real connector test double, partial status, selective retry, unknown reconciliation, no synthetic production success.
-- Migration integration test opens a copy of the current SQLite schema and verifies data preservation/raw-token revocation.
+- Pure unit tests for provider outcome classification, capability normalization, state transition rules, evidence allowlist and retry eligibility.
+- SQLite integration tests for attempt idempotency, immutable successful remote ID, rate-limit time, UNKNOWN reconciliation gate and additive migration.
+- Router tests with dependency-injected fake connectors for success, expired token, permission denial, 429 with Retry-After, timeout after send, malformed success, replay and partial success.
+- Verify connector call counts: replay 0 additional, selective retry calls only requested failed channel, PUBLISHED 0 calls, UNKNOWN 0 calls until reconcile.
+- Playwright: Connections test success; reconnect missing scope; Publish Result partial retry; unknown reconcile flow; console/page errors empty.
+- Live provider tests execute the eight checklist scenarios and append sanitized observed results. A missing credential produces pytest skip plus release status BLOCKED, never success.
 
-### Frontend
+### Feature B tests
 
-Component tests for InvitationScreen, MembersScreen, FamilyEditor, ReviewDetail, PublishConfirmation, PublishResult, ConnectionRecovery; fake timers for 800 ms autosave and polling; IndexedDB stub with real serialization; keyboard/focus assertions; mobile route rendering.
+- Unit tests for event schema allowlist/rejection, active-duration calculation, median/rate/missing count, time-saved calculation and decision rules.
+- SQLite tests for consent gating, withdrawal unlinking, no direct identifiers in export, safety-blocked GO and migration.
+- Router tests for facilitator authorization, cohort size bounds, enrollment, event ingestion, export headers/order and withdrawal.
+- Frontend component tests for pilot badge, non-blocking telemetry failure, dashboard states and disabled GO.
+- Playwright first-draft timing flow and pilot dashboard export using seeded pseudonymous cohort.
 
-### E2E
+### Feature C tests
 
-Add `frontend/e2e/family-completion.spec.ts` with tagged flows: invitation/auth, contributor editor conflict/offline recovery, exact review, stale approval, publish partial retry, unknown reconciliation, role route denial. Run Chromium desktop 1440x900 and mobile 390x844. Capture screenshots for invitation, members, editor desktop/mobile, review, confirmation, partial result, recovered result, plus empty and error states. Add axe scans and console/page-error guard.
+- Exhaustive parameterized policy matrix for four roles x seven capability categories.
+- Store/router tests for immediate downgrade enforcement, last-owner protection, unauthorized capability lookup, view-as projection and exact visibility mapping.
+- Privacy tests with real SQLite transactions: preview hash, reauth expiry/use-once, private idea deletion, published evidence pseudonymization, rollback on injected failure and receipt contents.
+- Component tests ensure contributor has no Publish element and sees correct state explanations.
+- Playwright member role preview, contributor flow, privacy deletion success/failure, keyboard focus restoration and 200% zoom smoke.
+
+### Acceptance-criterion mapping rule
+
+Test names include the story and criterion sequence, for example `test_us_002_ac_03_unknown_reconciles_before_retry`. Every story has AC-01 happy path, AC-02 edge condition and AC-03 error condition. The development report contains a generated inventory showing 27/27 acceptance criteria mapped to at least one test. The traceability matrix below maps every story at feature level; the test inventory supplies criterion-level file/test names.
 
 ### Commands
 
 Supported repository commands:
 
-```bash
-python -m pytest tests/test_family_auth_invites.py tests/test_family_members.py tests/test_family_editor.py tests/test_family_publish_flow.py
-python -m pytest
-ruff check src tests
-cd frontend && npm test
-cd frontend && npm run lint
-cd frontend && npm run build
-python scripts/run_backend.py
-cd frontend && npm run dev
-cd frontend && npx playwright test e2e/family-completion.spec.ts
-```
+- Backend targeted: `.venv/bin/python -m pytest tests/test_family_api.py tests/test_family_completion.py tests/test_family_provider_confidence.py tests/test_family_pilot.py tests/test_family_privacy.py -q`
+- Backend full: `.venv/bin/python -m pytest`
+- Backend lint: `.venv/bin/python -m ruff check .`
+- Frontend install: `cd frontend && npm ci`
+- Frontend tests: `cd frontend && npm test`
+- Frontend lint: `cd frontend && npm run lint`
+- Frontend type-check and production build: `cd frontend && npm run build`
+- Playwright provision: `cd frontend && npx playwright install --with-deps chromium`
+- Family E2E: `cd frontend && npx playwright test e2e/family.spec.ts --project=chromium`
+- All E2E: `cd frontend && npx playwright test --project=chromium`
+- Backend startup: `.venv/bin/python -m uvicorn src.main:app --host 127.0.0.1 --port 8099`
+- Frontend startup: `cd frontend && npm run dev -- --host 127.0.0.1 --port 5173`
+- Smoke: HTTP 200 from `/health`, frontend `/`, and authenticated family session fixture; no startup traceback.
 
-If Playwright browsers are absent, install them before verification and record exact result. Changed/new Python modules and family frontend logic target >=90% line coverage; permission and publish-gate branches require complete case coverage.
+The development environment creates `.venv` outside final packaging or removes it before delivery. If the lab gate scripts are supplied outside this archive, run: `tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, `ui-gate.sh`, and `git-push-verify.sh`. If they remain unavailable, the phase is BLOCKED by lab policy and must not mark them passed.
 
-### Objective pass criteria
+### Objective gates
 
-Zero targeted/full failures; existing 2,587-test baseline does not regress; zero Ruff/new ESLint/type/build errors; backend and frontend start; family E2E passes desktop/mobile; no serious axe findings; all required lab gates exit 0. Any unavailable gate or git remote is BLOCKED, never reported as PASS.
+- Backend full suite: exit 0, zero failures/errors.
+- Frontend Vitest: exit 0, zero failures.
+- Ruff and ESLint: exit 0, zero warnings/errors.
+- Production build/type-check: exit 0.
+- Startup smoke: all required HTTP probes 200 and processes stop cleanly.
+- E2E: zero failed tests and zero console/page errors; no critical accessibility violations.
+- Changed/new Python modules and extracted frontend family modules: >=90% line coverage; all security/state branches listed above exercised.
+- Live sandbox: both provider successes plus all failure/idempotency/partial scenarios observed, or release remains BLOCKED.
 
 ## Documentation Deliverables
 
-- `README.md`: JWT family quick start, invitation/editor/review/publish flow, configuration and troubleshooting.
-- `CHANGELOG.md`: trusted access, editor/review, publish recovery, migration, tests, accessibility.
-- `docs/family-workspace.md`: update all exact endpoints, role matrix, invitation lifecycle, autosave/offline/conflict, review diff, publish/reconcile/retry, privacy boundaries.
-- `docs/api-overview.md`: family endpoint and error summary.
-- `FEATURES-DONE.md`: list only fully completed features and map US-010 through US-018.
-- `development-report.md`: replace with RED/GREEN evidence, exact test/gate/build/startup/E2E/screenshot/git results, migration evidence, files, limitations, and traceability.
+- `README.md`: Family paid-beta workflow, immediate-only publishing statement, Provider Confidence Center, pilot opt-in/privacy, role capability summary, setup and verification commands.
+- `CHANGELOG.md`: additive APIs/tables, connection/reconciliation behavior, pilot instrumentation, privacy operations, Activity rename/route alias, test counts and explicitly blocked live evidence if applicable.
+- `docs/family-workspace.md`: complete screen/role/state flow, exact visibility vocabulary, recovery matrix and privacy lifecycle.
+- `docs/provider-sandbox-checklist.md`: prerequisites, exact commands/process, eight scenarios, expected classifications, cleanup and evidence redaction.
+- `docs/provider-sandbox-results.md` plus existing CSV: dated observed evidence, environment/app aliases, scenario result, remote ID hash, duplicate check and unresolved states; no secrets.
+- `docs/family-pilot.md`: consent, event dictionary, facilitator workflow, metric formulas, withdrawal/deletion and go/no-go rule.
+- `docs/api-overview.md`: all new family connection, attempt, pilot, capability and privacy endpoints with request/response/error examples.
+- `FEATURES-DONE.md`: mark only actually implemented and verified items; distinguish automated, live-sandbox and pilot-field evidence.
+- `development-report.md`: scope, architecture, files, migrations, RED/GREEN evidence, 27-criterion traceability, targeted/full command outputs, coverage, accessibility, screenshots, lab gates, live provider outcome, blocks, known limitations and suggested commit.
+- `family-pilot-results.csv` and `provider-sandbox-results.csv`: retain headers and append only real observed data. Never fabricate rows.
 
 ## Expected File Changes
 
-**Add:** `src/family/permissions.py`, `src/family/service.py`, `src/schemas/family.py`; focused backend test modules; `frontend/src/family/api.ts`, `session.tsx`, `routes.tsx`, `offline-drafts.ts`, `ui/*`, `screens/InvitationScreen.tsx`, `MembersScreen.tsx`, `FamilyEditor.tsx`, `ReviewQueue.tsx`, `ReviewDetail.tsx`, `PublishConfirmation.tsx`, `PublishResult.tsx`, `ConnectionRecovery.tsx`; component tests; `frontend/e2e/family-completion.spec.ts`.
+**Add:**
 
-**Modify:** `src/family/store.py`, `src/routers/family.py`, `src/main.py` only if dependency wiring requires it, `frontend/src/family.tsx`, `frontend/src/main.tsx`, `frontend/src/styles.css`, package dev dependencies/lock for axe, README, CHANGELOG, family/API docs, FEATURES-DONE, development-report.
+- `src/family/permissions.py`
+- `src/family/visibility.py`
+- `src/family/provider_verification.py`
+- `src/family/connections.py`
+- `src/family/pilot.py`
+- `src/family/privacy.py`
+- `src/services/family_publish.py`
+- `frontend/src/family/FamilyApp.tsx`
+- `frontend/src/family/Home.tsx`
+- `frontend/src/family/Connections.tsx`
+- `frontend/src/family/Publish.tsx`
+- `frontend/src/family/Members.tsx`
+- `frontend/src/family/Privacy.tsx`
+- `frontend/src/family/PilotAdmin.tsx`
+- `frontend/src/family/components.tsx`
+- `frontend/src/family/api.ts`
+- `frontend/src/family/types.ts`
+- `frontend/src/family/family.test.tsx`
+- `frontend/e2e/family.spec.ts`
+- `tests/test_family_provider_confidence.py`
+- `tests/test_family_pilot.py`
+- `tests/test_family_privacy.py`
+- `docs/provider-sandbox-results.md`
 
-Do not modify unrelated domain behavior. Fix pre-existing frontend lint issues only if required for the mandatory full lint gate, and document them separately.
+**Modify:**
+
+- `src/family/store.py`
+- `src/family/__init__.py`
+- `src/routers/family.py`
+- `src/config.py`
+- `frontend/src/family.tsx` (compatibility export)
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/playwright.config.ts`
+- `README.md`
+- `CHANGELOG.md`
+- `docs/family-workspace.md`
+- `docs/family-pilot.md`
+- `docs/provider-sandbox-checklist.md`
+- `docs/api-overview.md`
+- `FEATURES-DONE.md`
+- `development-report.md`
+- result CSVs only when real observations exist.
+
+No existing unrelated module is reformatted or rewritten.
 
 ## Traceability Matrix
 
-| Research need | Research evidence | User story id | Planned requirement | Acceptance criterion | Planned implementation location | Planned test evidence | Priority |
+| Research need | Research evidence | User story id (US-xxx) | Planned requirement | Acceptance criterion | Planned implementation location | Planned test evidence | Priority |
 |---|---|---|---|---|---|---|---|
-| Safe bounded participation | Research recommends adult-owned roles; report flags trusted headers | US-010 | Owner invitation/revocation UI and API | create, revoke, idempotent retry | family service/router; Members screen | auth-invite unit/integration/E2E | P0 |
-| Verified identity | Child privacy requires role enforcement; actor headers are current risk | US-011 | JWT-only acceptance/session | match, repeat, wrong/expired | auth dependency; Invitation screen | spoof-header and acceptance tests | P0 |
-| Durable adult control | Last-owner rule planned but incomplete | US-012 | role management and invariant | update, last owner, non-owner denial | permissions/store; Members screen | member transaction tests | P0 |
-| Low-friction contribution | Research asks mobile capture and contextual workflow | US-013 | preview editor and safe autosave | save, conflict, offline | editor APIs; FamilyEditor | autosave/IndexedDB/E2E | P0 |
-| Exact handoff | Approval/version ambiguity is validated demand | US-014 | exact-version submit | create, duplicate, failure retry | review service/dialog | submit integration/component tests | P0 |
-| Review confidence | Current report says review UI incomplete | US-015 | diff and measurable decision | approve, stale, failure | diff DTO; ReviewDetail | review API/component/E2E | P0 |
-| Trust before public action | Research highlights reliable adult publishing | US-016 | eligibility and confirmation | create, stale, timeout | publish service; confirmation | idempotency/eligibility/E2E | P0 |
-| Preserve successes | Research and existing domain favor selective retry | US-017 | per-channel result/retry | failed only, none, unknown | batch service; result screen | partial/retry tests | P0 |
-| Plain-language recovery | Families need nontechnical connection recovery | US-018 | reconnect and reconciliation | expired, healthy subset, unknown | connector adapter; recovery panel | connector/reconcile/E2E | P0 |
+| Provider readiness is unproved | Real LinkedIn/X credentials were absent; competitors monetize reliable publishing | US-001 | Provider sandbox attempt and evidence record | Configured sandbox test returns one classified attempt and a confirmed remote ID only on success | `src/family/provider_verification.py; src/routers/family.py` | unit provider classifier; SQLite integration; Playwright Connections flow | P0 |
+| Partial success must not duplicate posts | Existing per-channel delivery/idempotency semantics and required sandbox matrix | US-002 | Selective retry and reconcile-before-retry | Only RETRYABLE/FAILED channels are called; PUBLISHED remote IDs and attempt counts remain unchanged | `src/family/store.py; src/services/family_publish.py; frontend/src/family.tsx` | connector fake integration; real sandbox evidence; Playwright Publish Result | P0 |
+| Adults need self-service recovery | Expired-token and permission scenarios are required but unproved | US-003 | Capability-aware connection recovery | Reconnect remains incomplete until required capabilities pass; OAuth state failures make no connection change | `src/family/connections.py; src/routers/family.py; frontend/src/family.tsx` | OAuth callback tests; scope parser tests; browser reconnect flow | P0 |
+| Time to first value is not measured | SMBs report content freshness/time pressure; pilot target is <=10 minutes | US-004 | Privacy-preserving activation events | First saved useful draft records elapsed seconds without draft text; median is calculable | `src/family/pilot.py; src/family/store.py; frontend/src/family.tsx` | event payload unit tests; real SQLite funnel test; component test | P0 |
+| Teen next action and publish boundary need field proof | Parent-teen research favors transparent rules; existing role blocks publish | US-005 | Role-aware guided Home and measured comprehension task | Teen DOM and API expose no publish action; direct request returns 403 and no batch | `src/family/store.py; src/routers/family.py; frontend/src/family.tsx` | role matrix tests; component DOM test; Playwright teen flow | P0 |
+| Pilot evidence is empty | Existing 5-10 household protocol defines measurable go/no-go targets | US-006 | Consent-based pilot cohort, metrics and CSV export | Export is pseudonymous, excludes content, shows denominators/missing values, and safety incidents block GO | `src/family/pilot.py; src/routers/family.py; frontend/src/family.tsx` | aggregation unit tests; export schema integration; admin browser flow | P0 |
+| Role labels do not fully explain effective authority | Family research warns against opaque control and surveillance | US-007 | Effective capability matrix and role-change impact preview | Seven capability categories render; server enforces immediately; last owner remains protected | `src/family/permissions.py; src/family/store.py; frontend/src/family.tsx` | permission matrix unit tests; session revocation integration; Members UI test | P1 |
+| Private labels lack lifecycle controls | FTC/ICO emphasize parental control, minimization and privacy defaults | US-008 | Member data export/deletion with retention receipt | Eligible personal data is removed/pseudonymized; immutable publication evidence is minimized and explained | `src/family/privacy.py; src/family/store.py; src/routers/family.py; frontend/src/family.tsx` | deletion transaction and retention tests; reauth failure; Privacy UI E2E | P1 |
+| Private, approved and public can be confused | Pilot requires state comprehension; provider UNKNOWN must not appear public | US-009 | Shared visibility-state model and explanations | Private, Approved, Public and Verification required are distinct for every role | `src/family/visibility.py; frontend/src/family.tsx` | state mapper unit tests; component labels; Playwright contributor flow | P1 |
 
 ## Risks and Mitigations
 
-- JWT integration may expose assumptions in the current demo shell. Mitigate with a single family session provider and authenticated E2E fixture; no production header fallback.
-- Current invitation table stores `token_once`. Revoke all legacy pending tokens and migrate safely; accepted memberships remain.
-- External connector APIs may be unavailable. Use protocol-compatible test doubles; production reports connection required, never fake success.
-- IndexedDB behavior differs by browser/private mode. Surface storage failure and preserve in-memory text; do not claim offline persistence if write failed.
-- Monolithic current family component increases merge risk. Split by screen while preserving route entry and styles.
-- Previous full regression exceeded execution timeout. Run targeted groups during work, then full suite with sufficient timeout and record exact final summary.
+- **Provider sandbox cannot emulate every error:** use provider-approved means and test accounts; never intentionally compromise credentials. Where a real rate limit/expired token cannot be safely induced, record BLOCKED and retain deterministic fake-server integration evidence separately.
+- **Unknown-state reconciliation unsupported:** preserve UNKNOWN, show manual verification, block automatic retry. Do not downgrade ambiguity to failure.
+- **OAuth differences:** isolate provider-specific callbacks/capabilities behind `connections.py`; test state/PKCE and redaction independently.
+- **SQLite schema growth:** idempotent migrations, fixture migration tests and startup fail-fast. Keep transactions short around external calls.
+- **Pilot data becomes surveillance:** explicit opt-in, narrow event allowlist, no content, transparent badge, withdrawal and retention.
+- **Deletion conflicts with publication audit:** pseudonymize actor linkage and retain only minimal reasoned evidence; explain in preview and receipt.
+- **Scope pressure:** no scheduling, billing, new provider or design editor work in this pass.
+- **Browser availability:** pin `@playwright/test`, provision Chromium in CI with an explicit cache and verify before tests; inability to provision blocks UI release evidence.
+- **Lab scripts absent:** obtain them from the lab environment. Absence is BLOCKED, not waived.
+- **Git metadata absent from transport:** development must run in the actual repository/branch with remote configured; commit/push verification cannot be fabricated in a detached archive.
 
 ## Definition of Done
 
-- [ ] Features A, B, and C are complete with no facade, browser-controlled identity, or synthetic production publish success.
-- [ ] US-010 through US-018 each have happy, edge, and error tests passing.
-- [ ] All 27 acceptance criteria appear in traceability/test evidence.
-- [ ] Invitation, member, editor, review, confirmation, result, and recovery screens work desktop/mobile.
-- [ ] JWT, tenant isolation, invitation secrecy, last-owner invariant, idempotency, stale approval, selective retry, and unknown reconciliation tests pass.
-- [ ] Migration preserves existing accepted family data and invalidates legacy raw pending tokens.
-- [ ] Targeted tests and full regression pass with exact counts.
-- [ ] Changed/new modules measure >=90% coverage.
-- [ ] Ruff, full frontend lint, tests, type-check/build, startup, Playwright desktop/mobile, screenshots, and accessibility checks pass.
-- [ ] `tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, and `ui-gate.sh` exit 0.
-- [ ] README, CHANGELOG, API/family docs, FEATURES-DONE, and development-report match actual behavior.
-- [ ] No secrets, raw invitation tokens, caches, databases, dependency folders, build outputs, or screenshot scratch artifacts are packaged except intentional evidence paths documented by the lab.
-- [ ] Git add/commit/pull-rebase/push completes; working tree is clean; `git-push-verify.sh` exits 0. If input lacks Git metadata/remote, exact attempts are BLOCKED in report.
-- [ ] Complete project ZIP preserves top-level layout and passes integrity/list/extraction verification.
+- [ ] All three selected features are complete, integrated and contain no facade, synthetic provider success or placeholder UI.
+- [ ] US-001 through US-009 are implemented with all 27 acceptance criteria mapped to passing tests.
+- [ ] Credential presence alone never produces Healthy; provider proof is evidence-backed.
+- [ ] Initial publish, partial success, selective retry and reconcile-before-retry work end to end.
+- [ ] Live approved LinkedIn and X sandbox accounts complete the required scenario matrix, or release is explicitly BLOCKED.
+- [ ] Pilot collection is opt-in, content-free, pseudonymous, withdrawable and exports correct metrics/denominators.
+- [ ] Critical incidents force `BLOCKED_SAFETY`; GO cannot bypass the rule.
+- [ ] All roles display and enforce the same capability policy; teen/viewer forbidden actions are server denied.
+- [ ] Visibility labels distinguish Private, Approved, Public, Partial, Failed and Verification required.
+- [ ] Privacy preview, reauthentication, transaction, pseudonymization and receipt flows pass.
+- [ ] Family UI contains no scheduling choice; Calendar is presented as Activity with compatibility alias.
+- [ ] Targeted backend tests pass.
+- [ ] Full backend suite passes with zero failures/errors.
+- [ ] Frontend tests pass with zero failures.
+- [ ] Ruff and ESLint pass with zero findings.
+- [ ] TypeScript check and production Vite build pass.
+- [ ] Backend and frontend startup smoke tests pass.
+- [ ] Full Chromium family E2E passes with zero critical failures, console errors or page errors.
+- [ ] Automated accessibility checks have zero critical/serious violations; keyboard, focus, reduced-motion, mobile and 200% zoom checks are recorded.
+- [ ] Changed/new modules reach at least 90% line coverage.
+- [ ] `tdd-gate-v3.sh`, `bdd-gate.sh`, `security-gate.sh`, `doc-sync-check.sh`, and `ui-gate.sh` pass in the lab environment.
+- [ ] README, CHANGELOG, API docs, `FEATURES-DONE.md`, sandbox/pilot docs and `development-report.md` match observed behavior.
+- [ ] No token, credential, authorization header, personal test account identifier, private draft or raw provider body appears in repository artifacts or logs.
+- [ ] No `.venv`, `node_modules`, `dist`, coverage, Playwright reports, screenshots containing personal data, runtime DB, credentials, caches or scratch files enter the final package unless pre-existing intentional repository assets are explicitly preserved.
+- [ ] Every requirement is traceable to implementation and test evidence.
+- [ ] Changes are committed and pushed to the configured repository remote.
+- [ ] `git-push-verify.sh` passes and the verified commit hash is recorded.
+- [ ] The complete project is repackaged, ZIP integrity-tested, listed, separately extracted and checked for required files and root layout.

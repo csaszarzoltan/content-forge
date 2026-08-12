@@ -397,3 +397,11 @@
 - Fixed full frontend lint by preserving Brand Kit pagination parameters.
 - Added family pilot protocol/results template and provider sandbox checklist/results template.
 - Full backend regression: 2,599 collected tests, exit 0; frontend 39 tests, lint and production build exit 0.
+
+#### Family provider confidence, pilot, and trust hardening (2026-08-12)
+- Added explicit provider outcome classification, secret-safe evidence filtering, and selective-retry rules.
+- Credential presence now reports Not tested rather than Healthy.
+- Added shared family capability and private/public visibility policies.
+- Added content-free pilot validation, aggregation, safety blocking, and privacy deletion planning primitives.
+- Renamed the visible family Calendar navigation to Activity; family publishing remains immediate-only.
+- Added nine release-hardening contract tests covering US-001 through US-009.

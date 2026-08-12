@@ -14,6 +14,7 @@ from src.connectors.errors import ConnectorError
 from src.connectors.linkedin import LinkedInConnector
 from src.connectors.twitter import TwitterConnector
 from src.dependencies import get_current_user
+from src.family.permissions import capabilities_for
 from src.family.store import FamilyStore, PermissionDenied
 from src.models.user import User
 from src.services.publish_service import PublishService
@@ -232,7 +233,7 @@ def connections(return_to: str = "#home", u: User = Depends(get_current_user)):
         {
             "channel": "linkedin",
             "label": "LinkedIn",
-            "state": "HEALTHY" if cfg.LINKEDIN_ACCESS_TOKEN else "ACTION_REQUIRED",
+            "state": "NOT_TESTED" if cfg.LINKEDIN_ACCESS_TOKEN else "NOT_CONFIGURED",
             "action": "Return to publish" if cfg.LINKEDIN_ACCESS_TOKEN else "Reconnect",
             "authorize_url": f"https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={cfg.LINKEDIN_CLIENT_ID}&redirect_uri={cfg.PUBLIC_APP_URL}/auth/linkedin/callback&scope=w_member_social"
             if cfg.LINKEDIN_CLIENT_ID
@@ -241,7 +242,7 @@ def connections(return_to: str = "#home", u: User = Depends(get_current_user)):
         {
             "channel": "twitter",
             "label": "X",
-            "state": "HEALTHY"
+            "state": "NOT_TESTED"
             if all(
                 [
                     cfg.TWITTER_API_KEY,
@@ -339,3 +340,14 @@ def retry(batch_id: str, workspace_id: str, u: User = Depends(get_current_user))
 @router.post("/publish-batches/{batch_id}/reconcile")
 def reconcile(batch_id: str, workspace_id: str, u: User = Depends(get_current_user)):
     return run(lambda: store().reconcile_publish(workspace_id, u.id, batch_id))
+
+
+@router.get("/workspaces/{workspace_id}/members/{membership_id}/capabilities")
+def member_capabilities(workspace_id: str, membership_id: str, u: User = Depends(get_current_user)):
+    db = store()
+    db.membership(workspace_id, u.id)
+    rows = db.members(workspace_id, u.id)["members"]
+    member = next((x for x in rows if x["id"] == membership_id), None)
+    if not member:
+        raise HTTPException(404, detail="membership_not_found")
+    return {"membership_id": membership_id, "role": member["role"], "capabilities": capabilities_for(member["role"])}

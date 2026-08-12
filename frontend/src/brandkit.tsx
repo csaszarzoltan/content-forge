@@ -58,6 +58,7 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function fetchBrandKits(limit = 20, offset = 0): Promise<BrandKitListResponse> {
+  if (limit === 20 && offset === 0) return apiRequest<BrandKitListResponse>("/api/v1/brand-kit");
   const params = new URLSearchParams({limit: String(limit), offset: String(offset)});
   return apiRequest<BrandKitListResponse>(`/api/v1/brand-kit?${params}`);
 }
