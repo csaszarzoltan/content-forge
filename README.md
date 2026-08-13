@@ -996,4 +996,3 @@ The paid beta publishes immediately after adult confirmation. Scheduling is inte
 ## Family paid-beta release hardening
 
 Family mode uses immediate publishing only. Provider credentials are treated as **configured, not verified** until a non-public LinkedIn or X sandbox test returns a confirmed remote identifier. Unknown external provider state must be reconciled before retry. Family roles expose a shared capability model, and pilot measurement accepts only consented, content-free events. Scheduling remains hidden; the family navigation uses Activity for publication history.
->>>>>>> c9ac53d6a51b6d6321496d5b44be89dbb229cf3c
