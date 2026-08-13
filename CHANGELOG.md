@@ -1,8 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.16.0] - 2026-08-13
 
 ### Features
+- Added **Content Package pipeline (US-001..004)** — create once, publish everywhere, with safe per-variant retry:
+  - `POST /api/v1/content-packages` — create a content package with up to 10 platforms and 200k-char input; `Idempotency-Key` required, 409 on key collision with a different payload.
+  - `POST /api/v1/content-packages/{id}/generate` — LLM per-platform adaptation (`draft → generating → validating → ready_to_approve → approved → publishing → published | failed`); on failure only the failed variants are regenerated on retry, preserving completed content (US-003 safe retry).
+  - `POST /api/v1/content-packages/{id}/validate` — re-validates a generated package; `failed` packages return a structured JSON 409 `wrong_state` (regenerate first) instead of a 500.
+  - `POST /api/v1/content-packages/{id}/approve` and `/publish` — approval supersession and idempotent publication through the legal `approved → publishing → published` transition.
+  - `GET /api/v1/content-packages/{id}` and `/history` — package detail with per-variant validation status and full audit trail.
+  - ContentPackageStore (state machine + per-variant rows + audit log) and PlatformAdapter (LLM per-platform adaptation) in `product_ops.py` per analyst brief §2.1.
+  - 4-step content creation wizard UI (React + TypeScript, `#content-creation` route): source → platforms → generate → validate/approve/publish, with progress and per-variant failure states.
 - Added **Video Platform Analytics** — unified performance tracking across YouTube, TikTok, and Instagram under `/api/v1/analytics/video-performance`:
   - `GET /api/v1/analytics/video-performance` — aggregated views/likes/comments/shares per platform (plus platform-specific fields: plays, saves, completion rate, watch time) with `video_id`, `platform`, and date-range filters.
   - `GET /api/v1/analytics/video-performance/timeseries` — daily trend points per platform, Chart.js-ready.
@@ -11,10 +19,19 @@
   - Platform clients fail independently: unconfigured keys, quota exhaustion, and API errors degrade to `platforms_unavailable` entries with partial data instead of hard failures; no API keys needed to start the server.
   - Config via `YOUTUBE_API_KEY`, `YOUTUBE_OAUTH_TOKEN`, `TIKTOK_API_KEY`, `INSTAGRAM_ACCESS_TOKEN` (empty = platform skipped).
   - Typer CLI: `python -m src.cli analytics video-performance [--platform ...] [--days N]`.
-- New [Video Platform Analytics guide](docs/video-analytics.md) — setup (YouTube OAuth2, TikTok Research API access, Instagram Business account), endpoint reference with example requests/responses, CLI usage, error-handling contract.
+- New guides: [Content Package pipeline analysis brief](analysis/analysis-brief.md) and [Video Platform Analytics guide](docs/video-analytics.md) — setup (YouTube OAuth2, TikTok Research API access, Instagram Business account), endpoint reference with example requests/responses, CLI usage, error-handling contract.
 
 ### Fixes
-- None.
+- Content package retry from `failed` is now legal: `VALID_TRANSITIONS` allows `failed → {generating, validating}` and generate regenerates only variants with `validation_status == "failed"` (review t_1ba2653f, US-003).
+- `POST /validate` on a `failed` package returns a structured JSON 409 `wrong_state` instead of an unhandled 500 (`Invalid transition: failed→ready_to_approve`).
+- Publish now transitions `approved → publishing → published` through the state machine instead of bypassing it (was a latent 500 on real publish).
+- CLI entry point wired with `__main__` guard (t_906f2a5f).
+- `test_handlers_async` asserts the async retry endpoint wrapper, not the sync core (test-only fix).
+
+### Tests
+- 4 new content-creation regression tests pin the recovery contract: (a) LLM outage → generate (failed) → validate → structured 409 JSON; (b) partial failure → regenerate → only failed variants regenerated; (c) failed → regenerate → validate → approve → publish → `published`; (d) store-level `failed → {generating, validating}` legal.
+- Full backend suite: **2632 passed / 27 skipped, exit 0** (tech-lead re-review at HEAD 02a6a96).
+- Frontend: vitest 48/48, `tsc -b` + `vite build` clean, eslint `--max-warnings=0` clean, ui-gate PASS.
 
 ## [0.15.0] - 2026-08-08
 

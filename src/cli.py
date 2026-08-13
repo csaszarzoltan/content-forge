@@ -16,7 +16,7 @@ app = typer.Typer(help="ContentForge — AI-powered content platform CLI")
 @app.command()
 def root():
     """ContentForge CLI entry point."""
-    typer.echo("ContentForge CLI v0.15.0")
+    typer.echo("ContentForge CLI v0.16.0")
 
 
 analytics_app = typer.Typer(help="Analytics commands")
