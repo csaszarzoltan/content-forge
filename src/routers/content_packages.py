@@ -156,22 +156,39 @@ async def get_content_package(package_id: str) -> ContentPackageResponse:
 
 @router.post("/{package_id}/generate")
 async def generate_content_package(package_id: str) -> dict:
-    """Generate per-platform variants (US-001): draft → generating."""
+    """Generate per-platform variants (US-001): draft → generating.
+
+    On a ``failed`` package (US-003 safe retry) only variants whose
+    ``validation_status == "failed"`` are regenerated — already-generated
+    variants keep their content untouched, so partial work is preserved.
+    """
     store = _store()
     try:
         pkg = store.get_package(package_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="content_package_not_found") from None
-    if pkg["state"] != "draft":
+    if pkg["state"] == "failed":
+        # Retry path (US-003): regenerate ONLY the failed variants.
+        store.update_state(package_id, "generating")
+        variants = [
+            v
+            for v in store.get_variants(package_id)
+            if v["validation_status"] == "failed"
+        ]
+        if not variants:
+            # Nothing failed on record — treat as a fresh generation pass.
+            variants = store.get_variants(package_id)
+    elif pkg["state"] == "draft":
+        store.update_state(package_id, "generating")
+        variants = store.get_variants(package_id)
+    else:
         raise HTTPException(status_code=409, detail="wrong_state")
 
-    store.update_state(package_id, "generating")
     adapter = _adapter()
 
     # Generate one variant per platform via the LLM adapter. If the LLM is
     # unavailable we still record the failure per-variant and mark the package
     # failed — a RECOVERABLE error the user can retry (US-003).
-    variants = store.get_variants(package_id)
     failures: list[dict] = []
     for variant in variants:
         try:
@@ -216,7 +233,11 @@ async def validate_content_package(package_id: str) -> dict:
         pkg = store.get_package(package_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="content_package_not_found") from None
-    if pkg["state"] not in {"generating", "validating", "failed"}:
+    # US-003: a failed package must first be regenerated (retry only the
+    # failed variants) before validation is meaningful — reject it here with a
+    # structured 409 rather than letting the state machine raise an unhandled
+    # ValueError → 500 (tech-lead review t_1ba2653f BLOCKER-2).
+    if pkg["state"] not in {"generating", "validating"}:
         raise HTTPException(status_code=409, detail="wrong_state")
 
     from src.schemas.constraints import ValidateRequest
@@ -319,6 +340,9 @@ async def publish_content_package(
 
     deliveries: list[dict] = []
     failures: list[dict] = []
+    # Move through the publishing state so the approved → published transition
+    # passes the state machine (draft → … → approved → publishing → published).
+    store.update_state(package_id, "publishing")
     for variant in store.get_variants(package_id):
         try:
             if publish_service is not None and variant["platform"] in publish_service.connectors:

@@ -453,16 +453,17 @@ class TestContentPackagesApiBehavior:
         resp = client.get("/api/v1/content-packages/nope")
         assert resp.status_code == 404, resp.text
 
-    def test_generate_wrong_state_409(self, client):
-        created = client.post(
-            "/api/v1/content-packages",
-            json=_valid_body(),
-            headers={"Idempotency-Key": "gen-1"},
-        ).json()
-        resp = client.post(f"/api/v1/content-packages/{created['id']}/generate")
+    def test_generate_wrong_state_409(self, cp_client):
+        cp_client.llm.script = {"twitter": ["post"], "linkedin": ["post"]}
+        created = _create_package(cp_client, ["twitter", "linkedin"], key="gen-1")
+        resp = cp_client.post(f"/api/v1/content-packages/{created['id']}/generate")
         assert resp.status_code == 200, resp.text
-        # second generate from non-draft state must 409
-        again = client.post(f"/api/v1/content-packages/{created['id']}/generate")
+        assert resp.json()["state"] == "validating", resp.text
+        # advance past generating → a generate from a non-retryable state must 409
+        validated = cp_client.post(f"/api/v1/content-packages/{created['id']}/validate")
+        assert validated.status_code == 200, validated.text
+        assert validated.json()["state"] == "ready_to_approve", validated.text
+        again = cp_client.post(f"/api/v1/content-packages/{created['id']}/generate")
         assert again.status_code == 409, again.text
 
     def test_validate_requires_generated_variants(self, client):
@@ -506,6 +507,198 @@ class TestContentPackagesApiBehavior:
         resp = client.get("/api/v1/content-packages/nope")
         assert resp.headers["content-type"].startswith("application/json")
         assert "detail" in resp.json()
+
+
+# ── P0-7 — failure-recovery regression (US-003, tech-lead review t_1ba2653f) ──
+#
+# These tests pin the failure-recovery contract: a package whose generation
+# partially failed must be retryable (regenerate ONLY the failed variants,
+# preserving completed work) and validate-on-failed must never 500.
+
+
+class _ScriptedLLM:
+    """LLM stand-in whose behavior is driven by a per-platform call script.
+
+    ``script`` maps platform → list of outcomes; each ``generate`` call pops
+    the next outcome for that platform. An outcome is either an exception
+    (raised, simulating an LLM outage) or a string (returned as the variant
+    content). Exhausted platforms raise AssertionError so a test fails loudly
+    if the handler calls the LLM more times than scripted.
+    """
+
+    def __init__(self, script: dict[str, list]):
+        self.script = {p: list(seq) for p, seq in script.items()}
+        self.calls: list[str] = []
+
+    async def generate(self, prompt: str, system_prompt: str | None = None, **kwargs):
+        from src.services.llm_provider import LLMResponse
+
+        platform = prompt.split(" for ")[1].split(".\n")[0]
+        self.calls.append(platform)
+        seq = self.script.get(platform)
+        if not seq:
+            raise AssertionError(f"unexpected generate call for {platform}")
+        outcome = seq.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return LLMResponse(
+            text=outcome,
+            model_used="fake-model",
+            tokens_prompt=10,
+            tokens_completion=5,
+            latency_ms=1,
+        )
+
+
+@pytest.fixture
+def cp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Content-packages TestClient with a scripted LLM injected.
+
+    Monkeypatches the router module's ``_DB`` (fresh temp DB per test) and
+    ``_adapter`` so generation never touches a real provider.
+    """
+    from fastapi import FastAPI
+    from starlette.testclient import TestClient
+
+    import src.routers.content_packages as cp_module
+
+    app = FastAPI()
+    app.include_router(cp_module.router)
+    cp_module._DB = tmp_path / "content-packages-api.db"
+
+    llm = _ScriptedLLM({})
+
+    def _fake_adapter():
+        return PlatformAdapter(llm_provider=llm, registry=None)
+
+    monkeypatch.setattr(cp_module, "_adapter", _fake_adapter)
+    monkeypatch.setattr(cp_module, "_DB", cp_module._DB)
+
+    client = TestClient(app)
+    client.llm = llm  # type: ignore[attr-defined]
+    return client
+
+
+def _create_package(client, platforms: list[str], key: str = "recover-key") -> dict:
+    resp = client.post(
+        "/api/v1/content-packages",
+        json=_valid_body(platforms=platforms),
+        headers={"Idempotency-Key": key},
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def _cp_store() -> ContentPackageStore:
+    """Store bound to the same DB the ``cp_client`` fixture uses."""
+    import src.routers.content_packages as cp_module
+
+    return ContentPackageStore(cp_module._DB)
+
+
+class TestFailureRecovery:
+    """US-003 — safe retry from ``failed`` (tech-lead review t_1ba2653f B1/B2)."""
+
+    def test_validate_on_failed_package_returns_json_409_not_500(self, cp_client):
+        """BLOCKER-2 — LLM outage → generate (failed) → validate must be a
+        structured JSON 4xx (wrong_state), never an unhandled ValueError 500."""
+        cp_client.llm.script = {"twitter": [RuntimeError("llm_unavailable")]}
+        pkg = _create_package(cp_client, ["twitter"], key="b2-key")
+
+        gen = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/generate")
+        assert gen.status_code == 200, gen.text
+        assert gen.json()["state"] == "failed", gen.text
+
+        resp = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/validate")
+        assert resp.status_code == 409, resp.text
+        assert resp.headers["content-type"].startswith("application/json")
+        body = resp.json()
+        assert body["detail"] == "wrong_state"
+
+    def test_regenerate_only_failed_variants(self, cp_client):
+        """BLOCKER-1 — LLM outage → generate (partial failed) → retry must
+        regenerate ONLY the failed variants; generated ones stay untouched."""
+        cp_client.llm.script = {
+            "twitter": [RuntimeError("llm_unavailable"), "retried twitter post"],
+            "linkedin": ["original linkedin post"],
+            "email": ["original email post"],
+        }
+        pkg = _create_package(cp_client, ["twitter", "linkedin", "email"], key="b1-key")
+
+        gen = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/generate")
+        assert gen.status_code == 200, gen.text
+        body = gen.json()
+        assert body["state"] == "failed", gen.text
+        assert {e["platform"] for e in body["errors"]} == {"twitter"}
+
+        # First pass must have called the LLM once per platform.
+        assert sorted(cp_client.llm.calls) == ["email", "linkedin", "twitter"]
+
+        # Simulate per-variant content generated during the first pass.
+        store = _cp_store()
+        for platform in ("linkedin", "email"):
+            variant = next(
+                v for v in store.get_variants(pkg["id"]) if v["platform"] == platform
+            )
+            store.update_variant(
+                pkg["id"], variant["id"], content=f"original {platform} post"
+            )
+
+        cp_client.llm.calls.clear()
+        retry = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/generate")
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["state"] == "validating", retry.text
+
+        # Retry must have touched ONLY the failed platform.
+        assert cp_client.llm.calls == ["twitter"]
+        store = _cp_store()
+        variants = {v["platform"]: v for v in store.get_variants(pkg["id"])}
+        assert variants["twitter"]["content"] == "retried twitter post"
+        assert variants["linkedin"]["content"] == "original linkedin post"
+        assert variants["email"]["content"] == "original email post"
+
+    def test_failed_to_published_full_retry_flow(self, cp_client):
+        """(c) failed → regenerate → validate → approve → publish reaches published."""
+        cp_client.llm.script = {
+            "twitter": [RuntimeError("llm_unavailable"), "retried twitter post"],
+            "linkedin": ["linkedin post"],
+        }
+        pkg = _create_package(cp_client, ["twitter", "linkedin"], key="c-key")
+
+        gen = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/generate")
+        assert gen.status_code == 200, gen.text
+        assert gen.json()["state"] == "failed", gen.text
+
+        retry = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/generate")
+        assert retry.status_code == 200, retry.text
+        assert retry.json()["state"] == "validating", retry.text
+
+        validated = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/validate")
+        assert validated.status_code == 200, validated.text
+        assert validated.json()["state"] == "ready_to_approve", validated.text
+
+        approved = cp_client.post(f"/api/v1/content-packages/{pkg['id']}/approve")
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["state"] == "approved", approved.text
+
+        published = cp_client.post(
+            f"/api/v1/content-packages/{pkg['id']}/publish",
+            headers={"Idempotency-Key": "c-publish-key"},
+        )
+        assert published.status_code == 200, published.text
+        assert published.json()["state"] == "published", published.text
+
+    def test_failed_state_allows_retry_transitions(self, store: ContentPackageStore):
+        """Store-level contract: failed → {generating, validating} are legal."""
+        pkg = store.create_package(
+            source_type="text", source_ref="Hi", platforms=["twitter"]
+        )
+        store.update_state(pkg["id"], "generating")
+        store.update_state(pkg["id"], "failed")
+        store.update_state(pkg["id"], "generating")
+        assert store.get_package(pkg["id"])["state"] == "generating"
+        store.update_state(pkg["id"], "validating")
+        assert store.get_package(pkg["id"])["state"] == "validating"
 
 
 # ── P0-3 — PlatformAdapter behavior ─────────────────────────────────────────

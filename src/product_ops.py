@@ -1459,7 +1459,7 @@ class ContentPackageStore:
     per-platform variants derived from it:
 
       package state: draft → generating → validating → ready_to_approve →
-                     approved → publishing → published | failed
+                     approved → publishing → published | failed ⇄ generating
       variant state: pending → generated → validated → published | failed
 
     Idempotency: create/publish honour the FamilyStore ``_idem()`` pattern
@@ -1474,7 +1474,9 @@ class ContentPackageStore:
         "approved": {"publishing", "failed"},
         "publishing": {"published", "failed"},
         "published": set(),
-        "failed": set(),
+        # US-003 safe retry: a failed package can be regenerated (only the
+        # failed variants are retried — see router generate) or re-validated.
+        "failed": {"generating", "validating"},
     }
 
     def __init__(self, path: str | Path) -> None:
