@@ -38,6 +38,7 @@ from src.routers.brand_kit import router as brand_kit_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.constraints import router as constraints_router
 from src.routers.content import router as content_router
+from src.routers.content_packages import router as content_packages_router
 from src.routers.family import router as family_router
 from src.routers.languages import router as languages_router
 from src.routers.publish import router as publish_router
@@ -142,6 +143,7 @@ app.include_router(auth_router)
 app.include_router(brand_kit_router)
 app.include_router(brand_voice_router)
 app.include_router(content_router)
+app.include_router(content_packages_router)
 app.include_router(languages_router)
 app.include_router(translate_router)
 app.include_router(transcreation_router)

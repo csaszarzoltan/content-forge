@@ -33,6 +33,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import OperationalError
 
 from src.product_ops import VideoJobStore
 from src.schemas.video import (
@@ -138,7 +139,7 @@ async def _resolve_generation(generation_id: str) -> dict | None:
         finally:
             await session.close()
             await manager.close()
-    except (LookupError, OSError, ValueError):
+    except (LookupError, OSError, ValueError, OperationalError):
         return None
 
 
@@ -223,7 +224,7 @@ async def _resolve_voice_profile_name(brand_voice_id: str | None) -> str | None:
         finally:
             await session.close()
             await manager.close()
-    except (LookupError, OSError, ValueError):
+    except (LookupError, OSError, ValueError, OperationalError):
         return None
 
 

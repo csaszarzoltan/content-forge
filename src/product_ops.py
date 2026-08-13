@@ -6,6 +6,7 @@ keep the workflow rules deterministic and independently testable.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -1447,4 +1448,294 @@ class VideoJobStore:
         db.execute(
             "INSERT INTO video_audit VALUES (?,?,?,?,?)",
             (self._id(), job_id, kind, json.dumps(payload, sort_keys=True), time.time()),
+        )
+
+
+class ContentPackageStore:
+    """Persist content-creation packages with a workflow state machine (P0-1).
+
+    Follows the TranscreationStore/FamilyStore pattern: raw sqlite3 with JSON
+    columns and an audit log. A package records one source asset and the
+    per-platform variants derived from it:
+
+      package state: draft → generating → validating → ready_to_approve →
+                     approved → publishing → published | failed
+      variant state: pending → generated → validated → published | failed
+
+    Idempotency: create/publish honour the FamilyStore ``_idem()`` pattern
+    (request_hash + cached response; same key + different payload → 409).
+    """
+
+    VALID_TRANSITIONS: dict[str, set[str]] = {
+        "draft": {"generating", "failed"},
+        "generating": {"validating", "failed"},
+        "validating": {"ready_to_approve", "failed"},
+        "ready_to_approve": {"approved", "failed"},
+        "approved": {"publishing", "failed"},
+        "publishing": {"published", "failed"},
+        "published": set(),
+        "failed": set(),
+    }
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = str(path)
+        with self._db() as db:
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS content_packages(
+                    id TEXT PRIMARY KEY,
+                    source_type TEXT,
+                    source_ref TEXT,
+                    state TEXT,
+                    brand_voice_id TEXT,
+                    platforms TEXT,
+                    created_at REAL,
+                    updated_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS content_variants(
+                    id TEXT PRIMARY KEY,
+                    package_id TEXT,
+                    platform TEXT,
+                    content TEXT,
+                    char_count INTEGER DEFAULT 0,
+                    validation_status TEXT DEFAULT 'pending',
+                    publish_status TEXT DEFAULT 'pending',
+                    error TEXT,
+                    remote_id TEXT,
+                    created_at REAL,
+                    updated_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS content_package_audit(
+                    id TEXT PRIMARY KEY,
+                    package_id TEXT,
+                    kind TEXT,
+                    payload TEXT,
+                    created_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS content_package_idempotency(
+                    package_id TEXT,
+                    actor_id TEXT,
+                    key TEXT,
+                    request_hash TEXT,
+                    response TEXT,
+                    PRIMARY KEY(package_id, actor_id, key)
+                );
+                """
+            )
+
+    def _db(self) -> sqlite3.Connection:
+        db = sqlite3.connect(self.path, timeout=10)
+        db.row_factory = sqlite3.Row
+        return db
+
+    @staticmethod
+    def _id() -> str:
+        return uuid.uuid4().hex
+
+    # ── Idempotency (FamilyStore pattern) ───────────────────────────────────
+
+    def _idem(self, d, w, u, key, payload):
+        h = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        r = d.execute(
+            "SELECT request_hash,response FROM content_package_idempotency "
+            "WHERE package_id=? AND actor_id=? AND key=?",
+            (w, u, key),
+        ).fetchone()
+        if r and r[0] != h:
+            raise ValueError("idempotency_key_reused")
+        return json.loads(r[1]) if r else None
+
+    def _save_idem(self, d, w, u, key, payload, response):
+        d.execute(
+            "INSERT INTO content_package_idempotency VALUES(?,?,?,?,?)",
+            (
+                w,
+                u,
+                key,
+                hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest(),
+                json.dumps(response),
+            ),
+        )
+
+    # ── Package CRUD + state machine ────────────────────────────────────────
+
+    def create_package(
+        self,
+        source_type: str,
+        source_ref: str,
+        platforms: list[str],
+        brand_voice_id: str | None = None,
+        idempotency_key: str | None = None,
+        actor_id: str = "system",
+    ) -> dict:
+        """Create a package in ``draft`` state with one pending variant per platform."""
+        payload = {
+            "source_type": source_type,
+            "source_ref": source_ref,
+            "platforms": sorted(platforms),
+            "brand_voice_id": brand_voice_id,
+        }
+        now = time.time()
+        with self._db() as db:
+            if idempotency_key:
+                old = self._idem(db, "NEW", actor_id, idempotency_key, payload)
+                if old:
+                    return old
+            pkg_id = self._id()
+            db.execute(
+                "INSERT INTO content_packages(id,source_type,source_ref,state,brand_voice_id,platforms,created_at,updated_at) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (pkg_id, source_type, source_ref, "draft", brand_voice_id, json.dumps(sorted(platforms)), now, now),
+            )
+            for platform in platforms:
+                db.execute(
+                    "INSERT INTO content_variants(id,package_id,platform,content,char_count,validation_status,publish_status,created_at,updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
+                    (self._id(), pkg_id, platform, "", 0, "pending", "pending", now, now),
+                )
+            out = {
+                "id": pkg_id,
+                "state": "draft",
+                "platforms": sorted(platforms),
+                "created_at": now,
+            }
+            if idempotency_key:
+                self._save_idem(db, "NEW", actor_id, idempotency_key, payload, out)
+            self._audit(db, pkg_id, "PACKAGE_CREATED", {"source_type": source_type, "platforms": sorted(platforms)})
+            return out
+
+    def get_package(self, package_id: str) -> dict:
+        """Return the full package record with variants and timestamps."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM content_packages WHERE id=?", (package_id,)
+            ).fetchone()
+            if not row:
+                raise KeyError(package_id)
+            record = dict(row)
+            record["platforms"] = json.loads(record.get("platforms") or "[]")
+            record["variants"] = self._variants(db, package_id)
+            return record
+
+    def _variants(self, db: sqlite3.Connection, package_id: str) -> list[dict]:
+        rows = db.execute(
+            "SELECT * FROM content_variants WHERE package_id=? ORDER BY rowid", (package_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_state(self, package_id: str, state: str) -> None:
+        """Validate the transition and persist the new package state."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT state FROM content_packages WHERE id=?", (package_id,)
+            ).fetchone()
+            if not row:
+                raise KeyError(package_id)
+            current = row["state"]
+            allowed = self.VALID_TRANSITIONS.get(current, set())
+            if state not in allowed:
+                raise ValueError(f"invalid_transition:{current}->{state}")
+            db.execute(
+                "UPDATE content_packages SET state=?, updated_at=? WHERE id=?",
+                (state, time.time(), package_id),
+            )
+            self._audit(db, package_id, "STATE_CHANGE", {"from": current, "to": state})
+
+    def save_variants(self, package_id: str, variants: list[dict]) -> None:
+        """Upsert generated variant content (keyed by package + platform)."""
+        now = time.time()
+        with self._db() as db:
+            for variant in variants:
+                platform = variant["platform"]
+                existing = db.execute(
+                    "SELECT id FROM content_variants WHERE package_id=? AND platform=?",
+                    (package_id, platform),
+                ).fetchone()
+                content = variant.get("content", "")
+                char_count = variant.get("char_count", len(content))
+                if existing:
+                    db.execute(
+                        "UPDATE content_variants SET content=?, char_count=?, "
+                        "validation_status='generated', updated_at=? WHERE id=?",
+                        (content, char_count, now, existing["id"]),
+                    )
+                else:
+                    db.execute(
+                        "INSERT INTO content_variants(id,package_id,platform,content,char_count,validation_status,publish_status,created_at,updated_at) "
+                        "VALUES(?,?,?,?,?,?,?,?,?)",
+                        (self._id(), package_id, platform, content, char_count, "generated", "pending", now, now),
+                    )
+            self._audit(db, package_id, "VARIANTS_SAVED", {"count": len(variants)})
+
+    def get_variants(self, package_id: str) -> list[dict]:
+        """Return all variant rows for a package."""
+        with self._db() as db:
+            return self._variants(db, package_id)
+
+    def update_variant(self, package_id: str, variant_id: str, **fields) -> None:
+        """Update one variant row (validation_status, publish_status, content, error, remote_id)."""
+        allowed = {
+            "content",
+            "char_count",
+            "validation_status",
+            "publish_status",
+            "error",
+            "remote_id",
+        }
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        sets = ", ".join(f"{key}=?" for key in updates)
+        values = list(updates.values())
+        with self._db() as db:
+            db.execute(
+                f"UPDATE content_variants SET {sets}, updated_at=? WHERE id=? AND package_id=?",
+                values + [time.time(), variant_id, package_id],
+            )
+            self._audit(db, package_id, "VARIANT_UPDATE", {"variant_id": variant_id, **updates})
+
+    def approve(self, package_id: str) -> dict:
+        """Transition to ``approved`` — requires every variant to be ``validated``."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT state FROM content_packages WHERE id=?", (package_id,)
+            ).fetchone()
+            if not row:
+                raise KeyError(package_id)
+            variants = self._variants(db, package_id)
+            if not variants or any(
+                v["validation_status"] != "validated" for v in variants
+            ):
+                raise ValueError("not_all_validated")
+            if row["state"] != "ready_to_approve":
+                # allow direct approve from ready_to_approve only
+                raise ValueError(f"invalid_transition:{row['state']}->approved")
+            db.execute(
+                "UPDATE content_packages SET state='approved', updated_at=? WHERE id=?",
+                (time.time(), package_id),
+            )
+            self._audit(db, package_id, "APPROVED", {})
+            return {"state": "approved"}
+
+    # ── Audit ───────────────────────────────────────────────────────────────
+
+    def audit(self, package_id: str, kind: str, payload: dict | None = None) -> None:
+        """Append an audit event for the package."""
+        with self._db() as db:
+            self._audit(db, package_id, kind, payload or {})
+
+    def history(self, package_id: str) -> list[dict]:
+        """Return the audit trail for a package (newest first)."""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT * FROM content_package_audit WHERE package_id=? "
+                "ORDER BY created_at DESC, rowid DESC",
+                (package_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def _audit(self, db: sqlite3.Connection, package_id: str, kind: str, payload: dict) -> None:
+        db.execute(
+            "INSERT INTO content_package_audit VALUES (?,?,?,?,?)",
+            (self._id(), package_id, kind, json.dumps(payload, sort_keys=True), time.time()),
         )
