@@ -949,3 +949,11 @@ python scripts/run_backend.py
 ```
 
 This watches only `src/`, so installing frontend dependencies no longer restarts the API server. Python 3.11 installs SciPy 1.17.1, while Python 3.12 and later install SciPy 1.18.0.
+
+## Dokumentáció
+
+- [Engineering Standards](docs/engineering-standards.md) — kötelező olvasmány kódírás előtt
+- [Döntések / tanulságok](docs/decisions/) — javított hibák és anti-minták
+- [Specifikációk](docs/specs/) — feature-ök kanonikus követelményei
+
+- [Módszertan](docs/METHODOLOGY.md) — a lab fejlesztési módszertana (kötelező olvasmány)
