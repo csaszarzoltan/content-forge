@@ -14,7 +14,7 @@ import sqlite3
 import time
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from src.schemas.transcreation import TranscreationResult
@@ -1466,7 +1466,7 @@ class ContentPackageStore:
     (request_hash + cached response; same key + different payload → 409).
     """
 
-    VALID_TRANSITIONS: dict[str, set[str]] = {
+    VALID_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
         "draft": {"generating", "failed"},
         "generating": {"validating", "failed"},
         "validating": {"ready_to_approve", "failed"},

@@ -95,9 +95,8 @@ async def _resolve_generation_source(source_ref: str) -> str | None:
 
 def _adapter() -> PlatformAdapter:
     """Build a PlatformAdapter with the repo's LLM provider (lazy)."""
-    from src.services.llm_provider import get_provider
-
     from src.config import get_settings
+    from src.services.llm_provider import get_provider
 
     settings = get_settings()
     provider = get_provider(settings.LLM_PROVIDER)
