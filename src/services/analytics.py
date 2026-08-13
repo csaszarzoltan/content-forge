@@ -725,4 +725,3 @@ class AnalyticsService:
     ) -> None:
         """Update performance metrics (internal webhook)."""
         # Out of scope for P0-P2 (future external-sync path, analysis brief §1.5 #5).
-        pass

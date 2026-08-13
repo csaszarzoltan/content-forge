@@ -6,6 +6,8 @@ Behavioral tests — verify encryption/decryption and CRUD (RED until implementa
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
 
 
@@ -109,7 +111,7 @@ class TestPlatformTokenBehavioral:
     @pytest.mark.asyncio
     async def test_create_platform_token_in_db(self):
         """Creating a PlatformToken in the database should persist it."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from sqlalchemy import select
         from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -130,7 +132,7 @@ class TestPlatformTokenBehavioral:
                 platform="twitter",
                 access_token_encrypted="encrypted_token_value",
                 refresh_token_encrypted="encrypted_refresh_token",
-                expires_at=datetime.now(timezone.utc),
+                expires_at=datetime.now(UTC),
             )
             session.add(token)
             await session.commit()

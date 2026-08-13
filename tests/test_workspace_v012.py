@@ -1,6 +1,9 @@
 from pathlib import Path
+
 import pytest
+
 from src.product_ops import ContentOpsStore, render_approval_detail, render_workspace
+
 pytestmark=pytest.mark.quick
 
 def ops(tmp_path: Path): return ContentOpsStore(tmp_path/'ops.db')
@@ -19,6 +22,7 @@ def test_decided_approval_hides_form(tmp_path):
 
 def test_high_risk_self_approval_is_blocked_in_web(tmp_path,monkeypatch):
     from fastapi.testclient import TestClient
+
     from src.main import app
     from src.routers import workspaces
     monkeypatch.setattr(workspaces,'_DB',tmp_path/'web.db'); rid=workspaces._store().request_approval('asset-1','alice','HIGH',['claim'])

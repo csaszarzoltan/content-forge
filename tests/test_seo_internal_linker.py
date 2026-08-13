@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 from src.schemas.seo import LinkSuggestion
 from src.services.internal_linker import InternalLinker
-
-import pytest
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick

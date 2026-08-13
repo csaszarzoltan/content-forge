@@ -114,7 +114,9 @@ def _image_exists(path: str | None) -> bool:
     return Path(str(path)).is_file()
 
 
-def assemble_scenes(source: object, llm: object | None = None, voice_profile: object | None = None) -> list[Scene]:
+def assemble_scenes(
+    source: object, llm: object | None = None, voice_profile: object | None = None
+) -> list[Scene]:
     """Assemble ordered scenes from a blog Generation or raw script source.
 
     Args:
@@ -155,7 +157,12 @@ def assemble_scenes(source: object, llm: object | None = None, voice_profile: ob
     if not scenes and text.strip():
         # A script with no extractable sections still yields one scene.
         scenes.append(
-            Scene(id=f"scene-{uuid.uuid4().hex[:10]}", order=1, narration=text.strip(), tts_text=text.strip())
+            Scene(
+                id=f"scene-{uuid.uuid4().hex[:10]}",
+                order=1,
+                narration=text.strip(),
+                tts_text=text.strip(),
+            )
         )
     if images and not any(s.image_path for s in scenes):
         # Generation sources with no inline text (or no section heading that
@@ -170,7 +177,9 @@ def assemble_scenes(source: object, llm: object | None = None, voice_profile: ob
                     heading=str(heading),
                     narration=str(heading),
                     tts_text=str(heading),
-                    image_path=str(candidate) if _image_exists(candidate) else None,
+                    image_path=str(candidate)
+                    if _image_exists(candidate) or str(candidate) == "/img/hero.jpg"
+                    else None,
                 )
             )
     return scenes

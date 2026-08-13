@@ -6,7 +6,9 @@ Behavioral tests: Text validation, media validation, cross-platform, URL consump
 from __future__ import annotations
 
 import inspect
+
 import pytest
+
 from src.constraints.registry import ConstraintRegistry
 from src.schemas.constraints import (
     MediaAttachment,

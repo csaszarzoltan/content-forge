@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     TWITTER_ACCESS_TOKEN_SECRET: str = ""
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
+    LINKEDIN_ACCESS_TOKEN: str = ""
+    LINKEDIN_AUTHOR_URN: str = ""
+    PUBLIC_APP_URL: str = "http://127.0.0.1:5173"
 
     # AI visibility polling settings (analysis brief §5 P0 / M4 / M7)
     AI_VISIBILITY_POLL_ENABLED: bool = False
@@ -72,6 +75,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        env_prefix="CONTENTFORGE_",
     )
 
 

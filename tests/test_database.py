@@ -7,16 +7,13 @@ Behavioral tests — verify NotImplementedError for stubs.
 from __future__ import annotations
 
 import inspect
-from collections.abc import AsyncGenerator
 
 import pytest
-
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
 from src.database import Base, DatabaseManager, get_db
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

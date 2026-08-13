@@ -19,15 +19,13 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
 from pydantic import BaseModel
 
+from src.routers.analytics import router as analytics_router
+from src.schemas.analytics import AnomalyItem, AnomalyResponse, TrendPoint, TrendResponse
+from src.services.analytics import AnalyticsService
 from tests.analytics_test_utils import (
     seed_event,
     seed_generation,
 )
-from src.routers.analytics import router as analytics_router
-from src.schemas.analytics import AnomalyItem, AnomalyResponse, TrendPoint, TrendResponse
-from src.services.analytics import AnalyticsService
-
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

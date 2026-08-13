@@ -10,12 +10,10 @@ import inspect
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
-from src.dependencies import get_db, get_settings_dep, get_current_user
-
+from src.dependencies import get_current_user, get_db, get_settings_dep
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
@@ -44,7 +42,6 @@ class TestDependenciesInterface:
 
     def test_get_settings_dep_return_annotation(self):
         sig = inspect.signature(get_settings_dep)
-        from src.config import Settings
         ann = sig.return_annotation
         assert ann is not inspect.Parameter.empty
 

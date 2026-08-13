@@ -6,16 +6,17 @@ Demonstrates custom preset CRUD operations: saving, listing,
 retrieving, deleting, and remixing presets.
 """
 
+import os
+import tempfile
+
 from brand_voice.models import (
-    VoiceProfile,
-    VoiceAttribute,
-    VocabularyRules,
-    ScenarioTone,
     FormattingPrefs,
+    ScenarioTone,
+    VocabularyRules,
+    VoiceAttribute,
+    VoiceProfile,
 )
 from brand_voice.presets import PresetManager
-import tempfile
-import os
 
 
 def main():

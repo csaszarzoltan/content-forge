@@ -1,0 +1,9 @@
+scenario,provider,executed,result,batch_id,remote_id,attempt_count,http_status_class,duplicate_found,notes
+linkedin_success,linkedin,no,BLOCKED,,,,,,credentials not supplied
+x_success,twitter,no,BLOCKED,,,,,,credentials not supplied
+expired_token,both,no,BLOCKED,,,,,,credentials not supplied
+permission_failure,both,no,BLOCKED,,,,,,credentials not supplied
+rate_limit,both,no,BLOCKED,,,,,,credentials not supplied
+unknown_state,both,no,BLOCKED,,,,,,credentials not supplied
+idempotency_reuse,both,no,BLOCKED,,,,,,credentials not supplied
+partial_success,both,no,BLOCKED,,,,,,credentials not supplied

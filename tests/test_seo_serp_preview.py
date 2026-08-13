@@ -7,11 +7,9 @@ from __future__ import annotations
 
 import inspect
 
-from src.services.serp_preview import SERPPreviewGenerator
-
 import pytest
 
-
+from src.services.serp_preview import SERPPreviewGenerator
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

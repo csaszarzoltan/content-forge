@@ -132,7 +132,6 @@ async def db_session():
     )
 
     import src.models  # noqa: F401  (register all ORM models)
-
     from src.database import Base
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)

@@ -957,3 +957,43 @@ This watches only `src/`, so installing frontend dependencies no longer restarts
 - [Specifikációk](docs/specs/) — feature-ök kanonikus követelményei
 
 - [Módszertan](docs/METHODOLOGY.md) — a lab fejlesztési módszertana (kötelező olvasmány)
+
+## Family Creator
+
+Open the SPA at `#family` to start the guided Family Creator experience. An adult creates a workspace, family members contribute private ideas and drafts, and only an adult can approve the exact current revision and publish it.
+
+### Roles
+
+- **Adult owner:** manages members, creates, reviews, and publishes.
+- **Adult collaborator:** creates, reviews, and publishes.
+- **Teen contributor:** creates and edits private work and submits it for review; cannot publish or manage credentials.
+- **Viewer:** read-only.
+
+The primary flow is **setup -> Home -> four-step project wizard -> exact-revision review -> adult publish**. The family API is under `/api/v1/family`; local/demo clients send `X-User-ID`, `X-User-Name`, and `X-User-Email`. Production deployments should map these actor values from authenticated identity at the trusted gateway.
+
+```bash
+python scripts/run_backend.py
+cd frontend && npm run dev
+# open http://127.0.0.1:5173/#family
+```
+
+Troubleshooting: if Home cannot load, use its Retry action; draft and idea controls preserve entered text. A stale approval cannot publish and must be reviewed again.
+
+### Family Creator completion flow
+
+Family routes now require the normal ContentForge JWT. Open `#family`, sign in, then use Members to create bounded invitation links. Contributors edit through the preview-first editor; an 800 ms autosave uses optimistic versions and preserves unsaved text locally. Adults review the exact revision and can inspect per-channel publication results. Unknown provider states must be reconciled before retry.
+
+Security note: browser `X-User-*` headers are ignored. Public invitation previews return no invited email or project data. Pending invitation tokens created by older builds are invalidated because raw token storage was removed.
+
+### Paid-beta publishing configuration
+
+Family publication now calls the real LinkedIn/X connectors when credentials are configured. Set `LINKEDIN_ACCESS_TOKEN` plus `LINKEDIN_AUTHOR_URN`, or all four Twitter/X credential variables. Missing or expired connections are shown as Action required and never reported as published. The adult confirmation screen shows the approved revision, reviewer, destinations, visibility, and timing before sending.
+
+### Paid-beta scheduling and validation status
+
+The paid beta publishes immediately after adult confirmation. Scheduling is intentionally hidden until durable background execution, restart recovery, and timezone tests are implemented. See `docs/family-pilot.md` for the 5-10 household pilot and `docs/provider-sandbox-checklist.md` for real provider verification.
+
+## Family paid-beta release hardening
+
+Family mode uses immediate publishing only. Provider credentials are treated as **configured, not verified** until a non-public LinkedIn or X sandbox test returns a confirmed remote identifier. Unknown external provider state must be reconciled before retry. Family roles expose a shared capability model, and pilot measurement accepts only consented, content-free events. Scheduling remains hidden; the family navigation uses Activity for publication history.
+>>>>>>> c9ac53d6a51b6d6321496d5b44be89dbb229cf3c

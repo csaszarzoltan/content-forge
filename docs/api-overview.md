@@ -693,3 +693,7 @@ Validation errors include a structured detail:
 ```json
 {"detail": [{"loc": ["body", "topic"], "msg": "field required", "type": "value_error.missing"}]}
 ```
+
+### Family Creator API — `/api/v1/family/*`
+
+Family workspace, invitation, Home, journey, private idea, exact-revision review, and adult publish endpoints are documented in [Family Creator Workspace](family-workspace.md). Side-effecting create/publish operations use `Idempotency-Key`; role and workspace membership are enforced before object access.

@@ -85,7 +85,7 @@ class AiVisibilityPoller:
                     await manager.close()
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 — the loop must never die
+            except Exception:
                 # B3 (tech-lead review): log the failure so a silently dead
                 # poller is diagnosable; keep looping regardless.
                 logger.exception("ai_visibility poller loop error")

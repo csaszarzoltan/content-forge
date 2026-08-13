@@ -70,7 +70,7 @@ async def track_event(
 @router.get("/dashboard")
 async def get_dashboard(
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     channel: str | None = None,
@@ -87,7 +87,7 @@ async def get_dashboard(
 async def get_content_performance(
     generation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> ContentPerformanceResponse:
@@ -103,7 +103,7 @@ async def get_content_performance(
 @router.get("/channels")
 async def get_channel_comparison(
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     metric: str = "impressions",
@@ -119,7 +119,7 @@ async def get_channel_comparison(
 async def get_ab_results(
     test_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> ABResultsCorrelationResponse:
@@ -133,7 +133,7 @@ async def get_ab_results(
 @router.get("/export")
 async def export_data(
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     format: str = "json",
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -153,7 +153,7 @@ async def export_data(
 async def get_content_score(
     generation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> ContentScoreResponse:
     """Deterministic content quality score (engagement+SEO+readability+compliance)."""
     try:
@@ -165,7 +165,7 @@ async def get_content_score(
 @router.get("/trends")
 async def get_trends(
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     period: str = "30d",
     metric: str = "impressions",
     channel: str | None = None,
@@ -180,7 +180,7 @@ async def get_trends(
 @router.get("/anomalies")
 async def get_anomalies(
     db: AsyncSession = Depends(get_db),
-    current_user: "User | None" = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     period: str = "30d",
     metric: str = "impressions",
 ) -> AnomalyResponse:

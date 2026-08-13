@@ -82,4 +82,4 @@ class ContentAnalytics(Base):
 
 
 # Avoid circular import
-from src.models.generation import Generation  # noqa: E402
+from src.models.generation import Generation

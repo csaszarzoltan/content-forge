@@ -22,16 +22,15 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from tests.analytics_test_utils import (
-    seed_event,
-    seed_generation,
-)
 from src.models.analytics import AnalyticsEvent
 from src.routers.analytics import get_content_score as score_endpoint
 from src.routers.analytics import router as analytics_router
 from src.schemas.analytics import ContentScoreResponse, ScoreBreakdown
 from src.services.content_scoring import ContentScoringService
-
+from tests.analytics_test_utils import (
+    seed_event,
+    seed_generation,
+)
 
 GRADE_BOUNDARIES = {"A": 90.0, "B": 75.0, "C": 60.0, "D": 45.0, "F": 0.0}
 

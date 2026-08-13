@@ -5,7 +5,6 @@ Behavioral tests: Validation logic, field defaults, serialization.
 """
 from __future__ import annotations
 
-
 import pytest
 from pydantic import BaseModel
 

@@ -22,7 +22,6 @@ REQUIRED_SECTIONS = {"Identity", "Voice Attributes", "Vocabulary", "Scenarios", 
 class ParseError(Exception):
     """Raised when BRAND_VOICE.md is malformed or missing required sections."""
 
-    pass
 
 
 def _parse_attributes(lines: list[str]) -> list[VoiceAttribute]:

@@ -39,4 +39,4 @@ class Generation(Base):
 
 
 # Avoid circular import
-from src.models.brand_voice import BrandVoice  # noqa: E402
+from src.models.brand_voice import BrandVoice

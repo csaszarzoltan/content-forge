@@ -6,19 +6,15 @@ Behavioral tests — verify NotImplementedError for stub methods.
 
 from __future__ import annotations
 
-import inspect
-
 import pytest
-
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
+from src.models.analytics import ContentAnalytics
 from src.models.brand_voice import BrandVoice
 from src.models.generation import Generation
 from src.models.scheduled_post import ScheduledPost
-from src.models.analytics import ContentAnalytics
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

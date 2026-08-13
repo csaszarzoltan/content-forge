@@ -6,7 +6,7 @@ DELETE /schedule/{id} — cancel scheduled post
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ async def schedule_content(
     db: AsyncSession = Depends(get_db),
 ) -> ScheduleResponse:
     """Schedule content for automatic publishing at a future time."""
-    if body.publish_at <= datetime.now(timezone.utc):
+    if body.publish_at <= datetime.now(UTC):
         raise HTTPException(status_code=422, detail="publish_at must be in the future")
 
     scheduler = SchedulerService()
@@ -46,7 +46,7 @@ async def schedule_content(
         status="scheduled",
         publish_at=body.publish_at,
         platform=body.platform,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -64,12 +64,12 @@ async def get_schedule_status(
         schedule_id=status_data.get("schedule_id", schedule_id),
         generation_id="",
         status=status_data.get("status", "pending"),
-        publish_at=datetime.now(timezone.utc),
+        publish_at=datetime.now(UTC),
         platform="",
         retry_count=0,
         max_retries=3,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 

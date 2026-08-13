@@ -38,6 +38,7 @@ from src.routers.brand_kit import router as brand_kit_router
 from src.routers.brand_voice import router as brand_voice_router
 from src.routers.constraints import router as constraints_router
 from src.routers.content import router as content_router
+from src.routers.family import router as family_router
 from src.routers.languages import router as languages_router
 from src.routers.publish import router as publish_router
 from src.routers.schedule import router as schedule_router
@@ -152,6 +153,7 @@ app.include_router(analytics_router)
 app.include_router(ai_visibility_router)
 app.include_router(seo_router)
 app.include_router(workspaces_router)
+app.include_router(family_router)
 app.include_router(constraints_router)
 app.include_router(video_analytics_router)
 app.mount(

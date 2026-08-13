@@ -27,8 +27,8 @@ class ContentGenerator:
     """Orchestrates the full content generation pipeline."""
 
     def __init__(self) -> None:
-        from src.services.llm_provider import get_provider
         from src.config import get_settings
+        from src.services.llm_provider import get_provider
 
         self._settings = get_settings()
         self._provider = get_provider(self._settings.LLM_PROVIDER)

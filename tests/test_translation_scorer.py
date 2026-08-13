@@ -17,16 +17,14 @@ import inspect
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
 from src.services.translation_scorer import (
-    TranslationScores,
-    TranslationScorer,
     TranslationPair,
+    TranslationScorer,
+    TranslationScores,
 )
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

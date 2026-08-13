@@ -12,24 +12,18 @@ Covers:
 from __future__ import annotations
 
 import inspect
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
-
 
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
 from src.schemas.schedule import (
-    PlatformConfig,
     ScheduleRequest,
     ScheduleResponse,
-    ScheduleStatusResponse,
 )
-from src.routers.schedule import router as schedule_router
 from src.services.scheduler import SchedulerService
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
@@ -113,7 +107,7 @@ class TestLanguageScheduleRequestBehavioral:
         """ScheduleRequest should construct with language fields."""
         req = ScheduleRequest(
             generation_id="gen-1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
             source_language="en",
             target_language="de",
@@ -127,7 +121,7 @@ class TestLanguageScheduleRequestBehavioral:
         """ScheduleRequest should work without language fields."""
         req = ScheduleRequest(
             generation_id="gen-1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
         )
         assert req.source_language is None or req.source_language == "en"
@@ -137,7 +131,7 @@ class TestLanguageScheduleRequestBehavioral:
         tz = "America/New_York"
         req = ScheduleRequest(
             generation_id="gen-1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="blog",
             timezone=tz,
         )
@@ -153,9 +147,9 @@ class TestLanguageScheduleResponseBehavioral:
             schedule_id="sch_1",
             generation_id="gen-1",
             status="scheduled",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             source_language="en",
             target_language="de",
             timezone="Europe/Berlin",
@@ -174,7 +168,7 @@ class TestLanguageSchedulerBehavioral:
         svc = SchedulerService()
         schedule_id = await svc.schedule_post(
             generation_id="gen_1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
             source_language="en",
             target_language="de",
@@ -188,7 +182,7 @@ class TestLanguageSchedulerBehavioral:
         svc = SchedulerService()
         schedule_id = await svc.schedule_post(
             generation_id="gen_1",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="linkedin",
             timezone="Asia/Tokyo",
         )

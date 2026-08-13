@@ -8,7 +8,7 @@ DELETE /brand-voice/{id}     — soft-delete
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -127,7 +127,7 @@ async def update_brand_voice(
             bv.profile_data[field] = update_data[field]
 
     bv.increment_version()
-    bv.updated_at = datetime.now(timezone.utc)
+    bv.updated_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(bv)

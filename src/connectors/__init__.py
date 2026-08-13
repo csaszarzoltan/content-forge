@@ -8,9 +8,9 @@ from src.connectors.base import SocialMediaConnector
 from src.connectors.errors import AuthError, ConnectorError, PublishError, RateLimitError
 
 __all__ = [
-    "SocialMediaConnector",
-    "ConnectorError",
     "AuthError",
-    "RateLimitError",
+    "ConnectorError",
     "PublishError",
+    "RateLimitError",
+    "SocialMediaConnector",
 ]

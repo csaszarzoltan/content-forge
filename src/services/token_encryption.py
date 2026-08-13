@@ -15,7 +15,7 @@ _fernet: Fernet | None = None
 
 def _get_fernet() -> Fernet:
     """Return a Fernet instance, initialised from settings or a module-level fallback."""
-    global _fernet  # noqa: PLW0603
+    global _fernet
     if _fernet is not None:
         return _fernet
     try:

@@ -4,7 +4,7 @@ POST /generate/{content_type} — generate content via LLM with brand voice inje
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,5 +59,5 @@ async def generate_content(
         model_used=result.model_used,
         tokens_used=result.tokens_used,
         latency_ms=result.latency_ms,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )

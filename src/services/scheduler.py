@@ -38,7 +38,6 @@ class SchedulerService:
     async def cancel_post(self, schedule_id: str) -> None:
         """Cancel a scheduled post."""
         # In production: remove APScheduler job + update DB status
-        pass
 
     async def get_post_status(self, schedule_id: str) -> dict:
         """Return the current status and metadata of a scheduled post."""

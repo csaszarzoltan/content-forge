@@ -28,6 +28,8 @@ import pytest
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.quick]
 
+from typing import Self
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,7 +67,7 @@ class _KeyedURLErrorClient:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
-    async def __aenter__(self) -> "_KeyedURLErrorClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info) -> bool:
@@ -115,7 +117,7 @@ class _RequestErrorClient:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
-    async def __aenter__(self) -> "_RequestErrorClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info) -> bool:

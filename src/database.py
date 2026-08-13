@@ -46,7 +46,7 @@ class DatabaseManager:
     async def get_session(self) -> AsyncSession:
         """Create a new async session."""
         self._create_engine()
-        assert self._session_factory is not None  # noqa: S101
+        assert self._session_factory is not None
         return self._session_factory()
 
     async def close(self) -> None:

@@ -10,12 +10,10 @@ import inspect
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
 from src.config import Settings, get_settings
-
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

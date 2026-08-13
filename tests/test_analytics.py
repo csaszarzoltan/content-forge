@@ -23,10 +23,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 
-from tests.analytics_test_utils import (
-    seed_event,
-    seed_generation,
-)
 from src.models.analytics import (
     ANALYTICS_CHANNELS,
     ANALYTICS_EVENT_TYPES,
@@ -34,8 +30,12 @@ from src.models.analytics import (
 )
 from src.routers.analytics import (
     get_content_performance as content_endpoint,
-    track_event as track_endpoint,
+)
+from src.routers.analytics import (
     router as analytics_router,
+)
+from src.routers.analytics import (
+    track_event as track_endpoint,
 )
 from src.schemas.analytics import (
     ABResultsCorrelationResponse,
@@ -62,7 +62,10 @@ from src.schemas.analytics import (
     VariantPerformance,
 )
 from src.services.analytics import AnalyticsService
-
+from tests.analytics_test_utils import (
+    seed_event,
+    seed_generation,
+)
 
 NEW_SCHEMAS = [
     TrackEventRequest,

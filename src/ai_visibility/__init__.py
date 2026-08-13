@@ -9,8 +9,8 @@ only after the developer implements them (see ``models.py`` docstring).
 from __future__ import annotations
 
 from src.ai_visibility.models import (
-    AI_ENGINES,
     AI_ENGINE_REFERRER_DOMAINS,
+    AI_ENGINES,
     AI_METRICS,
     AI_SENTIMENTS,
     AI_TREND_PERIODS,

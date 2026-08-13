@@ -17,11 +17,10 @@ Usage:
 """
 
 import asyncio
-import sys
 
 # Attempt imports with helpful error if contentforge is not installed
 try:
-    from contentforge.multilang import LanguageDetector, PromptTemplate, MultiLangTemplateManager
+    from contentforge.multilang import LanguageDetector, MultiLangTemplateManager, PromptTemplate
 except ImportError:
 
     class LanguageDetector:  # type: ignore[no-redef]

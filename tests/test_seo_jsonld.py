@@ -7,11 +7,9 @@ from __future__ import annotations
 
 import inspect
 
-from src.services.jsonld_generator import JSONLDGenerator
-
 import pytest
 
-
+from src.services.jsonld_generator import JSONLDGenerator
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)

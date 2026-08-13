@@ -1,6 +1,9 @@
 from pathlib import Path
+
 import pytest
+
 from src.product_ops import ContentOpsStore, render_publish_batch_detail, render_workspace
+
 pytestmark=pytest.mark.quick
 
 def ops(tmp_path: Path): return ContentOpsStore(tmp_path/'ops.db')

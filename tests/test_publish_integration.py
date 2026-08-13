@@ -10,9 +10,6 @@ from __future__ import annotations
 
 import pytest
 
-
-
-
 # Mark as integration (uses TestClient/AsyncClient)
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 

@@ -16,13 +16,13 @@ AC-T2 coverage:
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import pytest
 
-
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
+
+from datetime import UTC
 
 from src.models.brand_voice import BrandVoice
 from src.models.generation import Generation
@@ -30,7 +30,6 @@ from src.models.scheduled_post import ScheduledPost
 from src.schemas.brand_voice import BrandVoiceResponse
 from src.schemas.content import GenerationResponse
 from src.schemas.schedule import ScheduleRequest, ScheduleResponse
-
 
 # ============================================================================
 # SECTION 1 — MODEL INTERFACE TESTS
@@ -110,8 +109,8 @@ class TestBrandVoiceLanguageColumn:
         col = {c.name: c for c in BrandVoice.__table__.columns}.get("languages")
         if col is None:
             pytest.skip("languages column not yet added to BrandVoice model")
-        from sqlalchemy.dialects.postgresql import JSON as PGJSON
         from sqlalchemy import JSON as SAJSON
+        from sqlalchemy.dialects.postgresql import JSON as PGJSON
         assert isinstance(col.type, (SAJSON, PGJSON)), (
             "languages column should be JSON type to store list[str]"
         )
@@ -522,11 +521,11 @@ class TestExistingDataIntegrity:
 
     def test_existing_scheduled_post_can_be_instantiated(self):
         """Existing ScheduledPost fields still work after adding language columns."""
-        from datetime import datetime, timezone
+        from datetime import datetime
         sp = ScheduledPost(
             id="test-id",
             generation_id="gen-id",
-            publish_at=datetime.now(timezone.utc),
+            publish_at=datetime.now(UTC),
             platform="twitter",
         )
         assert sp.id == "test-id"

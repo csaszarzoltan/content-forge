@@ -31,6 +31,7 @@ dependencies = [
     "imageio-ffmpeg>=0.5,<1",
     "numpy>=2.0,<3",
     "pillow>=11.0,<13",
+    "typer>=0.12,<1",
 ]
 
 [project.scripts]
@@ -65,6 +66,10 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [".venv", "frontend/node_modules", "frontend/dist"]
+
+[tool.ruff.lint]
+extend-ignore = ["B008", "B017", "S110", "S112", "EXE001", "RUF100", "BLE001", "DTZ001", "DTZ005"]
 
 [tool.setuptools.package-data]
 "*" = ["static/*.css"]

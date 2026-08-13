@@ -369,3 +369,46 @@
 
 ### Features
 - Initial ContentForge scaffold with FastAPI
+
+#### Family Creator vertical slice (2026-08-12)
+- Added adult-owned family workspaces with owner, adult collaborator, teen contributor, and viewer permissions.
+- Added single-use seven-day invitation tokens, contextual Family Home, a four-step goal wizard, and private mobile idea capture.
+- Added exact-revision guardian review, approval supersession on edits, contributor publish denial, idempotent adult publication, and audit records.
+- Added responsive desktop/mobile family UI with explicit loading, empty, validation, success, retry, offline, focus, and reduced-motion behavior.
+- Added 10 backend behavior tests covering US-001 through US-009; changed family domain measured at 93% line coverage.
+- Added family API and user-flow documentation plus an auditable development report.
+
+#### Family Creator completion pass (2026-08-12)
+- Replaced family actor headers with the existing JWT current-user dependency.
+- Added private invitation preview, revocation, member listing, role changes, removal, and transactional last-owner protection.
+- Added secure migration that clears legacy raw pending invitation tokens while preserving token hashes.
+- Added asset detail, conflict-safe autosave, revision history, review detail with word diff, publish eligibility, result, retry, and reconciliation APIs.
+- Added authenticated sign-in, Members, preview-first Editor, and per-channel Publish Result experiences with responsive states.
+- Added nine completion tests covering US-010 through US-018; combined family domain coverage measured at 91%.
+
+#### Family paid-beta hardening (2026-08-12)
+- Completed invitation acceptance, calm adult publish confirmation, connection recovery, weekly family summary, family avatars, and private/public safety labels.
+- Connected family publishing to real LinkedIn/X connector execution when provider credentials are configured; missing credentials now produce `connection_required` instead of synthetic success.
+- Fixed config default isolation, CLI Typer runtime dependency, and video source-image reuse regressions.
+- Added queued provider batches, delivery completion, honest aggregate results, and weekly outcome reporting.
+
+#### Release verification and pilot readiness (2026-08-12)
+- Hid unimplemented scheduling from the paid-beta UI and explicitly states immediate publication.
+- Fixed full frontend lint by preserving Brand Kit pagination parameters.
+- Added family pilot protocol/results template and provider sandbox checklist/results template.
+- Full backend regression: 2,599 collected tests, exit 0; frontend 39 tests, lint and production build exit 0.
+
+#### Family provider confidence, pilot, and trust hardening (2026-08-12)
+- Added explicit provider outcome classification, secret-safe evidence filtering, and selective-retry rules.
+- Credential presence now reports Not tested rather than Healthy.
+- Added shared family capability and private/public visibility policies.
+- Added content-free pilot validation, aggregation, safety blocking, and privacy deletion planning primitives.
+- Renamed the visible family Calendar navigation to Activity; family publishing remains immediate-only.
+- Added nine release-hardening contract tests covering US-001 through US-009.
+
+#### Release closure verification (2026-08-12)
+- Completed the full backend regression in four exhaustive test-file partitions: 2,581 passed, 27 skipped, 0 failed from 2,608 collected tests.
+- Cleaned repository-wide Ruff findings; full Ruff and frontend ESLint now exit 0.
+- Reverified 39 frontend tests, production build, and backend startup health.
+- Pinned Playwright test tooling; Chromium provisioning remained blocked by the environment timeout.
+- Live LinkedIn/X sandbox and the 5–10-family field pilot remain explicitly blocked, with no synthetic evidence recorded.

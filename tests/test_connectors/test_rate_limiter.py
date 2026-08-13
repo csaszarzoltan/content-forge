@@ -137,9 +137,9 @@ class TestRateLimiterBehavioral:
     @pytest.mark.asyncio
     async def test_tokens_refill_over_time(self):
         """Tokens should refill according to the refill_rate."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
-
         import asyncio
+
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=5, refill_rate=5.0)  # 5 tokens/sec
         # Consume 3 tokens
@@ -190,9 +190,9 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_acquire_after_refill_eventually_succeeds(self):
         """Acquire after refill should eventually succeed."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
-
         import asyncio
+
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=2, refill_rate=4.0)
         # Drain
@@ -217,9 +217,8 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_acquire_zero_tokens_returns_zero(self):
         """acquire(tokens=0) should return 0.0 immediately."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
-        import asyncio
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=5, refill_rate=1.0)
         wait = await limiter.acquire(tokens=0)
@@ -237,9 +236,8 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_negative_tokens_acquire_returns_zero(self):
         """acquire(tokens=-1) should return 0.0 immediately."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
-        import asyncio
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=5, refill_rate=1.0)
         wait = await limiter.acquire(tokens=-1)
@@ -248,9 +246,9 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_remaining_never_exceeds_capacity(self):
         """The remaining property should never exceed capacity."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
-
         import asyncio
+
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=10, refill_rate=100.0)
         # Wait for significant refill time
@@ -261,9 +259,8 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_acquire_blocks_when_exhausted(self):
         """acquire() should block when no tokens available, then succeed after refill."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
-        import asyncio
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=3, refill_rate=6.0)  # 6 tokens/s
         # Drain
@@ -277,9 +274,8 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_acquire_multiple_tokens(self):
         """acquire() should support consuming multiple tokens."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
-        import asyncio
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=10, refill_rate=0.0)
         wait = await limiter.acquire(tokens=3)
@@ -309,9 +305,9 @@ class TestRateLimiterEdgeCases:
     @pytest.mark.asyncio
     async def test_zero_refill_rate_acquire_blocks_indefinitely(self):
         """acquire() with refill_rate=0 should block (no refill possible)."""
-        from src.connectors.rate_limiter import TokenBucketRateLimiter
-
         import asyncio
+
+        from src.connectors.rate_limiter import TokenBucketRateLimiter
 
         limiter = TokenBucketRateLimiter(capacity=3, refill_rate=0.0)
         # Drain

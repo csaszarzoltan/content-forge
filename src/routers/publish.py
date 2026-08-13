@@ -6,7 +6,7 @@ GET  /api/v1/publish/status        — list publishes with optional filter
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -31,7 +31,7 @@ def _get_publish_service(request: Request) -> PublishService:
     svc: PublishService | None = getattr(request.app.state, "publish_service", None)
     if svc is not None:
         return svc
-    global _default_publish_service  # noqa: PLW0603
+    global _default_publish_service
     if _default_publish_service is None:
         _default_publish_service = PublishService(connectors={})
     return _default_publish_service
@@ -63,7 +63,7 @@ async def publish_content(
             platform=body.platform,
             status="published",
             platform_url=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     try:
@@ -83,7 +83,7 @@ async def publish_content(
         platform=body.platform,
         status=result.get("status", "published"),
         platform_url=result.get("platform_url"),
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 

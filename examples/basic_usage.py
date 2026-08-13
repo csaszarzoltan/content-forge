@@ -6,13 +6,14 @@ Demonstrates loading a preset, generating a system prompt,
 rendering scenario templates, and multi-brand management.
 """
 
-from brand_voice.presets import PresetManager
-from brand_voice.templates import TemplateEngine
+import os
+import tempfile
+
 from brand_voice.multi_brand import VoiceManager
+from brand_voice.presets import PresetManager
 from brand_voice.prompt_binding import PromptBinder
 from brand_voice.scoping import VoiceScope
-import tempfile
-import os
+from brand_voice.templates import TemplateEngine
 
 
 def main():

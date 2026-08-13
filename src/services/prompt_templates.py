@@ -212,6 +212,6 @@ def _parse_yaml_simple(content: str) -> dict | list:
 
 __all__ = [
     "LanguagePromptTemplate",
-    "TemplateInfo",
     "PromptTemplateRegistry",
+    "TemplateInfo",
 ]

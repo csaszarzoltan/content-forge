@@ -7,7 +7,6 @@ Behavioral tests — verify expected runtime behavior (should FAIL with NotImple
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import pytest
 
@@ -16,6 +15,11 @@ import pytest
 # Mark as quick (unit tests)
 pytestmark = pytest.mark.quick
 
+# ── P2: Compliance ──────────────────────────────────────────────────────────
+from brand_voice.compliance import ComplianceResult, ComplianceScorer
+
+# ── P2: Extraction ──────────────────────────────────────────────────────────
+from brand_voice.extraction import VoiceExtractor
 from brand_voice.models import (
     FormattingPrefs,
     ScenarioTone,
@@ -24,17 +28,19 @@ from brand_voice.models import (
     VoiceProfile,
 )
 
+# ── P1: Multi-Brand ─────────────────────────────────────────────────────────
+from brand_voice.multi_brand import VoiceManager
+
 # ── P0: Parser ──────────────────────────────────────────────────────────────
-from brand_voice.parser import ParseError, parse_brand_voice, parse_brand_voice_string, validate_brand_voice
+from brand_voice.parser import (
+    ParseError,
+    parse_brand_voice,
+    parse_brand_voice_string,
+    validate_brand_voice,
+)
 
 # ── P0: Presets ─────────────────────────────────────────────────────────────
 from brand_voice.presets import PresetManager
-
-# ── P0: Templates ───────────────────────────────────────────────────────────
-from brand_voice.templates import TemplateEngine
-
-# ── P1: Multi-Brand ─────────────────────────────────────────────────────────
-from brand_voice.multi_brand import VoiceManager
 
 # ── P1: Prompt Binding ──────────────────────────────────────────────────────
 from brand_voice.prompt_binding import PromptBinder
@@ -42,12 +48,8 @@ from brand_voice.prompt_binding import PromptBinder
 # ── P1: Scoping ─────────────────────────────────────────────────────────────
 from brand_voice.scoping import VoiceScope
 
-# ── P2: Compliance ──────────────────────────────────────────────────────────
-from brand_voice.compliance import ComplianceResult, ComplianceScorer
-
-# ── P2: Extraction ──────────────────────────────────────────────────────────
-from brand_voice.extraction import VoiceExtractor
-
+# ── P0: Templates ───────────────────────────────────────────────────────────
+from brand_voice.templates import TemplateEngine
 
 # ============================================================================
 # SECTION 1 — INTERFACE TESTS (should PASS immediately)
@@ -652,7 +654,7 @@ class TestPresetsBehavioral:
     def test_preset_manager_init_creates_dir(self, temp_dir):
         """PresetManager should create custom_dir if it does not exist."""
         custom = temp_dir / "my_presets"
-        mgr = PresetManager(custom_dir=custom)
+        PresetManager(custom_dir=custom)
         assert custom.exists()
         assert custom.is_dir()
 
@@ -943,7 +945,7 @@ class TestScopingBehavioral:
     def test_voice_scope_config_dir_created(self, temp_dir):
         """Config directory should be created if it does not exist."""
         nested = temp_dir / "deep" / "nested" / "config"
-        scope = VoiceScope(nested)
+        VoiceScope(nested)
         assert nested.exists()
         assert nested.is_dir()
 
@@ -1008,9 +1010,9 @@ class TestExtractionBehavioral:
         """extract() should return a valid VoiceProfile."""
         extractor = VoiceExtractor(min_words=100)
         samples = [
-            "We are excited to announce our new platform. "
+            ("We are excited to announce our new platform. "
             "This solution helps teams collaborate more effectively across departments. "
-            "Our mission is to make work easier for everyone involved in the process."
+            "Our mission is to make work easier for everyone involved in the process.")
         ]
         profile = extractor.extract(samples)
         assert isinstance(profile, VoiceProfile)
@@ -1022,8 +1024,8 @@ class TestExtractionBehavioral:
         """extract() should infer vocabulary rules from samples."""
         extractor = VoiceExtractor(min_words=50)
         samples = [
-            "Our scalable and robust platform helps enterprise teams. "
-            "We provide proven solutions for modern businesses."
+            ("Our scalable and robust platform helps enterprise teams. "
+            "We provide proven solutions for modern businesses.")
         ]
         profile = extractor.extract(samples)
         assert len(profile.vocabulary.preferred) > 0
@@ -1038,8 +1040,8 @@ class TestExtractionBehavioral:
         """analyze_samples() should return analysis metrics."""
         extractor = VoiceExtractor(min_words=50)
         samples = [
-            "We are pleased to announce a new feature release. "
-            "This update includes performance improvements and bug fixes."
+            ("We are pleased to announce a new feature release. "
+            "This update includes performance improvements and bug fixes.")
         ]
         analysis = extractor.analyze_samples(samples)
         assert isinstance(analysis, dict)
