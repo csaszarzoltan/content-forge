@@ -44,6 +44,25 @@ PLATFORM_PROMPTS: dict[str, str] = {
         "and narrative; use headings and paragraphs. Target 800-1500 words; "
         "end with a CTA."
     ),
+    "x": (
+        "You are writing an X (Twitter) post. Be concise and conversational; keep it "
+        "under 280 characters including hashtags. One clear idea, punchy wording, "
+        "1-2 hashtags max."
+    ),
+    "instagram": (
+        "You are writing an Instagram caption. Keep it under 2200 characters (visible "
+        "cutoff at 125 characters before 'more'), include 3-8 relevant hashtags, and "
+        "end with a soft CTA."
+    ),
+    "landing": (
+        "You are writing landing page copy. Structure it as a hero headline, a short "
+        "benefits section, and a clear CTA. Keep the total under 1500 characters."
+    ),
+    "script": (
+        "You are writing a short video script (60-90 seconds). Structure it as "
+        "scene/visual/audio lines suitable for a voiceover or on-camera take: "
+        "one line per scene, visual cue, and spoken audio."
+    ),
 }
 
 PLATFORM_CONSTRAINTS_MAP: dict[str, dict[str, Any]] = {
