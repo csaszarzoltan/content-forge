@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.0] - 2026-08-14
+
+### Features
+- Added **Content Forge P0 (US-001..US-005)** — brand-safe multi-format drafting, review and export workspace:
+  - **Brief entity + versioning (US-001)** — structured brief store with immutable versions, output constraint validation (channels, max chars, prohibited phrases, brand voice), persistence across reopen and archive lifecycle.
+  - **7-channel drafting + channel rule engine (US-001)** — LLM drafting across all seven platforms (x, instagram, linkedin, facebook, landing, email, script) with per-channel prompts, brand-voice system-prompt injection, and a registry-driven rule engine enforcing per-channel `max_chars` and prohibited phrases (no hardcoded limits in the engine).
+  - **Claim verification & provenance (US-004)** — mechanical span verification (exact-match with overlap handling, out-of-bounds rejection) distinguishing **verified** claims from **suggestions**; no span is ever trusted without a judge-supported source.
+  - **Blocked-term gate (US-002)** — hard gate with case-insensitive, whole-word matching, no false positives on contained words, spec-example exceptions, and append-only violation records.
+  - **Review/approval workflow + version diff (US-003)** — request/decide review adapter over the existing approval store: stale decisions rejected, findings block approval, unified diff of versions, edits invalidate prior approvals (FR-17), revoke returns asset to editing.
+  - **Byte-faithful export with EU AI Act Art. 50 disclosure (US-005)** — txt/md/html/json exports byte-identical to the approved body (`visible_fidelity` True), HTML ships with JSON-LD AI-generated-content disclosure marker, preflight hash mismatch blocks export, export is a pure function (store untouched).
+
 ## [0.16.0] - 2026-08-13
 
 ### Features
