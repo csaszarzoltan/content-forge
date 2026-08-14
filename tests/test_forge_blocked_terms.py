@@ -108,7 +108,8 @@ class TestScanBehavior:
     def test_multiple_terms_multiple_positions(self):
         """Multiple distinct terms each carry their own positions."""
         hits = BlockedTermGate().scan("Guaranteed results, guaranteed income.", ["guaranteed"])
-        assert hits[0]["positions"] == [(0, 10), (21, 31)]
+        # Real byte offsets: second 'guaranteed' starts at char 20 (single space after the comma)
+        assert hits[0]["positions"] == [(0, 10), (20, 30)]
 
 
 class TestGateApprovalBehavior:

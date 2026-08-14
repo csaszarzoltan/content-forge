@@ -116,9 +116,8 @@ def _make_brief(
 
 
 async def test_generate_drafts_returns_one_per_channel():
-    from tests.conftest import FakeProvider
-
     from src.forge.drafting import generate_drafts
+    from tests.conftest import FakeProvider
 
     brief = _make_brief(channels=["blog", "linkedin", "x"])
     drafts = await generate_drafts(
@@ -130,9 +129,8 @@ async def test_generate_drafts_returns_one_per_channel():
 
 
 async def test_generate_drafts_defaults_to_brief_channels():
-    from tests.conftest import FakeProvider
-
     from src.forge.drafting import generate_drafts
+    from tests.conftest import FakeProvider
 
     brief = _make_brief(channels=["blog", "email"])
     drafts = await generate_drafts(brief, provider=FakeProvider())
@@ -140,10 +138,9 @@ async def test_generate_drafts_defaults_to_brief_channels():
 
 
 async def test_max_chars_violation_flagged():
-    from tests.conftest import FakeProvider
-
     from src.forge.drafting import generate_drafts
     from src.forge.rule_engine import RuleSeverity
+    from tests.conftest import FakeProvider
 
     brief = _make_brief(channels=["x"])
     bad = await generate_drafts(
@@ -157,10 +154,9 @@ async def test_max_chars_violation_flagged():
 
 
 async def test_prohibited_phrase_violation_flagged():
-    from tests.conftest import FakeProvider
-
     from src.forge.drafting import generate_drafts
     from src.forge.rule_engine import RuleSeverity
+    from tests.conftest import FakeProvider
 
     brief = _make_brief(channels=["email"], prohibited_phrases=["buy now"])
     hits = await generate_drafts(
@@ -173,9 +169,8 @@ async def test_prohibited_phrase_violation_flagged():
 
 
 async def test_unknown_channel_raises_valueerror():
-    from tests.conftest import FakeProvider
-
     from src.forge.drafting import generate_drafts
+    from tests.conftest import FakeProvider
 
     brief = _make_brief(channels=["blog"])
     with pytest.raises(ValueError):
@@ -183,9 +178,8 @@ async def test_unknown_channel_raises_valueerror():
 
 
 async def test_brand_voice_injected_when_profile_present():
-    from tests.conftest import RecordingProvider
-
     from src.forge.drafting import generate_drafts
+    from tests.conftest import RecordingProvider
 
     brief = _make_brief(channels=["blog"], brand_profile_id="acme-corp-v1")
     d = await generate_drafts(brief, channels=["blog"], provider=RecordingProvider())
@@ -194,9 +188,8 @@ async def test_brand_voice_injected_when_profile_present():
 
 async def test_provider_called_with_brand_voice_system_prompt():
     """Recording provider must observe the brand-voice block in the system prompt."""
-    from tests.conftest import RecordingProvider
-
     from src.forge.drafting import generate_drafts
+    from tests.conftest import RecordingProvider
 
     brief = _make_brief(channels=["blog"], brand_profile_id="acme-corp-v1")
     provider = RecordingProvider()

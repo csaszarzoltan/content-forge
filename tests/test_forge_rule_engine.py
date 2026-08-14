@@ -25,9 +25,6 @@ never stub-guard with pytest.raises(NotImplementedError)).
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
-
-import pytest
 
 # ── Interface tests ─────────────────────────────────────────────────────────
 
@@ -161,7 +158,6 @@ def test_hashtags_over_budget_hard():
     registry = _load_registry()
     # instagram allows max_hashtags=30; fabricate a tight budget via a copy
     from src.constraints.models import PlatformConstraints
-
     from src.forge.rule_engine import ChannelRuleEngine
 
     constraints = registry.get("instagram")
@@ -186,10 +182,8 @@ def test_hashtags_over_budget_hard():
 
 
 def test_required_sections_missing_is_soft():
-    from src.forge.rule_engine import RuleSeverity
-
-    registry = _load_registry()
     from src.forge.brief_schemas import OutputConstraints
+    from src.forge.rule_engine import RuleSeverity
 
     engine = _make_engine()
     constraints = OutputConstraints(required_sections=["pricing", "testimonials"])
@@ -201,9 +195,8 @@ def test_required_sections_missing_is_soft():
 
 
 def test_reading_level_keywords_absent_is_soft():
-    from src.forge.rule_engine import RuleSeverity
-
     from src.forge.brief_schemas import OutputConstraints
+    from src.forge.rule_engine import RuleSeverity
 
     engine = _make_engine()
     constraints = OutputConstraints(
@@ -225,7 +218,6 @@ def test_ok_is_false_with_any_hard_violation():
 
 def test_evaluate_all_aggregates_per_channel():
     from src.forge.brief_schemas import Brief
-
     from src.forge.rule_engine import ChannelRuleEngine
 
     engine = ChannelRuleEngine(registry=_load_registry())
