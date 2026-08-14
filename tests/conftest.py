@@ -142,3 +142,98 @@ async def db_session():
     yield session
     await session.close()
     await engine.dispose()
+@pytest_asyncio.fixture
+async def forge_fake_provider() -> "FakeProvider":
+    """Canned-text LLM provider for content-forge P0-2 drafting tests.
+
+    ``FakeProvider`` never calls a real LLM: ``generate()`` returns the
+    configured canned text (default a short, rules-compliant copy) wrapped
+    in an ``LLMResponse``. Defined in this module so both the fixture and
+    direct construction inside tests share one implementation.
+    """
+    return FakeProvider()
+
+
+class FakeProvider:
+    """Deterministic stand-in for the LLM provider (P0-2 tests).
+
+    Returns the configured canned ``text`` for every call. The default text
+    is short enough to pass every channel char limit so drafting tests can
+    assert ``channel_rules_ok is True`` without an LLM.
+    """
+
+    def __init__(self, text: str | None = None) -> None:
+        self.text = text if text is not None else "Scalable platform launch. Sign up now."
+        self.calls: list[dict] = []
+
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> "LLMResponse":
+        """Record the call and return the canned text (async, spec-compliant)."""
+        from src.services.llm_provider import LLMResponse
+
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+        )
+        return LLMResponse(
+            text=self.text,
+            model_used=model or "fake-model",
+            tokens_prompt=0,
+            tokens_completion=len(self.text.split()),
+            latency_ms=0,
+        )
+
+
+class RecordingProvider:
+    """Provider that records the exact prompt/system-prompt per call.
+
+    Used to prove brand-voice injection: ``generate_drafts`` must pass a
+    system prompt containing the brand voice block when the brief carries a
+    ``brand_profile_id``. ``last_system_prompt`` exposes the most recent
+    value so tests can assert the injection happened.
+    """
+
+    def __init__(self, text: str | None = None) -> None:
+        self.text = text if text is not None else "Scalable platform launch. Sign up now."
+        self.calls: list[dict] = []
+        self.last_system_prompt: str | None = None
+
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> "LLMResponse":
+        """Record prompt + system prompt, then return the canned text."""
+        from src.services.llm_provider import LLMResponse
+
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+        )
+        self.last_system_prompt = system_prompt
+        return LLMResponse(
+            text=self.text,
+            model_used=model or "recording-model",
+            tokens_prompt=0,
+            tokens_completion=len(self.text.split()),
+            latency_ms=0,
+        )
